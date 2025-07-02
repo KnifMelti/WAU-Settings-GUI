@@ -30,7 +30,7 @@ Configure **WAU** settings after installation, including:
   - MSI transform creation
   - Configuration backup/import (i.e. for sharing settings)
 
-NB: Must be run as Administrator (initial `.lnk` in project and shortcut creation function has/sets the flag)!
+NB: Must be run as Administrator (shortcut creation function sets the flag)
 
 ### Installation
 - Extract `Install.cmd`, `WAU-Settings-GUI.ps1` and `config` to wherever you want to install **WAU Settings GUI**
