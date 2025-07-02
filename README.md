@@ -30,7 +30,7 @@ Configure **WAU** settings after installation, including:
   - MSI transform creation
   - Configuration backup/import (i.e. for sharing settings)
 
-NB: Must be run as Administrator!
+NB: Must be run as Administrator (initial `.lnk` in project and shortcut creation function sets the flag)!
 
 ### Screenshots
 Managed by Registry (local):  
