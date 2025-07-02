@@ -8,3 +8,5 @@
 You can manage shortcuts afterwards in **WAU Settings (Administrator)** itself.
 
 The icon for the shortcut when managed afterwards is fetched from the **GUID path** of the current installed version of **WAU** (%SystemRoot%\Installer\GUID).
+
+The files will survive an upgrade of **WAU**. 
