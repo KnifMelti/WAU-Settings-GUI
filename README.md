@@ -30,7 +30,7 @@ Configure **WAU** settings after installation, including:
   - MSI transform creation
   - Configuration backup/import (i.e. for sharing settings)
 
-NB: Must be run as Administrator (initial `.lnk` in project and shortcut creation function sets the flag)!
+NB: Must be run as Administrator (initial `.lnk` in project and shortcut creation function has/sets the flag)!
 
 ### Installation
 [README.md](https://github.com/KnifMelti/WAU-Settings-GUI/blob/main/Sources/WAU%20Settings%20GUI/README.md)
