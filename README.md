@@ -32,6 +32,9 @@ Configure **WAU** settings after installation, including:
 
 NB: Must be run as Administrator (initial `.lnk` in project and shortcut creation function sets the flag)!
 
+### Installation
+[README.md](https://github.com/KnifMelti/WAU-Settings-GUI/blob/main/Sources/WAU%20Settings%20GUI/README.md)
+
 ### Screenshots
 Managed by Registry (local):  
 ![image](https://github.com/user-attachments/assets/4017c461-da41-4b5f-8960-73d7db64224a)
