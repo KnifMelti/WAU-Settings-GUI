@@ -16,7 +16,7 @@ Configure **WAU** settings after installation, including:
 - Notification levels
 - Configuring list and mods paths
 - Additional options like running at logon, user context, etc.
-- Creating/removing shortcuts
+- Creating/deleting shortcuts
 - Managing log files
 - Starting WAU manually
 - Screenshot with masking functionality for documentation
@@ -38,7 +38,7 @@ NB: Must be run as Administrator (shortcut creation function sets the flag)
 - Run `Install.cmd`
   - Toggle the 'Start Menu shortcuts' option in the GUI and save settings
   - Retoggle it and save settings again (depending on your choice)
-- The 'WAU Settings GUI' shortcut is now created in Start Menu under 'Winget-AutoUpdate' folder or on your own desktop.
+- The 'WAU Settings (Administrator)' shortcut is now created in Start Menu under 'Winget-AutoUpdate' folder or on your own Desktop.
 - This first release uses the [2.5.2](https://github.com/Romanitho/Winget-AutoUpdate/releases/tag/v2.5.2) version of **WAU GUID path** for the icon
 
 ### Screenshots
