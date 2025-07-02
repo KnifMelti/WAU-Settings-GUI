@@ -41,8 +41,6 @@ NB: Must be run as Administrator (shortcut creation function sets the flag)
 - The 'WAU Settings GUI' shortcut is now created in Start Menu under 'Winget AutoUpdate' folder or on your own desktop.
 - This first release uses the [2.5.2](https://github.com/Romanitho/Winget-AutoUpdate/releases/tag/v2.5.2) version of **WAU GUID path** for the icon
 
-The icon for the shortcut when managed afterwards is fetched from the **GUID path** of the current installed version of **WAU** (%SystemRoot%\Installer\GUID).
-
 ### Screenshots
 Managed by Registry (local):  
 ![image](https://github.com/user-attachments/assets/fb4592b5-23cb-465f-bd7a-fc593f59164a)
