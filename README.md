@@ -2,7 +2,7 @@
 Provides a user-friendly interface to modify every aspect of **Winget-AutoUpdate** (**WAU**) settings.
 
 ### Dependencies
-This project depends on the following repositorie:
+This project depends on the following repository:
 - [Winget-AutoUpdate](https://github.com/Romanitho/Winget-AutoUpdate): Has all the settings handled by this project.
 
 ### Description
