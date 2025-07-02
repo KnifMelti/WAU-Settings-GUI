@@ -9,7 +9,7 @@ This project depends on the following repository:
 Significantly enhance **WAU's** usability for home users while maintaining enterprise-grade functionality.<br>
 Benefits from not having to manage the settings in several places when testing etc. (great for developers)...
 
-...a perfect companion for those supporting the community being able to ask for a screenshot of the settings because it now has everything in it (even a screenshot function with masking of sensitive data)!
+...a perfect companion for those supporting the community being able to ask for a screenshot of the settings because it now has everything in it (even a screenshot function with masking of maybe sensitive data)!
 
 Configure **WAU** settings after installation, including:
 - Update intervals and timing
@@ -19,7 +19,7 @@ Configure **WAU** settings after installation, including:
 - Creating/removing shortcuts
 - Managing log files
 - Starting WAU manually
-- Screenshot functionality for documentation
+- Screenshot with masking functionality for documentation
 - GPO management integration
 - Real-time status information display showing version details, last run times, and current configuration state
 - Developer tools for advanced troubleshooting:
