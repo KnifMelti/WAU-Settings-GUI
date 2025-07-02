@@ -1,5 +1,5 @@
 # WAU Settings GUI (for Winget-AutoUpdate)
-Provides a user-friendly stand-alone interface to modify every aspect of **Winget-AutoUpdate** (**WAU**) settings.
+Provides a user-friendly standalone interface to modify every aspect of Winget-AutoUpdate (WAU) settings
 
 ### Dependencies
 This project depends on the following repository:
