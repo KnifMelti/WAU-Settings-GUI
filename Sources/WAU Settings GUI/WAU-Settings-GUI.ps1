@@ -64,22 +64,6 @@ function Test-Administrator {
     $principal = New-Object Security.Principal.WindowsPrincipal($currentUser)
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
-function Hide-SensitiveText {
-    param(
-        [string]$originalText,
-        [int]$visibleChars = 5
-    )
-    
-    if ([string]::IsNullOrWhiteSpace($originalText) -or $originalText.Length -le ($visibleChars * 2)) {
-        return $originalText
-    }
-    
-    $start = $originalText.Substring(0, $visibleChars)
-    $end = $originalText.Substring($originalText.Length - $visibleChars)
-    $masked = "*" * [Math]::Max(1, $originalText.Length - ($visibleChars * 2))
-    
-    return "$start$masked$end"
-}
 Function Start-PopUp ($Message) {
 
     if (!$PopUpWindow) {
@@ -550,7 +534,7 @@ function Set-WAUConfig {
                     Add-Shortcut "$Script:STARTMENU_WAU_DIR\Run WAU.lnk" $Script:CONHOST_EXE "$($currentConfig.InstallLocation)" "$Script:POWERSHELL_ARGS `"$($currentConfig.InstallLocation)$Script:USER_RUN_SCRIPT`"" "$Script:WAU_ICON" "Run Winget AutoUpdate" "Normal"
                     Add-Shortcut "$Script:STARTMENU_WAU_DIR\Open Logs.lnk" "$($currentConfig.InstallLocation)logs" "" "" "" "Open WAU Logs" "Normal"
                     Add-Shortcut "$Script:STARTMENU_WAU_DIR\WAU App Installer.lnk" $Script:CONHOST_EXE "$($currentConfig.InstallLocation)" "$Script:POWERSHELL_ARGS `"$($currentConfig.InstallLocation)WAU-Installer-GUI.ps1`"" "$Script:WAU_ICON" "Search for and Install WinGet Apps, etc..." "Normal"
-                    Add-Shortcut "$Script:STARTMENU_WAU_DIR\$Script:WAU_TITLE.lnk" $Script:CONHOST_EXE "$($currentConfig.InstallLocation)" "$Script:POWERSHELL_ARGS `"$($currentConfig.InstallLocation)WAU-Settings-GUI.ps1`"" "$Script:WAU_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
+                    Add-Shortcut "$Script:STARTMENU_WAU_DIR\$Script:WAU_TITLE.lnk" $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$($Script:WorkingDir.TrimEnd('\'))\WAU-Settings-GUI.ps1`"" "$Script:WAU_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
                 }
                 else {
                     if (Test-Path $Script:STARTMENU_WAU_DIR) {
@@ -559,7 +543,7 @@ function Set-WAUConfig {
                     
                     # Create desktop shortcut for WAU Settings if Start Menu shortcuts are removed
                     if (-not (Test-Path $Script:DESKTOP_WAU_SETTINGS)) {
-                        Add-Shortcut $Script:DESKTOP_WAU_SETTINGS $Script:CONHOST_EXE "$($currentConfig.InstallLocation)" "$Script:POWERSHELL_ARGS `"$($currentConfig.InstallLocation)WAU-Settings-GUI.ps1`"" "$Script:WAU_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
+                        Add-Shortcut $Script:DESKTOP_WAU_SETTINGS $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$($Script:WorkingDir.TrimEnd('\'))\WAU-Settings-GUI.ps1`"" "$Script:WAU_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
                     }
                 }
             }
@@ -963,6 +947,34 @@ function Start-WAUManually {
 }
 
 # 4. GUI helper functions (depends on config functions)
+function Hide-SensitiveText {
+    param(
+        [string]$originalText,
+        [int]$visibleChars = 5
+    )
+    
+    if ([string]::IsNullOrWhiteSpace($originalText) -or $originalText.Length -le ($visibleChars * 2)) {
+        return $originalText
+    }
+    
+    $start = $originalText.Substring(0, $visibleChars)
+    $end = $originalText.Substring($originalText.Length - $visibleChars)
+    $masked = "*" * [Math]::Max(1, $originalText.Length - ($visibleChars * 2))
+    
+    return "$start$masked$end"
+}
+function Get-ColoredStatusText {
+    param(
+        [string]$label, 
+        [bool]$enabled, 
+        [string]$enabledText = "Enabled", 
+        [string]$disabledText = "Disabled"
+    )
+    
+    $color = if ($enabled) { $Script:COLOR_ENABLED } else { $Script:COLOR_DISABLED }
+    $status = if ($enabled) { $enabledText } else { $disabledText }
+    return "{0}: <Run Foreground='{1}'>{2}</Run>" -f $label, $color, $status
+}
 function Test-ValidPathCharacter {
     param([string]$text, [string]$currentTextBoxValue = "")
     
@@ -1542,13 +1554,6 @@ function Update-WAUGUIFromConfig {
     $wauPreReleaseEnabled = [bool](Get-DisplayValue -PropertyName "WAU_UpdatePrerelease" -Config $updatedConfig -Policies $updatedPolicies)
     $wauActivateGPOManagementEnabled = ($updatedPolicies.WAU_ActivateGPOManagement -eq 1)
     $wauRunGPOManagementEnabled = ($updatedConfig.WAU_RunGPOManagement -eq 1)
-
-    # Helper function to colorize status text
-    function Get-ColoredStatusText($label, $enabled, $enabledText = "Enabled", $disabledText = "Disabled") {
-        $color = if ($enabled) { $Script:COLOR_ENABLED } else { $Script:COLOR_DISABLED }
-        $status = if ($enabled) { $enabledText } else { $disabledText }
-        return "{0}: <Run Foreground='{1}'>{2}</Run>" -f $label, $color, $status
-    }
 
     # Compose colored status text using Inlines (for TextBlock with Inlines)
     $statusText = @(

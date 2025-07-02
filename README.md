@@ -33,18 +33,15 @@ Configure **WAU** settings after installation, including:
 NB: Must be run as Administrator (initial `.lnk` in project and shortcut creation function has/sets the flag)!
 
 ### Installation
-- Extract `WAU-Settings-GUI.ps1` and `config` to **WAU** installation directory (usually "%ProgramFiles%\Winget-AutoUpdate")
-- The shortcut can be placed anywhere, for example in the Start Menu of **WAU**:
-  -  "%ProgramData%\Microsoft\Windows\Start Menu\Programs\Winget-AutoUpdate"
-- Change the shortcut properties if **WAU** installation directory differs from standard location
+- Extract `Install.cmd`, `WAU-Settings-GUI.ps1` and `config` to wherever you want to install **WAU Settings GUI**
+- Don't place them in the **WAU** installation directory, as this will be overwritten on updates.
+- Run `Install.cmd`
+  - Toggle the 'Start Menu shortcuts' option in the GUI and save settings
+  - Retoggle it and save settings again (depending on your choice)
+- The 'WAU Settings GUI' shortcut is now created in Start Menu under 'Winget AutoUpdate' folder or on your own desktop.
 - This first release uses the [2.5.2](https://github.com/Romanitho/Winget-AutoUpdate/releases/tag/v2.5.2) version of **WAU GUID path** for the icon
 
-You can manage shortcuts afterwards in **WAU Settings (Administrator)** itself.
-
 The icon for the shortcut when managed afterwards is fetched from the **GUID path** of the current installed version of **WAU** (%SystemRoot%\Installer\GUID).
-
-The files/shortcut will survive an upgrade of **WAU** (except the **XAML** files under **config** - will release this as completely stand-alone soon). 
-
 
 ### Screenshots
 Managed by Registry (local):  
