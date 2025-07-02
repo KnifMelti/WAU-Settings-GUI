@@ -28,11 +28,14 @@ Provides a user-friendly interface to modify every aspect of **WAU** settings in
 NB: Must be run as Administrator!
 
 Managed by Registry (local):  
-![image](https://github.com/user-attachments/assets/75dc97ba-72b2-429a-b277-dcdb2e702213)
+![image](https://github.com/user-attachments/assets/4017c461-da41-4b5f-8960-73d7db64224a)
+
 
 Dev Tools (F12):  
-![image](https://github.com/user-attachments/assets/c085497f-3068-45c3-9bc1-50c0d61965ae)
+![image](https://github.com/user-attachments/assets/4548193c-76aa-4c70-ab07-77bee285d570)
+
 
 Managed by GPO (central/local):  
-![image](https://github.com/user-attachments/assets/c5b811ce-a6f9-46a6-b6f9-0d74adea8ca6)
+![image](https://github.com/user-attachments/assets/1cd6706b-b08f-45ce-8756-728c898317fc)
+
 
