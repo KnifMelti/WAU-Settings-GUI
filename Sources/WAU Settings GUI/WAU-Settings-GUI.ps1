@@ -112,7 +112,7 @@ Function Close-PopUp {
         $Script:PopUpWindow = $null
     }
 }
-function Add-Shortcut ($Shortcut, $Target, $StartIn, $Arguments, $Icon, $Description, $WindowStyle = "Normal") {
+function Add-Shortcut ($Shortcut, $Target, $StartIn, $Arguments, $Icon, $Description, $WindowStyle = "Normal", $RunAsAdmin = $false) {
     $WScriptShell = New-Object -ComObject WScript.Shell
     $ShortcutObj = $WScriptShell.CreateShortcut($Shortcut)
     $ShortcutObj.TargetPath = $Target
@@ -130,6 +130,20 @@ function Add-Shortcut ($Shortcut, $Target, $StartIn, $Arguments, $Icon, $Descrip
         default     { $ShortcutObj.WindowStyle = 1 }
     }
     $ShortcutObj.Save()
+
+    # Set "Run as administrator" flag if requested
+    if ($RunAsAdmin) {
+        try {
+            $bytes = [System.IO.File]::ReadAllBytes($Shortcut)
+            # The "Run as administrator" flag is at byte offset 21 (0x15)
+            # Set bit 5 (0x20) to enable "Run as administrator"
+            $bytes[21] = $bytes[21] -bor 0x20
+            [System.IO.File]::WriteAllBytes($Shortcut, $bytes)
+        }
+        catch {
+            Write-Warning "Failed to set 'Run as administrator' flag for shortcut: $($_.Exception.Message)"
+        }
+    }
 
     [System.Runtime.Interopservices.Marshal]::ReleaseComObject($ShortcutObj) | Out-Null
     [System.Runtime.Interopservices.Marshal]::ReleaseComObject($WScriptShell) | Out-Null
@@ -536,7 +550,7 @@ function Set-WAUConfig {
                     Add-Shortcut "$Script:STARTMENU_WAU_DIR\Run WAU.lnk" $Script:CONHOST_EXE "$($currentConfig.InstallLocation)" "$Script:POWERSHELL_ARGS `"$($currentConfig.InstallLocation)$Script:USER_RUN_SCRIPT`"" "$Script:WAU_ICON" "Run Winget AutoUpdate" "Normal"
                     Add-Shortcut "$Script:STARTMENU_WAU_DIR\Open Logs.lnk" "$($currentConfig.InstallLocation)logs" "" "" "" "Open WAU Logs" "Normal"
                     Add-Shortcut "$Script:STARTMENU_WAU_DIR\WAU App Installer.lnk" $Script:CONHOST_EXE "$($currentConfig.InstallLocation)" "$Script:POWERSHELL_ARGS `"$($currentConfig.InstallLocation)WAU-Installer-GUI.ps1`"" "$Script:WAU_ICON" "Search for and Install WinGet Apps, etc..." "Normal"
-                    Add-Shortcut "$Script:STARTMENU_WAU_DIR\$Script:WAU_TITLE.lnk" $Script:CONHOST_EXE "$($currentConfig.InstallLocation)" "$Script:POWERSHELL_ARGS `"$($currentConfig.InstallLocation)WAU-Settings-GUI.ps1`"" "$Script:WAU_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal"
+                    Add-Shortcut "$Script:STARTMENU_WAU_DIR\$Script:WAU_TITLE.lnk" $Script:CONHOST_EXE "$($currentConfig.InstallLocation)" "$Script:POWERSHELL_ARGS `"$($currentConfig.InstallLocation)WAU-Settings-GUI.ps1`"" "$Script:WAU_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
                 }
                 else {
                     if (Test-Path $Script:STARTMENU_WAU_DIR) {
@@ -545,7 +559,7 @@ function Set-WAUConfig {
                     
                     # Create desktop shortcut for WAU Settings if Start Menu shortcuts are removed
                     if (-not (Test-Path $Script:DESKTOP_WAU_SETTINGS)) {
-                        Add-Shortcut $Script:DESKTOP_WAU_SETTINGS $Script:CONHOST_EXE "$($currentConfig.InstallLocation)" "$Script:POWERSHELL_ARGS `"$($currentConfig.InstallLocation)WAU-Settings-GUI.ps1`"" "$Script:WAU_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal"
+                        Add-Shortcut $Script:DESKTOP_WAU_SETTINGS $Script:CONHOST_EXE "$($currentConfig.InstallLocation)" "$Script:POWERSHELL_ARGS `"$($currentConfig.InstallLocation)WAU-Settings-GUI.ps1`"" "$Script:WAU_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
                     }
                 }
             }
