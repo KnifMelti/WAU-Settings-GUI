@@ -1,12 +1,17 @@
-# WAU Settings GUI (for [Winget-AutoUpdate](https://github.com/Romanitho/Winget-AutoUpdate))
+# WAU Settings GUI (for Winget-AutoUpdate)
 Provides a user-friendly interface to modify every aspect of **Winget-AutoUpdate** (**WAU**) settings.
 
+### Dependencies
+This project depends on the following repositorie:
+- [Winget-AutoUpdate](https://github.com/Romanitho/Winget-AutoUpdate): Has all the settings handled by this project.
+
+### Description
 Significantly enhance **WAU's** usability for home users while maintaining enterprise-grade functionality.<br>
 Benefits from not having to manage the settings in several places when testing etc. (perfect for developers)...
 
 ...a perfect companion for those supporting the community being able to ask for a screenshot of the settings because it now has everything in it (even a screenshot function)!
 
-Provides a user-friendly interface to modify every aspect of **WAU** settings including:
+Configure **WAU** settings after installation, including:
 - Update intervals and timing
 - Notification levels
 - Configuring list and mods paths
@@ -27,6 +32,7 @@ Provides a user-friendly interface to modify every aspect of **WAU** settings in
 
 NB: Must be run as Administrator!
 
+### Screenshots
 Managed by Registry (local):  
 ![image](https://github.com/user-attachments/assets/4017c461-da41-4b5f-8960-73d7db64224a)
 
