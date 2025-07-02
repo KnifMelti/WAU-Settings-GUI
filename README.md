@@ -48,7 +48,8 @@ The files/shortcut will survive an upgrade of **WAU**.
 
 ### Screenshots
 Managed by Registry (local):  
-![image](https://github.com/user-attachments/assets/4017c461-da41-4b5f-8960-73d7db64224a)
+![image](https://github.com/user-attachments/assets/5548f4ef-ac76-4882-99af-e103a18c5b4b)
+
 
 
 Dev Tools (F12):  
