@@ -50,11 +50,8 @@ The files/shortcut will survive an upgrade of **WAU**.
 Managed by Registry (local):  
 ![image](https://github.com/user-attachments/assets/5548f4ef-ac76-4882-99af-e103a18c5b4b)
 
-
-
 Dev Tools (F12):  
 ![image](https://github.com/user-attachments/assets/4548193c-76aa-4c70-ab07-77bee285d570)
-
 
 Managed by GPO (central/local):  
 ![image](https://github.com/user-attachments/assets/1cd6706b-b08f-45ce-8756-728c898317fc)
