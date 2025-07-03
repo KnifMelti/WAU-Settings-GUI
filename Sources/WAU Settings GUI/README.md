@@ -4,4 +4,4 @@
 - Run `Install.cmd`
   - Toggle the **☐|☑ Start Menu shortcuts** option in the GUI and save settings
   - Retoggle **☑|☐** and save settings again (depending on your choice)
-- The **WAU Settings (Administrator)** shortcut has now been created under **Start Menu\Programs\Winget-AutoUpdate** folder or on your own **Desktop**.
+- The **WAU Settings (Administrator)** shortcut has now been created under **Start Menu\Programs\Winget-AutoUpdate** folder (along with the other **WAU** shortcuts) or on your own **Desktop**.
