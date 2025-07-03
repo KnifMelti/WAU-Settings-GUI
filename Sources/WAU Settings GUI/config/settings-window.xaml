@@ -48,7 +48,7 @@
                 <Button x:Name="DevGUIDButton" Content="[guid]" Width="36" Height="25" Visibility="Collapsed" Margin="0,0,3,0"
                     ToolTip="open the 'GUID path' to registry/installer folder"/>
                 <Button x:Name="DevSysButton" Content="[sys]" Width="36" Height="25" Visibility="Collapsed" Margin="0,0,3,0"
-                    ToolTip="open the list of current installed 'WinGet' system apps"/>
+                    ToolTip="open the list of current 'WinGet' system wide installed applications"/>
                 <Button x:Name="DevListButton" Content="[list]" Width="36" Height="25" Visibility="Collapsed" Margin="0,0,3,0"
                     ToolTip="open the current local list"/>
                 <Button x:Name="DevMSIButton" Content="[msi]" Width="36" Height="25" Visibility="Collapsed" Margin="0,0,3,0"

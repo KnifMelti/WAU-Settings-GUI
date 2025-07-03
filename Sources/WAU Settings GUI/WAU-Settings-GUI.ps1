@@ -2221,7 +2221,7 @@ function Show-WAUSettingsGUI {
     # Dev button event handlers
     $controls.DevTaskButton.Add_Click({
         try {
-            Start-PopUp "Task Scheduler opening, look in WAU folder..."
+            Start-PopUp "Task scheduler opening, look in WAU folder..."
             # Open Task Scheduler
             $taskschdPath = "$env:SystemRoot\system32\taskschd.msc"
             Start-Process $taskschdPath
@@ -2246,7 +2246,7 @@ function Show-WAUSettingsGUI {
 
     $controls.DevRegButton.Add_Click({
         try {
-            Start-PopUp "WAU Registry opening..."
+            Start-PopUp "WAU registry opening..."
             # Open Registry Editor and navigate to WAU registry key
             $regPath = "HKEY_LOCAL_MACHINE\SOFTWARE\Romanitho\Winget-AutoUpdate"
             
@@ -2276,7 +2276,7 @@ function Show-WAUSettingsGUI {
 
     $controls.DevGUIDButton.Add_Click({
         try {
-            Start-PopUp "WAU GUID Paths opening..."
+            Start-PopUp "WAU GUID paths opening..."
             # Open Registry Editor and navigate to WAU Installation GUID registry key
             $GUIDPath = "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\${Script:WAU_GUID}"
 	    
@@ -2314,10 +2314,10 @@ function Show-WAUSettingsGUI {
 
             $systemFile = Join-Path $installdir 'config\winget_system_apps.txt'
             if (Test-Path $systemFile) {
-                Start-PopUp "WinGet current installed System Apps List opening..."
+                Start-PopUp "WinGet current list of system wide installed apps opening..."
                 Start-Process "explorer.exe" -ArgumentList $systemFile
             } else {
-                [System.Windows.MessageBox]::Show("No current List of WinGet System Apps found", "File Not Found", "OK", "Warning")
+                [System.Windows.MessageBox]::Show("No current list of WinGet system wide installed apps found", "File Not Found", "OK", "Warning")
                 return
             }
 
@@ -2354,23 +2354,23 @@ function Show-WAUSettingsGUI {
             if ($updatedConfig.WAU_UseWhiteList -eq 1 -or $updatedPolicies.WAU_UseWhiteList -eq 1) {
                 $whiteListFile = Join-Path $installdir 'included_apps.txt'
                 if (Test-Path $whiteListFile) {
-                    Start-PopUp "WAU Included Apps List opening..."
+                    Start-PopUp "WAU included apps list opening..."
                     Start-Process "explorer.exe" -ArgumentList $whiteListFile
                 } else {
-                    [System.Windows.MessageBox]::Show("No Included Apps List found ('included_apps.txt')", "File Not Found", "OK", "Warning")
+                    [System.Windows.MessageBox]::Show("No included apps list found ('included_apps.txt')", "File Not Found", "OK", "Warning")
                     return
                 }
             } else {
                 $excludedFile = Join-Path $installdir 'excluded_apps.txt'
                 $defaultExcludedFile = Join-Path $installdir 'config\default_excluded_apps.txt'
                 if (Test-Path $excludedFile) {
-                    Start-PopUp "WAU Excluded Apps List opening..."
+                    Start-PopUp "WAU excluded apps list opening..."
                     Start-Process "explorer.exe" -ArgumentList $excludedFile
                 } elseif (Test-Path $defaultExcludedFile) {
-                    Start-PopUp "WAU Default Excluded Apps List opening..."
+                    Start-PopUp "WAU default excluded apps List opening..."
                     Start-Process "explorer.exe" -ArgumentList $defaultExcludedFile
                 } else {
-                    [System.Windows.MessageBox]::Show("No Excluded Apps List found (neither 'excluded_apps.txt' nor 'config\default_excluded_apps.txt').", "File Not Found", "OK", "Warning")
+                    [System.Windows.MessageBox]::Show("No excluded apps list found (neither 'excluded_apps.txt' nor 'config\default_excluded_apps.txt').", "File Not Found", "OK", "Warning")
                     return
                 }
             }
