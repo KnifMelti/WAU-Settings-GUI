@@ -44,15 +44,17 @@
                 <Button x:Name="DevTaskButton" Content="[task]" Width="36" Height="25" Visibility="Collapsed" Margin="0,0,3,0"
                     ToolTip="open the task scheduler"/>
                 <Button x:Name="DevRegButton" Content="[reg]" Width="36" Height="25" Visibility="Collapsed" Margin="0,0,3,0"
-                    ToolTip="open the WAU settings path in registry"/>
+                    ToolTip="open the 'WAU' settings path in registry"/>
                 <Button x:Name="DevGUIDButton" Content="[guid]" Width="36" Height="25" Visibility="Collapsed" Margin="0,0,3,0"
-                    ToolTip="open the GUID path to registry/installer folder"/>
+                    ToolTip="open the 'GUID path' to registry/installer folder"/>
+                <Button x:Name="DevSysButton" Content="[sys]" Width="36" Height="25" Visibility="Collapsed" Margin="0,0,3,0"
+                    ToolTip="open the list of current installed 'WinGet' system apps"/>
                 <Button x:Name="DevListButton" Content="[list]" Width="36" Height="25" Visibility="Collapsed" Margin="0,0,3,0"
                     ToolTip="open the current local list"/>
                 <Button x:Name="DevMSIButton" Content="[msi]" Width="36" Height="25" Visibility="Collapsed" Margin="0,0,3,0"
-                    ToolTip="create a transform file for 'WAU.msi' using the current visible settings"/>
+                    ToolTip="create a transform file for 'WAU.msi' using the current showing settings"/>
                 <Button x:Name="DevCfgButton" Content="[cfg]" Width="36" Height="25" Visibility="Collapsed" Margin="0,0,0,0"
-                    ToolTip="backup current &amp; import WAU settings file"/>
+                    ToolTip="backup current &amp; import 'WAU' settings file"/>
             </StackPanel>
         </Grid>
     </GroupBox>

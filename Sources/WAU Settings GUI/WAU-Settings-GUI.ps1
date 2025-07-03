@@ -1195,7 +1195,7 @@ function Set-ControlsState {
 
     $alwaysEnabledControls = @(
         'ScreenshotButton', 'SaveButton', 'CancelButton', 'RunNowButton', 'OpenLogsButton',
-        'DevTaskButton', 'DevRegButton', 'DevGUIDButton', 'DevListButton', 'DevMSIButton'
+        'DevTaskButton', 'DevRegButton', 'DevGUIDButton', 'DevSysButton', 'DevListButton', 'DevMSIButton'
     )
 
     function Get-Children($control) {
@@ -1986,6 +1986,7 @@ function Set-DevToolsVisibility {
         $controls.DevTaskButton.Visibility = 'Visible'
         $controls.DevRegButton.Visibility = 'Visible'
         $controls.DevGUIDButton.Visibility = 'Visible'
+        $controls.DevSysButton.Visibility = 'Visible'
         $controls.DevListButton.Visibility = 'Visible'
         $controls.DevMSIButton.Visibility = 'Visible'
         $controls.DevCfgButton.Visibility = 'Visible'
@@ -1995,6 +1996,7 @@ function Set-DevToolsVisibility {
         $controls.DevTaskButton.Visibility = 'Collapsed'
         $controls.DevRegButton.Visibility = 'Collapsed'
         $controls.DevGUIDButton.Visibility = 'Collapsed'
+        $controls.DevSysButton.Visibility = 'Collapsed'
         $controls.DevListButton.Visibility = 'Collapsed'
         $controls.DevMSIButton.Visibility = 'Collapsed'
         $controls.DevCfgButton.Visibility = 'Collapsed'
@@ -2301,6 +2303,39 @@ function Show-WAUSettingsGUI {
         catch {
             Close-PopUp
             [System.Windows.MessageBox]::Show("Failed to open GUID Paths: $($_.Exception.Message)", "Error", "OK", "Error")
+        }
+    })
+    
+    $controls.DevSysButton.Add_Click({
+        try {
+            # Get updated config
+            $updatedConfig = Get-WAUCurrentConfig
+            $installdir = $updatedConfig.InstallLocation
+
+            $systemFile = Join-Path $installdir 'config\winget_system_apps.txt'
+            if (Test-Path $systemFile) {
+                Start-PopUp "WinGet current installed System Apps List opening..."
+                Start-Process "explorer.exe" -ArgumentList $systemFile
+            } else {
+                [System.Windows.MessageBox]::Show("No Excluded Apps List found (neither 'excluded_apps.txt' nor 'config\default_excluded_apps.txt').", "File Not Found", "OK", "Warning")
+                return
+            }
+
+            # Update status to "Done"
+            $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
+            $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED
+            
+            # Create timer to reset status back to ready after standard wait time
+            $window.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Background, [Action]{
+                Start-Sleep -Milliseconds $Script:WAIT_TIME
+                $controls.StatusBarText.Text = "$Script:STATUS_READY_TEXT"
+                $controls.StatusBarText.Foreground = "$Script:COLOR_INACTIVE"
+                Close-PopUp
+            }) | Out-Null
+        }
+        catch {
+            Close-PopUp
+            [System.Windows.MessageBox]::Show("Failed to open List: $($_.Exception.Message)", "Error", "OK", "Error")
         }
     })
 
