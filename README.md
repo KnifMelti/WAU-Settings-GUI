@@ -46,12 +46,12 @@ NB: Must be run as Administrator (shortcut creation sets the flag)
 
 ### Screenshots
 Managed by Registry (local):  
-![image](https://github.com/user-attachments/assets/fb4592b5-23cb-465f-bd7a-fc593f59164a)
+![image](https://github.com/KnifMelti/WAU-Settings-GUI/blob/0470349fc9dd7ea4d5f280835246434239899be6/Sources/assets/Screenshot_Local.png)
 
 Dev Tools (F12):  
-![image](https://github.com/user-attachments/assets/859438ca-d4bc-4883-9a9f-eeb0b996c6ad)
+![image](https://github.com/KnifMelti/WAU-Settings-GUI/blob/0470349fc9dd7ea4d5f280835246434239899be6/Sources/assets/Screenshot_F12.png)
 
 Managed by GPO (central/local):  
-![image](https://github.com/user-attachments/assets/1cd6706b-b08f-45ce-8756-728c898317fc)
+![image](https://github.com/KnifMelti/WAU-Settings-GUI/blob/0470349fc9dd7ea4d5f280835246434239899be6/Sources/assets/Screenshot_GPO.png)
 
 
