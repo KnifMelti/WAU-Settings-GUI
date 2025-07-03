@@ -33,7 +33,7 @@ Configure **WAU** settings after installation, including:
 NB: Must be run as Administrator (shortcut creation function sets the flag)
 
 ### Installation
-- Extract `Install.cmd`, `WAU-Settings-GUI.ps1` and `config` to wherever you want to install **WAU Settings GUI**
+- Extract `Install.cmd`, `WAU-Settings-GUI.ps1` and `config` to wherever you want to run **WAU Settings GUI** from
 - Don't place them in the **WAU** installation directory, as this will be overwritten on updates.
 - Run `Install.cmd`
   - Toggle the 'Start Menu shortcuts' option in the GUI and save settings
