@@ -1,4 +1,4 @@
-<img src="Sources/assets/WAU%20Settings%20GUI.png" alt="WAU Settings GUI" width="128" align="right">
+<img src="Sources/assets/WAU%20Settings%20GUI.png" alt="WAU Settings GUI" width="128" align="right"><br><br>
 
 # WAU Settings GUI (for Winget-AutoUpdate)
 
