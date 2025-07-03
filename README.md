@@ -1,4 +1,4 @@
-<img src="https://github.com/KnifMelti/WAU-Settings-GUI/blob/5a5372bda716890ed9f5ce1e4ef5fa7fb9a7dba9/Sources/assets/WAU%20Settings%20GUI.png" alt="WAU Settings GUI" width="128" align="right">
+<img src="Sources/assets/WAU%20Settings%20GUI.png" alt="WAU Settings GUI" width="128" align="right">
 
 # WAU Settings GUI (for Winget-AutoUpdate)
 
@@ -46,12 +46,12 @@ NB: Must be run as Administrator (shortcut creation sets the flag)
 
 ### Screenshots
 Managed by Registry (local):  
-![image](https://github.com/KnifMelti/WAU-Settings-GUI/blob/0470349fc9dd7ea4d5f280835246434239899be6/Sources/assets/Screenshot_Local.png)
+![image](Sources/assets/Screenshot_Local.png)
 
 Dev Tools (F12):  
-![image](https://github.com/KnifMelti/WAU-Settings-GUI/blob/0470349fc9dd7ea4d5f280835246434239899be6/Sources/assets/Screenshot_F12.png)
+![image](Sources/assets/Screenshot_F12.png)
 
 Managed by GPO (central/local):  
-![image](https://github.com/KnifMelti/WAU-Settings-GUI/blob/0470349fc9dd7ea4d5f280835246434239899be6/Sources/assets/Screenshot_GPO.png)
+![image](Sources/assets/Screenshot_GPO.png)
 
 
