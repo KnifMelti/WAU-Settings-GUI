@@ -2317,7 +2317,7 @@ function Show-WAUSettingsGUI {
                 Start-PopUp "WinGet current installed System Apps List opening..."
                 Start-Process "explorer.exe" -ArgumentList $systemFile
             } else {
-                [System.Windows.MessageBox]::Show("No Excluded Apps List found (neither 'excluded_apps.txt' nor 'config\default_excluded_apps.txt').", "File Not Found", "OK", "Warning")
+                [System.Windows.MessageBox]::Show("No current List of WinGet System Apps found", "File Not Found", "OK", "Warning")
                 return
             }
 
