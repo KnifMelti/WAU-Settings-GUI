@@ -73,7 +73,7 @@ Function Start-PopUp ($Message) {
         #Read the form
         $Reader = (New-Object System.Xml.XmlNodeReader $XAML)
         $Script:PopUpWindow = [Windows.Markup.XamlReader]::Load($Reader)
-        $PopUpWindow.Icon = $Script:WAU_ICON
+        $PopUpWindow.Icon = $Script:GUI_ICON
 
         # Make sure window stays on top (redundant, but ensures behavior)
         $PopUpWindow.Topmost = $true
@@ -534,7 +534,7 @@ function Set-WAUConfig {
                     Add-Shortcut "$Script:STARTMENU_WAU_DIR\Run WAU.lnk" $Script:CONHOST_EXE "$($currentConfig.InstallLocation)" "$Script:POWERSHELL_ARGS `"$($currentConfig.InstallLocation)$Script:USER_RUN_SCRIPT`"" "$Script:WAU_ICON" "Run Winget AutoUpdate" "Normal"
                     Add-Shortcut "$Script:STARTMENU_WAU_DIR\Open Logs.lnk" "$($currentConfig.InstallLocation)logs" "" "" "" "Open WAU Logs" "Normal"
                     Add-Shortcut "$Script:STARTMENU_WAU_DIR\WAU App Installer.lnk" $Script:CONHOST_EXE "$($currentConfig.InstallLocation)" "$Script:POWERSHELL_ARGS `"$($currentConfig.InstallLocation)WAU-Installer-GUI.ps1`"" "$Script:WAU_ICON" "Search for and Install WinGet Apps, etc..." "Normal"
-                    Add-Shortcut "$Script:STARTMENU_WAU_DIR\$Script:WAU_TITLE.lnk" $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$($Script:WorkingDir.TrimEnd('\'))\WAU-Settings-GUI.ps1`"" "$Script:WAU_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
+                    Add-Shortcut "$Script:STARTMENU_WAU_DIR\$Script:WAU_TITLE.lnk" $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$($Script:WorkingDir.TrimEnd('\'))\WAU-Settings-GUI.ps1`"" "$Script:GUI_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
                 }
                 else {
                     if (Test-Path $Script:STARTMENU_WAU_DIR) {
@@ -543,7 +543,7 @@ function Set-WAUConfig {
                     
                     # Create desktop shortcut for WAU Settings if Start Menu shortcuts are removed
                     if (-not (Test-Path $Script:DESKTOP_WAU_SETTINGS)) {
-                        Add-Shortcut $Script:DESKTOP_WAU_SETTINGS $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$($Script:WorkingDir.TrimEnd('\'))\WAU-Settings-GUI.ps1`"" "$Script:WAU_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
+                        Add-Shortcut $Script:DESKTOP_WAU_SETTINGS $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$($Script:WorkingDir.TrimEnd('\'))\WAU-Settings-GUI.ps1`"" "$Script:GUI_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
                     }
                 }
             }
@@ -2091,7 +2091,7 @@ function Show-WAUSettingsGUI {
     [xml]$xamlXML = $Script:WINDOW_XAML -replace 'x:N', 'N'
     $reader = (New-Object System.Xml.XmlNodeReader $xamlXML)
     $window = [Windows.Markup.XamlReader]::Load($reader)
-    $window.Icon = $Script:WAU_ICON
+    $window.Icon = $Script:GUI_ICON
     
     # Get controls
     $controls = @{}
@@ -2637,6 +2637,26 @@ if (Test-Path $wauIconPath) {
         $fs.Close()
     }
     $Script:WAU_ICON = $iconDest
+}
+
+# Set WAU Settings GUI icon
+$guiIconPath = "$($Script:WorkingDir.TrimEnd('\'))\config\WAU Settings GUI.ico"
+if (Test-Path $guiIconPath) {
+    $Script:GUI_ICON = $guiIconPath
+} else {
+    # If missing, fallback and extract icon from PowerShell.exe and save as icon.ico in SYSTEM TEMP
+    $iconSource = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
+    $systemTemp = [System.Environment]::GetEnvironmentVariable("TEMP", [System.EnvironmentVariableTarget]::Machine)
+    if (-not $systemTemp) { $systemTemp = "$env:SystemRoot\Temp" }
+    $iconDest = Join-Path $systemTemp "icon.ico"
+    # Only extract if the icon doesn't already exist
+    if (-not (Test-Path $iconDest)) {
+        $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($iconSource)
+        $fs = [System.IO.File]::Open($iconDest, [System.IO.FileMode]::Create)
+        $icon.Save($fs)
+        $fs.Close()
+    }
+    $Script:GUI_ICON = $iconDest
 }
 
 #Pop "Starting..."
