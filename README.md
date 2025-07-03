@@ -1,4 +1,4 @@
-<img src="https://github.com/user-attachments/assets/d274271f-aaba-4079-b896-c4eb39e80151" alt="WAU Settings GUI" width="128" align="right">
+<img src="https://github.com/KnifMelti/WAU-Settings-GUI/blob/5a5372bda716890ed9f5ce1e4ef5fa7fb9a7dba9/Sources/assets/WAU%20Settings%20GUI.png" alt="WAU Settings GUI" width="128" align="right">
 
 # WAU Settings GUI (for Winget-AutoUpdate)
 
