@@ -46,7 +46,7 @@ Managed by Registry (local):
 ![image](https://github.com/user-attachments/assets/fb4592b5-23cb-465f-bd7a-fc593f59164a)
 
 Dev Tools (F12):  
-![image](https://github.com/user-attachments/assets/4548193c-76aa-4c70-ab07-77bee285d570)
+![image](https://github.com/user-attachments/assets/859438ca-d4bc-4883-9a9f-eeb0b996c6ad)
 
 Managed by GPO (central/local):  
 ![image](https://github.com/user-attachments/assets/1cd6706b-b08f-45ce-8756-728c898317fc)
