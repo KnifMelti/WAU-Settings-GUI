@@ -1,4 +1,7 @@
+<img src="https://github.com/user-attachments/assets/d274271f-aaba-4079-b896-c4eb39e80151" alt="WAU Settings GUI" width="128" align="right">
+
 # WAU Settings GUI (for Winget-AutoUpdate)
+
 Provides a user-friendly standalone interface to modify every aspect of Winget-AutoUpdate (**WAU**) settings
 
 ### Dependencies
