@@ -1171,7 +1171,7 @@ function Update-StatusDisplay {
     if ($interval -eq "Never") {
         $controls.StatusText.Text = "Disabled"
         $controls.StatusText.Foreground = "Red"
-        $controls.StatusDescription.Text = "WAU will not check for updates when disabled"
+        $controls.StatusDescription.Text = "WAU will not check for updates"
         $controls.UpdateTimeHourComboBox.IsEnabled = $false
         $controls.UpdateTimeMinuteComboBox.IsEnabled = $false
         $controls.RandomDelayHourComboBox.IsEnabled = $false
