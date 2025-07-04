@@ -200,8 +200,93 @@ function Get-WAUCurrentConfig {
         return $config
     }
     catch {
-        [System.Windows.MessageBox]::Show("WAU configuration not found. Please ensure WAU is properly installed.", "Error", "OK", "Error")
-        exit 1
+        $result = [System.Windows.MessageBox]::Show(
+            "WAU configuration not found. Please ensure WAU is properly installed.`n`nDo you want to download and install WAU now?", 
+            "WAU Not Found", 
+            "YesNo", 
+            "Question"
+        )
+        
+        if ($result -eq 'Yes') {
+            # Download MSI file
+            $msiFilePath = Get-WAU
+            if ($msiFilePath) {
+                # Ask user if they want to install now
+                $installResult = [System.Windows.MessageBox]::Show(
+                    "WAU MSI downloaded successfully to:`n$msiFilePath`n`nDo you want to install it now?", 
+                    "Install WAU", 
+                    "YesNo", 
+                    "Question"
+                )
+                
+                if ($installResult -eq 'Yes') {
+                    try {
+                        # Start installation
+                        Start-Process -FilePath "msiexec.exe" -ArgumentList "/i `"$msiFilePath`" /qb" -Wait
+                        
+                        # Check if installation was successful
+                        $installCheck = Test-InstalledWAU -DisplayName "Winget-AutoUpdate"
+                        if ($installCheck.Count -ge 1) {
+                            [System.Windows.MessageBox]::Show(
+                                "WAU installed successfully! Please restart this application to configure the new installation.", 
+                                "Installation Complete", 
+                                "OK", 
+                                "Information"
+                            )
+                            exit 0
+                        } else {
+                            [System.Windows.MessageBox]::Show(
+                                "Installation may have failed. Please check the installation manually.", 
+                                "Installation Status Unknown", 
+                                "OK", 
+                                "Warning"
+                            )
+                            # Check if we're in main application context
+                            if ($Script:MainWindowStarted) {
+                                return $null  # Return to main window
+                            } else {
+                                exit 1
+                            }
+                        }
+                    }
+                    catch {
+                        [System.Windows.MessageBox]::Show(
+                            "Failed to install WAU: $($_.Exception.Message)", 
+                            "Installation Failed", 
+                            "OK", 
+                            "Error"
+                        )
+                        # Check if we're in main application context
+                        if ($Script:MainWindowStarted) {
+                            return $null  # Return to main window
+                        } else {
+                            exit 1
+                        }
+                    }
+                } else {
+                    # Check if we're in main application context
+                    if ($Script:MainWindowStarted) {
+                        return $null  # Return to main window
+                    } else {
+                        exit 1
+                    }
+                }
+            } else {
+                # Check if we're in main application context
+                if ($Script:MainWindowStarted) {
+                    return $null  # Return to main window
+                } else {
+                    exit 1
+                }
+            }
+        } else {
+            # Check if we're in main application context
+            if ($Script:MainWindowStarted) {
+                return $null  # Return to main window
+            } else {
+                exit 1
+            }
+        }
     }
 }
 function Import-WAUSettingsFromFile {
@@ -620,13 +705,49 @@ function Set-WAUConfig {
 }
 
 # 3. WAU operation functions (depends on config functions)
+function Get-WAU {
+    # Configuration
+    $msiDir = Join-Path $Script:USER_DIR "Msi"
+    $GitHubRepo = "Romanitho/Winget-AutoUpdate"
+
+    # Create temp directory
+    if (!(Test-Path $msiDir)) {
+        New-Item -ItemType Directory -Path $msiDir -Force | Out-Null
+    }
+
+    try {
+        # Get latest release info from GitHub API
+        $ApiUrl = "https://api.github.com/repos/$GitHubRepo/releases/latest"
+        $Release = Invoke-RestMethod -Uri $ApiUrl -UseBasicParsing
+
+        # Find MSI download URL
+        $MsiAsset = $Release.assets | Where-Object { $_.name -like "*.msi" }
+        if (!$MsiAsset) {
+            throw "MSI file not found in latest release"
+        }
+        Start-PopUp "Downloading MSI: $($MsiAsset.name)..."
+        
+        $MsiUrl = $MsiAsset.browser_download_url
+        $msiFilePath = Join-Path $msiDir $MsiAsset.name
+        
+        Invoke-WebRequest -Uri $MsiUrl -OutFile $msiFilePath -UseBasicParsing
+        
+        Close-PopUp
+        
+        return $msiFilePath
+    } 
+    catch {
+        Close-PopUp
+        [System.Windows.MessageBox]::Show("Failed to download WAU: $($_.Exception.Message)", "Error", "OK", "Error")
+        return $null
+    }
+}
 function New-WAUTransformFile {
     param($controls)
     try {
 
         # Configuration
         $msiDir = Join-Path $Script:USER_DIR "Msi"
-        $GitHubRepo = "Romanitho/Winget-AutoUpdate"
 
         # Create temp directory
         if (!(Test-Path $msiDir)) {
@@ -639,21 +760,10 @@ function New-WAUTransformFile {
         # If no MSI file was found download the latest MSI from GitHub
         if ([string]::IsNullOrEmpty($MsiAsset.name)) {
             try {
-            # Get latest release info from GitHub API
-            $ApiUrl = "https://api.github.com/repos/$GitHubRepo/releases/latest"
-            $Release = Invoke-RestMethod -Uri $ApiUrl -UseBasicParsing
-
-            # Find MSI download URL
-            $MsiAsset = $Release.assets | Where-Object { $_.name -like "*.msi" }
-            if (!$MsiAsset) {
-                throw "MSI file not found in latest release"
-            }
-            Start-PopUp "Downloading MSI: $($MsiAsset.name)..."
-            
-            $MsiUrl = $MsiAsset.browser_download_url
-            $msiFilePath = Join-Path $msiDir $MsiAsset.name
-            
-            Invoke-WebRequest -Uri $MsiUrl -OutFile $msiFilePath -UseBasicParsing
+                $msiFilePath = Get-WAU
+                if (-not $msiFilePath) {
+                    throw "Failed to download MSI file"
+                }
             } catch {
                 Close-PopUp
                 [System.Windows.MessageBox]::Show("No MSI file found in $GitHubRepo latest release", "Error", "OK", "Error")
@@ -1180,7 +1290,7 @@ function Update-StatusDisplay {
     } else {
         $controls.StatusText.Text = "Enabled"
         $controls.StatusText.Foreground = "Green"
-        $controls.StatusDescription.Text = "WAU will check for updates as scheduled"
+        $controls.StatusDescription.Text = "WAU will check for updates"
         $controls.UpdateTimeHourComboBox.IsEnabled = $true
         $controls.UpdateTimeMinuteComboBox.IsEnabled = $true
         $controls.RandomDelayHourComboBox.IsEnabled = $true
@@ -1196,7 +1306,7 @@ function Set-ControlsState {
 
     $alwaysEnabledControls = @(
         'ScreenshotButton', 'SaveButton', 'CancelButton', 'RunNowButton', 'OpenLogsButton',
-        'DevTaskButton', 'DevRegButton', 'DevGUIDButton', 'DevSysButton', 'DevListButton', 'DevMSIButton'
+        'DevTaskButton', 'DevRegButton', 'DevGUIDButton', 'DevSysButton', 'DevListButton', 'DevMSIButton', 'DevInstButton'
     )
 
     function Get-Children($control) {
@@ -1991,6 +2101,7 @@ function Set-DevToolsVisibility {
         $controls.DevListButton.Visibility = 'Visible'
         $controls.DevMSIButton.Visibility = 'Visible'
         $controls.DevCfgButton.Visibility = 'Visible'
+        $controls.DevInstButton.Visibility = 'Visible'
         $controls.LinksStackPanel.Visibility = 'Visible'
         $window.Title = "$Script:WAU_TITLE - Dev Tools"
     } else {
@@ -2001,6 +2112,7 @@ function Set-DevToolsVisibility {
         $controls.DevListButton.Visibility = 'Collapsed'
         $controls.DevMSIButton.Visibility = 'Collapsed'
         $controls.DevCfgButton.Visibility = 'Collapsed'
+        $controls.DevInstButton.Visibility = 'Collapsed'
         $controls.LinksStackPanel.Visibility = 'Collapsed'
         $window.Title = "$Script:WAU_TITLE"
     }
@@ -2088,6 +2200,14 @@ function Show-WAUSettingsGUI {
     # Get current configuration
     $currentConfig = Get-WAUCurrentConfig
     
+    # If config is null (WAU not found and user chose not to install), return gracefully
+    if ($null -eq $currentConfig) {
+        return
+    }
+    
+    # Set flag to indicate main window is starting/started (AFTER successful config retrieval)
+    $Script:MainWindowStarted = $true
+
     # Load XAML
     [xml]$xamlXML = $Script:WINDOW_XAML -replace 'x:N', 'N'
     $reader = (New-Object System.Xml.XmlNodeReader $xamlXML)
@@ -2495,6 +2615,21 @@ function Show-WAUSettingsGUI {
             [System.Windows.MessageBox]::Show("Failed to import configuration: $($_.Exception.Message)", "Error", "OK", "Error")
         }
         Close-PopUp
+    })
+
+    $controls.DevInstButton.Add_Click({
+        if (New-WAUTransformFile -controls $controls) {
+            # Update status to "Done"
+            $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
+            $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED
+            
+            # Create timer to reset status back to ready after standard wait time
+            $window.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Background, [Action]{
+                Start-Sleep -Milliseconds $Script:WAIT_TIME
+                $controls.StatusBarText.Text = "$Script:STATUS_READY_TEXT"
+                $controls.StatusBarText.Foreground = "$Script:COLOR_INACTIVE"
+            }) | Out-Null
+        }
     })
 
     # Save button handler to save settings

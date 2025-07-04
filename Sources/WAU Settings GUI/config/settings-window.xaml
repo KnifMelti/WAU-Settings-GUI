@@ -28,16 +28,16 @@
                 <TextBlock Text="Schedule:" VerticalAlignment="Center" Margin="0,0,10,0"/>
                 <TextBlock x:Name="StatusText" Text="Enabled" Foreground="Green" FontWeight="Bold" VerticalAlignment="Center"/>
             </StackPanel>
-            <TextBlock x:Name="StatusDescription" Text="WAU will check for updates as scheduled" FontSize="10" Foreground="$Script:COLOR_INACTIVE" Margin="0,5,0,0"/>
+            <TextBlock x:Name="StatusDescription" Text="WAU will check for updates" FontSize="10" Foreground="$Script:COLOR_INACTIVE" Margin="0,5,0,0"/>
             </StackPanel>
             <!-- Right column: Dev buttons (hidden by default) -->
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
                 <!-- Vertical links stack (hidden by default) -->
                 <StackPanel x:Name="LinksStackPanel" Orientation="Vertical" VerticalAlignment="Top" Margin="0,0,10,0" Visibility="Collapsed">
-                    <TextBlock>
+                    <TextBlock FontSize="9">
                         <Hyperlink x:Name="ManifestsLink" NavigateUri="https://github.com/microsoft/winget-pkgs/tree/master/manifests" ToolTip="open 'winget-pkgs' Manifests on GitHub">[manifests]</Hyperlink>
                     </TextBlock>
-                    <TextBlock Margin="0,0,0,0">
+                    <TextBlock Margin="0,0,0,0" FontSize="9">
                         <Hyperlink x:Name="IssuesLink" NavigateUri="https://github.com/microsoft/winget-pkgs/issues" ToolTip="open 'winget-pkgs' Issues on GitHub">[issues]</Hyperlink>
                     </TextBlock>
                 </StackPanel>
@@ -53,8 +53,10 @@
                     ToolTip="open the current local list"/>
                 <Button x:Name="DevMSIButton" Content="[msi]" Width="36" Height="25" Visibility="Collapsed" Margin="0,0,3,0"
                     ToolTip="create a transform file for 'WAU.msi' using the current showing settings"/>
-                <Button x:Name="DevCfgButton" Content="[cfg]" Width="36" Height="25" Visibility="Collapsed" Margin="0,0,0,0"
+                <Button x:Name="DevCfgButton" Content="[cfg]" Width="36" Height="25" Visibility="Collapsed" Margin="0,0,3,0"
                     ToolTip="backup current &amp; import 'WAU' settings file"/>
+                <Button x:Name="DevInstButton" Content="[inst]" Width="36" Height="25" Visibility="Collapsed" Margin="0,0,0,0"
+                    ToolTip="uninstall/install 'WAU'"/>
             </StackPanel>
         </Grid>
     </GroupBox>
