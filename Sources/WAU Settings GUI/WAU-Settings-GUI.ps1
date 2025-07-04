@@ -2618,18 +2618,8 @@ function Show-WAUSettingsGUI {
     })
 
     $controls.DevInstButton.Add_Click({
-        if (New-WAUTransformFile -controls $controls) {
-            # Update status to "Done"
-            $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
-            $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED
-            
-            # Create timer to reset status back to ready after standard wait time
-            $window.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Background, [Action]{
-                Start-Sleep -Milliseconds $Script:WAIT_TIME
-                $controls.StatusBarText.Text = "$Script:STATUS_READY_TEXT"
-                $controls.StatusBarText.Foreground = "$Script:COLOR_INACTIVE"
-            }) | Out-Null
-        }
+        # Check if WAU is installed and uninstall it
+        # If not installed, install it
     })
 
     # Save button handler to save settings
