@@ -35,6 +35,7 @@ Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName PresentationFramework
 
 # Constants of most used paths and arguments
+$Script:WAU_REPO = "Romanitho/Winget-AutoUpdate"
 $Script:WAU_REGISTRY_PATH = "HKLM:\SOFTWARE\Romanitho\Winget-AutoUpdate"
 $Script:WAU_POLICIES_PATH = "HKLM:\SOFTWARE\Policies\Romanitho\Winget-AutoUpdate"
 $Script:CONHOST_EXE = "${env:SystemRoot}\System32\conhost.exe"
@@ -708,7 +709,6 @@ function Set-WAUConfig {
 function Get-WAU {
     # Configuration
     $msiDir = Join-Path $Script:USER_DIR "Msi"
-    $GitHubRepo = "Romanitho/Winget-AutoUpdate"
 
     # Create temp directory
     if (!(Test-Path $msiDir)) {
@@ -717,7 +717,7 @@ function Get-WAU {
 
     try {
         # Get latest release info from GitHub API
-        $ApiUrl = "https://api.github.com/repos/$GitHubRepo/releases/latest"
+        $ApiUrl = "https://api.github.com/repos/$Script:WAU_REPO/releases/latest"
         $Release = Invoke-RestMethod -Uri $ApiUrl -UseBasicParsing
 
         # Find MSI download URL
@@ -766,7 +766,7 @@ function New-WAUTransformFile {
                 }
             } catch {
                 Close-PopUp
-                [System.Windows.MessageBox]::Show("No MSI file found in $GitHubRepo latest release", "Error", "OK", "Error")
+                [System.Windows.MessageBox]::Show("No MSI file found in $Script:WAU_REPO latest release", "Error", "OK", "Error")
                 $MsiAsset = @{ name = '*.msi' }
                 Start-PopUp "Locate $($MsiAsset.name)..."
             }
