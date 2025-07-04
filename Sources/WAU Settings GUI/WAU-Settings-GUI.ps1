@@ -10,16 +10,17 @@ Provides a user-friendly interface to modify every aspect of WAU settings includ
 - Notification levels
 - Configuring list and mods paths
 - Additional options like running at logon, user context, etc.
-- Creating/removing shortcuts
+- Creating/deleting shortcuts
 - Managing log files
 - Starting WAU manually
-- Screenshot functionality for documentation
+- Screenshot with masking functionality for documentation
 - GPO management integration
 - Real-time status information display showing version details, last run times, and current configuration state
 - Developer tools for advanced troubleshooting:
   - Task scheduler access
   - Registry editor access
   - GUID path exploration
+  - WinGet system wide installed application list
   - List file management
   - MSI transform creation
   - Configuration backup/import (i.e. for sharing settings)
