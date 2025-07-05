@@ -8,7 +8,7 @@ Provides a user-friendly standalone interface to modify every aspect of Winget-A
 This project depends on the following repository:
 - [Winget-AutoUpdate](https://github.com/Romanitho/Winget-AutoUpdate): has all the settings this project can handle/modify/save/restore/share and document.
 
-If **WAU** is not installed, the GUI will when starting prompt to download and install it with standard settings.
+If **WAU** is not installed, the GUI prompts at startup to download and install it with standard settings.
 
 ### Description
 Significantly enhance **WAU's** usability for home users while maintaining enterprise-grade functionality.<br>
