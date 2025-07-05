@@ -52,11 +52,11 @@
                 <Button x:Name="DevListButton" Content="[list]" Width="36" Height="25" Visibility="Collapsed" Margin="0,0,3,0"
                     ToolTip="open the current local list"/>
                 <Button x:Name="DevMSIButton" Content="[msi]" Width="36" Height="25" Visibility="Collapsed" Margin="0,0,3,0"
-                    ToolTip="create a transform file for 'WAU.msi' using the current showing settings"/>
+                    ToolTip="create a transform file for 'WAU.msi' using current showing configuration"/>
                 <Button x:Name="DevCfgButton" Content="[cfg]" Width="36" Height="25" Visibility="Collapsed" Margin="0,0,3,0"
                     ToolTip="backup current &amp; import 'WAU' settings file"/>
                 <Button x:Name="DevWAUButton" Content="[wau]" Width="36" Height="25" Visibility="Collapsed" Margin="0,0,0,0"
-                    ToolTip="uninstall/install 'WAU'"/>
+                    ToolTip="uninstall/install 'WAU' with current showing configuration"/>
             </StackPanel>
         </Grid>
     </GroupBox>

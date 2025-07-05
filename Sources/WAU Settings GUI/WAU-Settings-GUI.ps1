@@ -22,9 +22,9 @@ Provides a user-friendly interface to modify every aspect of WAU settings includ
   - GUID path exploration
   - WinGet system wide installed application list
   - List file management
-  - MSI transform creation
+  - MSI transform creation (using current showing configuration)
   - Configuration backup/import (i.e. for sharing settings)
-  - Uninstall/install WAU
+  - Uninstall/install WAU (with current showing configuration)
 
 .NOTES
 Must be run as Administrator
@@ -2763,7 +2763,7 @@ function Show-WAUSettingsGUI {
             } else {
                 # WAU is not installed - download and install
                 $result = [System.Windows.MessageBox]::Show(
-                    "WAU is not installed. Do you want to download and install it?", 
+                    "WAU is not installed. Do you want to download and install it with current showing configuration?", 
                     "Install WAU", 
                     "YesNo", 
                     "Question"

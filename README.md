@@ -8,6 +8,8 @@ Provides a user-friendly standalone interface to modify every aspect of Winget-A
 This project depends on the following repository:
 - [Winget-AutoUpdate](https://github.com/Romanitho/Winget-AutoUpdate): has all the settings this project can handle/modify/save/restore/share and document.
 
+If **WAU** is not installed, the GUI will when starting prompt to download and install it with standard settings.
+
 ### Description
 Significantly enhance **WAU's** usability for home users while maintaining enterprise-grade functionality.<br>
 Benefits from not having to manage the settings in several places when testing etc. (great for developers)...
@@ -31,8 +33,9 @@ Configure **WAU** settings after installation, including:
   - GUID path exploration
   - WinGet system wide installed application list
   - List file management
-  - MSI transform creation
+  - MSI transform creation (using current showing configuration)
   - Configuration backup/import (i.e. for sharing settings)
+  - Uninstall/install **WAU** (with current showing configuration)
 
 NB: Must be run as Administrator (shortcut creation sets the flag)
 
@@ -40,6 +43,7 @@ NB: Must be run as Administrator (shortcut creation sets the flag)
 - Extract `Sources\WAU Settings GUI` (`Install.cmd`, `WAU-Settings-GUI.ps1` and `config`) to wherever you want to run **WAU Settings GUI** from
 - Don't place them in the **WAU** installation directory, as this will be overwritten on updates.
 - Run `Install.cmd`
+  - If **WAU** is not installed, it will prompt to download and install it with standard settings (creating a **WAU Settings (Administrator)** shortcut on your own **Desktop**).
   - Toggle the **☐|☑ Start Menu shortcuts** option in the GUI and `Save Settings`
   - Retoggle **☑|☐** and `Save Settings` again (depending on your choice)
 - The **WAU Settings (Administrator)** shortcut has now been created under **Start Menu\Programs\Winget-AutoUpdate** folder (along with the other **WAU** shortcuts) or on your own **Desktop**.
