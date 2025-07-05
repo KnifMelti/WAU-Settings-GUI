@@ -187,12 +187,44 @@ function Test-WAUGUIUpdate {
         $currentVer = [Version]$Script:WAU_GUI_VERSION
         $latestVer = [Version]$latestVersion
         
+        # Find download URL - GitHub automatically creates source code assets
+        $downloadAsset = $null
+        
+        # First, try to find manually uploaded assets with specific patterns
+        $patterns = @(
+            "*WAU-Settings-GUI*.zip",
+            "*WAU*Settings*GUI*.zip", 
+            "*Settings*GUI*.zip",
+            "*GUI*.zip",
+            "*.zip"
+        )
+        
+        foreach ($pattern in $patterns) {
+            $downloadAsset = $Release.assets | Where-Object { $_.name -like $pattern } | Select-Object -First 1
+            if ($downloadAsset) {
+                Write-Host "Found manually uploaded asset using pattern '$pattern': $($downloadAsset.name)"
+                break
+            }
+        }
+        
+        # If no manually uploaded ZIP found, use GitHub's automatic source code ZIP
+        if (-not $downloadAsset) {
+            # GitHub automatically provides source code downloads at predictable URLs
+            $downloadUrl = "https://github.com/$Script:WAU_GUI_REPO/archive/refs/tags/$($Release.tag_name).zip"
+            $downloadAsset = [PSCustomObject]@{
+                name = "WAU-Settings-GUI-$($Release.tag_name)-source.zip"
+                browser_download_url = $downloadUrl
+            }
+            Write-Host "Using GitHub automatic source code ZIP: $($downloadAsset.name)"
+        }
+        
         return @{
             UpdateAvailable = ($latestVer -gt $currentVer)
             CurrentVersion = $Script:WAU_GUI_VERSION
             LatestVersion = $latestVersion
-            DownloadUrl = $Release.assets | Where-Object { $_.name -like "*.zip" } | Select-Object -First 1 -ExpandProperty browser_download_url
+            DownloadUrl = $downloadAsset.browser_download_url
             ReleaseNotes = $Release.body
+            AssetName = $downloadAsset.name
         }
     }
     catch {
@@ -202,11 +234,12 @@ function Test-WAUGUIUpdate {
         }
     }
 }
+
 function Start-WAUGUIUpdate {
     param($updateInfo)
     
     try {
-        if (-not $updateInfo.DownloadUrl) {
+        if ([string]::IsNullOrEmpty($updateInfo.DownloadUrl)) {
             throw "No download URL found in release"
         }
         
@@ -219,13 +252,24 @@ function Start-WAUGUIUpdate {
         $downloadPath = Join-Path $downloadDir $fileName
         
         Start-PopUp "Downloading update: $fileName..."
-        Invoke-WebRequest -Uri $updateInfo.DownloadUrl -OutFile $downloadPath -UseBasicParsing
+        
+        # Add User-Agent header for better GitHub API compatibility
+        $headers = @{
+            'User-Agent' = 'WAU-Settings-GUI-Updater/1.0'
+        }
+        
+        Invoke-WebRequest -Uri $updateInfo.DownloadUrl -OutFile $downloadPath -UseBasicParsing -Headers $headers
         
         Close-PopUp
         
+        # Verify download was successful
+        if (-not (Test-Path $downloadPath) -or (Get-Item $downloadPath).Length -eq 0) {
+            throw "Downloaded file is missing or empty"
+        }
+        
         # Ask user if they want to install now
         $result = [System.Windows.MessageBox]::Show(
-            "Update downloaded successfully!`n`nDo you want to extract and view the update now?",
+            "Update downloaded successfully!`n`nFile: $fileName`nLocation: $downloadPath`n`nDo you want to extract and view the update now?",
             "Update Downloaded",
             "YesNo",
             "Question"
@@ -243,7 +287,6 @@ function Start-WAUGUIUpdate {
         return $false
     }
 }
-
 # 2. Configuration functions
 function Get-DisplayValue {
     param (
