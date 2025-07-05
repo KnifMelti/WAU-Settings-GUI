@@ -24,6 +24,7 @@ Provides a user-friendly interface to modify every aspect of WAU settings includ
   - List file management
   - MSI transform creation
   - Configuration backup/import (i.e. for sharing settings)
+  - Uninstall/install WAU
 
 .NOTES
 Must be run as Administrator
@@ -195,11 +196,11 @@ function Get-DisplayValue {
 function Get-WAUCurrentConfig {
     try {
         $config = Get-ItemProperty -Path $Script:WAU_REGISTRY_PATH -ErrorAction SilentlyContinue
-        if (!$config) {
-            throw "WAU not found in registry"
+        if (!$config -or [string]::IsNullOrEmpty($config.ProductVersion)) {
+            throw "WAU not found in registry or ProductVersion missing"
         }
         return $config
-    }
+    }    
     catch {
         $result = [System.Windows.MessageBox]::Show(
             "WAU configuration not found. Please ensure WAU is properly installed.`n`nDo you want to download and install WAU now?", 
