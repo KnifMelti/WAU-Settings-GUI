@@ -10,6 +10,8 @@ This project depends on the following repository:
 
 If **WAU** is not installed, the GUI prompts at startup to download and install it with standard settings.
 
+---
+
 ### Description
 Significantly enhance **WAU's** usability for home users while maintaining enterprise-grade functionality.<br>
 Benefits from not having to manage the settings in several places when testing etc. (great for developers)...
