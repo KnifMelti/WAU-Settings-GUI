@@ -38,6 +38,7 @@ Configure **WAU** settings after installation, including:
   - MSI transform creation (using current showing configuration)
   - Configuration backup/import (i.e. for sharing settings)
   - Uninstall/install **WAU** (with current showing configuration)
+  - Manual check for **WAU Settings GUI** updates
 
 NB: Must be run as Administrator (shortcut creation sets the flag)
 
