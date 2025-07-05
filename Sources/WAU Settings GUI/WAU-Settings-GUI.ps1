@@ -202,95 +202,87 @@ function Get-WAUCurrentConfig {
         return $config
     }    
     catch {
-        $result = [System.Windows.MessageBox]::Show(
+        if (!$Script:MainWindowStarted) {
+            Close-PopUp
+        }
+        
+        # Show initial prompt
+        $userWantsToInstall = [System.Windows.MessageBox]::Show(
             "WAU configuration not found. Please ensure WAU is properly installed.`n`nDo you want to download and install WAU now?", 
             "WAU Not Found", 
             "YesNo", 
             "Question"
-        )
+        ) -eq 'Yes'
         
-        if ($result -eq 'Yes') {
+        if ($userWantsToInstall) {
             # Download MSI file
-            $msiFilePath = Get-WAU
+            $msiFilePath = Get-WAUMsi
+            
             if ($msiFilePath) {
                 # Ask user if they want to install now
-                $installResult = [System.Windows.MessageBox]::Show(
+                $userWantsToInstallNow = [System.Windows.MessageBox]::Show(
                     "WAU MSI downloaded successfully to:`n$msiFilePath`n`nDo you want to install it now?", 
                     "Install WAU", 
                     "YesNo", 
                     "Question"
-                )
+                ) -eq 'Yes'
                 
-                if ($installResult -eq 'Yes') {
-                    try {
-                        # Start installation
-                        Start-Process -FilePath "msiexec.exe" -ArgumentList "/i `"$msiFilePath`" /qb" -Wait
-                        
-                        # Check if installation was successful
-                        $installCheck = Test-InstalledWAU -DisplayName "Winget-AutoUpdate"
-                        if ($installCheck.Count -ge 1) {
-                            [System.Windows.MessageBox]::Show(
-                                "WAU installed successfully! Please restart this application to configure the new installation.", 
-                                "Installation Complete", 
-                                "OK", 
-                                "Information"
-                            )
-                            exit 0
-                        } else {
-                            [System.Windows.MessageBox]::Show(
-                                "Installation may have failed. Please check the installation manually.", 
-                                "Installation Status Unknown", 
-                                "OK", 
-                                "Warning"
-                            )
-                            # Check if we're in main application context
-                            if ($Script:MainWindowStarted) {
-                                return $null  # Return to main window
-                            } else {
-                                exit 1
-                            }
-                        }
+                if ($userWantsToInstallNow) {
+                    # Install WAU using the downloaded MSI file
+                    $installResult = Install-WAU -msiFilePath $msiFilePath
+                    
+                    # Handle post-installation logic
+                    if ($Script:MainWindowStarted) {
+                        return $null  # Return to main window regardless of install result
                     }
-                    catch {
-                        [System.Windows.MessageBox]::Show(
-                            "Failed to install WAU: $($_.Exception.Message)", 
-                            "Installation Failed", 
-                            "OK", 
-                            "Error"
-                        )
-                        # Check if we're in main application context
-                        if ($Script:MainWindowStarted) {
-                            return $null  # Return to main window
-                        } else {
+                    
+                    # Create desktop shortcut for settings
+                    Add-Shortcut $Script:DESKTOP_WAU_SETTINGS $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$($Script:WorkingDir.TrimEnd('\'))\WAU-Settings-GUI.ps1`"" "$Script:GUI_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
+                    
+                    if ($installResult) {
+                        # Installation succeeded, try to get config again
+                        try {
+                            return Get-ItemProperty -Path $Script:WAU_REGISTRY_PATH -ErrorAction Stop
+                        }
+                        catch {
+                            [System.Windows.MessageBox]::Show("Installation succeeded but cannot read WAU configuration.", "Configuration Error", "OK", "Error")
                             exit 1
                         }
+                    } else {
+                        exit 1  # Installation failed
                     }
                 } else {
-                    # Check if we're in main application context
+                    # User chose not to install now - open the directory where MSI is located
+                    Start-Process "explorer.exe" -ArgumentList "/select,`"$msiFilePath`""
+                    
                     if ($Script:MainWindowStarted) {
-                        return $null  # Return to main window
+                        return $config  # Return to main window
                     } else {
+                        Add-Shortcut $Script:DESKTOP_WAU_SETTINGS $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$($Script:WorkingDir.TrimEnd('\'))\WAU-Settings-GUI.ps1`"" "$Script:GUI_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
                         exit 1
                     }
                 }
             } else {
-                # Check if we're in main application context
+                # MSI download failed
                 if ($Script:MainWindowStarted) {
                     return $null  # Return to main window
                 } else {
+                    Add-Shortcut $Script:DESKTOP_WAU_SETTINGS $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$($Script:WorkingDir.TrimEnd('\'))\WAU-Settings-GUI.ps1`"" "$Script:GUI_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
                     exit 1
                 }
             }
         } else {
-            # Check if we're in main application context
+            # User declined to install
             if ($Script:MainWindowStarted) {
                 return $null  # Return to main window
             } else {
+                Add-Shortcut $Script:DESKTOP_WAU_SETTINGS $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$($Script:WorkingDir.TrimEnd('\'))\WAU-Settings-GUI.ps1`"" "$Script:GUI_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
                 exit 1
             }
         }
     }
 }
+
 function Import-WAUSettingsFromFile {
     param(
         [string]$FilePath,
@@ -707,7 +699,7 @@ function Set-WAUConfig {
 }
 
 # 3. WAU operation functions (depends on config functions)
-function Get-WAU {
+function Get-WAUMsi {
     # Configuration
     $msiDir = Join-Path $Script:USER_DIR "Msi"
 
@@ -743,6 +735,86 @@ function Get-WAU {
         return $null
     }
 }
+function Install-WAU {
+    param(
+        [string]$msiFilePath,
+        $controls
+    )
+    
+    try {
+        if (-not (Test-Path $msiFilePath)) {
+            throw "MSI file not found: $msiFilePath"
+        }
+        
+        # Check if we're in main application context
+        if ($Script:MainWindowStarted) {
+            # If in main window context; start installation process with the showing settings
+            Start-Process -FilePath "msiexec.exe" -ArgumentList "/i `"$msiFilePath`" /qb" -Wait
+        } else {
+            # If not in main window context; Start installation process with default settings
+            Start-Process -FilePath "msiexec.exe" -ArgumentList "/i `"$msiFilePath`" /qb" -Wait
+        }                    
+        
+        # Check if installation was successful
+        $Script:WAU_INSTALL_INFO = Test-InstalledWAU -DisplayName "Winget-AutoUpdate"
+        if ($Script:WAU_INSTALL_INFO.Count -ge 1) {
+            [System.Windows.MessageBox]::Show("WAU installed successfully! Please configure the new installation.", "Installation Complete", "OK", "Information")
+
+            # Get WAU installation info and store as constants
+            $Script:WAU_VERSION = if ($Script:WAU_INSTALL_INFO.Count -ge 1) { $Script:WAU_INSTALL_INFO[0] } else { "Unknown" }
+            $Script:WAU_GUID = if ($Script:WAU_INSTALL_INFO.Count -ge 2) { $Script:WAU_INSTALL_INFO[1] } else { $null }
+            $wauIconPath = "${env:SystemRoot}\Installer\${Script:WAU_GUID}\icon.ico"
+            if (Test-Path $wauIconPath) {
+                $Script:WAU_ICON = $wauIconPath
+            }
+
+            # Reload configuration after successful installation
+            if ($Script:MainWindowStarted -and $controls) {
+                Update-WAUGUIFromConfig -Controls $controls 
+            }
+
+            return $true
+        } else {
+            [System.Windows.MessageBox]::Show("Installation may have failed. Please check the installation manually.", "Installation Status Unknown", "OK", "Warning")
+            return $false
+        }
+    } 
+    catch {
+        Close-PopUp
+        [System.Windows.MessageBox]::Show("Failed to install WAU: $($_.Exception.Message)", "Installation Failed", "OK", "Error")
+        return $false
+    }
+}
+function Uninstall-WAU {
+    try {
+        # Check if WAU is installed
+        $installedWAU = Test-InstalledWAU -DisplayName "Winget-AutoUpdate"
+        if ($installedWAU.Count -eq 0) {
+            [System.Windows.MessageBox]::Show("WAU is not installed.", "Uninstall WAU", "OK", "Information")
+            return $false
+        }
+        
+        Start-PopUp "Uninstalling WAU..."
+        
+        # Start uninstallation process
+        Start-Process -FilePath "msiexec.exe" -ArgumentList "/x `"$($installedWAU[1])`" /qb" -Wait
+        # After uninstall, verify WAU is no longer installed
+        $remainingWAU = Test-InstalledWAU -DisplayName "Winget-AutoUpdate"
+        if ($remainingWAU.Count -ne 0) {
+            throw "WAU is still detected as installed after uninstallation."
+        }
+        Close-PopUp
+        
+        [System.Windows.MessageBox]::Show("WAU uninstalled successfully.", "Uninstall Complete", "OK", "Information")
+        return $true
+    } 
+    catch {
+        Close-PopUp
+        [System.Windows.MessageBox]::Show("Failed to uninstall WAU: $($_.Exception.Message)", "Uninstall Failed", "OK", "Error")
+        return $false
+    }
+}
+
 function New-WAUTransformFile {
     param($controls)
     try {
@@ -761,7 +833,7 @@ function New-WAUTransformFile {
         # If no MSI file was found download the latest MSI from GitHub
         if ([string]::IsNullOrEmpty($MsiAsset.name)) {
             try {
-                $msiFilePath = Get-WAU
+                $msiFilePath = Get-WAUMsi
                 if (-not $msiFilePath) {
                     throw "Failed to download MSI file"
                 }
@@ -1307,7 +1379,7 @@ function Set-ControlsState {
 
     $alwaysEnabledControls = @(
         'ScreenshotButton', 'SaveButton', 'CancelButton', 'RunNowButton', 'OpenLogsButton',
-        'DevTaskButton', 'DevRegButton', 'DevGUIDButton', 'DevSysButton', 'DevListButton', 'DevMSIButton', 'DevInstButton'
+        'DevTaskButton', 'DevRegButton', 'DevGUIDButton', 'DevSysButton', 'DevListButton', 'DevMSIButton'
     )
 
     function Get-Children($control) {
@@ -1515,7 +1587,12 @@ function Update-WAUGUIFromConfig {
         $controls.UpdateTimeMinuteComboBox.SelectedIndex = 0  # fallback to 00
     }
 
-    $randomDelay = (Get-DisplayValue -PropertyName "WAU_UpdatesTimeDelay" -Config $updatedConfig -Policies $updatedPolicies).ToString()
+    # Special case: 'WAU_UpdatesTimeDelay' isn't in the wild yet, so we handle it separately
+    $randomDelayValue = Get-DisplayValue -PropertyName "WAU_UpdatesTimeDelay" -Config $updatedConfig -Policies $updatedPolicies
+    $randomDelay = if ($null -ne $randomDelayValue) { $randomDelayValue.ToString() } else { "" }
+    if ($null -eq $randomDelay -or $randomDelay -eq "" -or $randomDelay.Length -lt 5) {
+        $randomDelay = "00:00"
+    }
     # Get the first 2 characters (hours), convert to int and set as SelectedIndex
     $hourIndex = [int]$randomDelay.Substring(0,2)
     if ($hourIndex -ge 0 -and $hourIndex -lt $controls.RandomDelayHourComboBox.Items.Count) {
@@ -2102,7 +2179,7 @@ function Set-DevToolsVisibility {
         $controls.DevListButton.Visibility = 'Visible'
         $controls.DevMSIButton.Visibility = 'Visible'
         $controls.DevCfgButton.Visibility = 'Visible'
-        $controls.DevInstButton.Visibility = 'Visible'
+        $controls.DevWAUButton.Visibility = 'Visible'
         $controls.LinksStackPanel.Visibility = 'Visible'
         $window.Title = "$Script:WAU_TITLE - Dev Tools"
     } else {
@@ -2113,7 +2190,7 @@ function Set-DevToolsVisibility {
         $controls.DevListButton.Visibility = 'Collapsed'
         $controls.DevMSIButton.Visibility = 'Collapsed'
         $controls.DevCfgButton.Visibility = 'Collapsed'
-        $controls.DevInstButton.Visibility = 'Collapsed'
+        $controls.DevWAUButton.Visibility = 'Collapsed'
         $controls.LinksStackPanel.Visibility = 'Collapsed'
         $window.Title = "$Script:WAU_TITLE"
     }
@@ -2618,9 +2695,64 @@ function Show-WAUSettingsGUI {
         Close-PopUp
     })
 
-    $controls.DevInstButton.Add_Click({
+    $controls.DevWAUButton.Add_Click({
         # Check if WAU is installed and uninstall it
         # If not installed, install it
+        try {
+            # Check if WAU is installed
+            $installedWAU = Test-InstalledWAU -DisplayName "Winget-AutoUpdate"
+            
+            if ($installedWAU.Count -gt 0) {
+                # WAU is installed - ask user if they want to uninstall
+                $result = [System.Windows.MessageBox]::Show(
+                    "WAU is currently installed. Do you want to uninstall it?", 
+                    "Uninstall WAU", 
+                    "YesNo", 
+                    "Question"
+                )
+                
+                if ($result -eq 'Yes') {
+                    $uninstallResult = Uninstall-WAU
+                    if ($uninstallResult) {
+                        # Update status to "Done"
+                        $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
+                        $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED
+                    }
+                }
+            } else {
+                # WAU is not installed - download and install
+                $result = [System.Windows.MessageBox]::Show(
+                    "WAU is not installed. Do you want to download and install it?", 
+                    "Install WAU", 
+                    "YesNo", 
+                    "Question"
+                )
+                
+                if ($result -eq 'Yes') {
+                    # Download MSI file
+                    $msiFilePath = Get-WAUMsi
+                    if ($msiFilePath) {
+                        # Install WAU
+                        $installResult = Install-WAU -msiFilePath $msiFilePath -controls $controls
+                        if ($installResult) {
+                            # Update status to "Done"
+                            $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
+                            $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED
+                        }
+                    }
+                }
+            }
+            
+            # Create timer to reset status back to ready after standard wait time
+            $window.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Background, [Action]{
+                Start-Sleep -Milliseconds $Script:WAIT_TIME
+                $controls.StatusBarText.Text = $Script:STATUS_READY_TEXT
+                $controls.StatusBarText.Foreground = $Script:COLOR_INACTIVE
+            }) | Out-Null
+        }
+        catch {
+            [System.Windows.MessageBox]::Show("Failed to process WAU installation/uninstallation: $($_.Exception.Message)", "Error", "OK", "Error")
+        }        
     })
 
     # Save button handler to save settings
@@ -2743,7 +2875,7 @@ if (Test-Path $xamlConfigPath) {
     exit 1
 }
 
-# Get WAU installation info once and store as constants
+# Get WAU installation info and store as constants
 $Script:WAU_INSTALL_INFO = Test-InstalledWAU -DisplayName "Winget-AutoUpdate"
 $Script:WAU_VERSION = if ($Script:WAU_INSTALL_INFO.Count -ge 1) { $Script:WAU_INSTALL_INFO[0] } else { "Unknown" }
 $Script:WAU_GUID = if ($Script:WAU_INSTALL_INFO.Count -ge 2) { $Script:WAU_INSTALL_INFO[1] } else { $null }

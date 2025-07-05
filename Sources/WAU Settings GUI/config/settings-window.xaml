@@ -55,7 +55,7 @@
                     ToolTip="create a transform file for 'WAU.msi' using the current showing settings"/>
                 <Button x:Name="DevCfgButton" Content="[cfg]" Width="36" Height="25" Visibility="Collapsed" Margin="0,0,3,0"
                     ToolTip="backup current &amp; import 'WAU' settings file"/>
-                <Button x:Name="DevInstButton" Content="[inst]" Width="36" Height="25" Visibility="Collapsed" Margin="0,0,0,0"
+                <Button x:Name="DevWAUButton" Content="[wau]" Width="36" Height="25" Visibility="Collapsed" Margin="0,0,0,0"
                     ToolTip="uninstall/install 'WAU'"/>
             </StackPanel>
         </Grid>
