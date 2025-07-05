@@ -36,6 +36,7 @@ Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName PresentationFramework
 
 # Constants of most used paths and arguments
+$Script:WAU_GUI_REPO = "KnifMelti/WAU-Settings-GUI"
 $Script:WAU_REPO = "Romanitho/Winget-AutoUpdate"
 $Script:WAU_REGISTRY_PATH = "HKLM:\SOFTWARE\Romanitho\Winget-AutoUpdate"
 $Script:WAU_POLICIES_PATH = "HKLM:\SOFTWARE\Policies\Romanitho\Winget-AutoUpdate"
@@ -175,6 +176,72 @@ function Test-InstalledWAU {
     }
 
     return $matchingApps
+}
+function Test-WAUGUIUpdate {
+    try {
+        $ApiUrl = "https://api.github.com/repos/$Script:WAU_GUI_REPO/releases/latest"
+        $Release = Invoke-RestMethod -Uri $ApiUrl -UseBasicParsing
+        $latestVersion = $Release.tag_name.TrimStart('v')
+        
+        # Compare versions
+        $currentVer = [Version]$Script:WAU_GUI_VERSION
+        $latestVer = [Version]$latestVersion
+        
+        return @{
+            UpdateAvailable = ($latestVer -gt $currentVer)
+            CurrentVersion = $Script:WAU_GUI_VERSION
+            LatestVersion = $latestVersion
+            DownloadUrl = $Release.assets | Where-Object { $_.name -like "*.zip" } | Select-Object -First 1 -ExpandProperty browser_download_url
+            ReleaseNotes = $Release.body
+        }
+    }
+    catch {
+        return @{
+            UpdateAvailable = $false
+            Error = $_.Exception.Message
+        }
+    }
+}
+function Start-WAUGUIUpdate {
+    param($updateInfo)
+    
+    try {
+        if (-not $updateInfo.DownloadUrl) {
+            throw "No download URL found in release"
+        }
+        
+        $downloadDir = Join-Path $Script:USER_DIR "Updates"
+        if (-not (Test-Path $downloadDir)) {
+            New-Item -ItemType Directory -Path $downloadDir -Force | Out-Null
+        }
+        
+        $fileName = Split-Path $updateInfo.DownloadUrl -Leaf
+        $downloadPath = Join-Path $downloadDir $fileName
+        
+        Start-PopUp "Downloading update: $fileName..."
+        Invoke-WebRequest -Uri $updateInfo.DownloadUrl -OutFile $downloadPath -UseBasicParsing
+        
+        Close-PopUp
+        
+        # Ask user if they want to install now
+        $result = [System.Windows.MessageBox]::Show(
+            "Update downloaded successfully!`n`nDo you want to extract and view the update now?",
+            "Update Downloaded",
+            "YesNo",
+            "Question"
+        )
+        
+        if ($result -eq 'Yes') {
+            Start-Process "explorer.exe" -ArgumentList "/select,`"$downloadPath`""
+        }
+        
+        return $true
+    }
+    catch {
+        Close-PopUp
+        [System.Windows.MessageBox]::Show("Failed to download update: $($_.Exception.Message)", "Update Error", "OK", "Error")
+        return $false
+    }
 }
 
 # 2. Configuration functions
@@ -1709,8 +1776,8 @@ function Update-WAUGUIFromConfig {
     }
 
     # Update information section
-    $Controls.SettingsVersion.Text = "WAU Settings Version: $Script:WAU_GUI_VERSION | "
-    $Controls.VersionText.Text = "WAU Version: $Script:WAU_VERSION | "
+    $Controls.SettingsVersion.Text = "Versions - WAU Settings: $Script:WAU_GUI_VERSION | "
+    $Controls.VersionText.Text = "WAU: $Script:WAU_VERSION | "
  
     # Get last run time for the scheduled task 'Winget-AutoUpdate'
     try {
@@ -1724,7 +1791,7 @@ function Update-WAUGUIFromConfig {
     } catch {
         $Controls.RunDate.Text = "WAU Last Run: Unknown!"
     }
-    $Controls.WinGetVersion.Text = "WinGet Version: $Script:WINGET_VERSION | "
+    $Controls.WinGetVersion.Text = "WinGet: $Script:WINGET_VERSION | "
     $Controls.InstallLocationText.Text = "WAU Install Location: $($updatedConfig.InstallLocation) | "
     if ($wauGPOListPathEnabled -and $wauActivateGPOManagementEnabled) {
         $Controls.LocalListText.Inlines.Clear()
@@ -2230,6 +2297,7 @@ function Set-DevToolsVisibility {
         $controls.DevMSIButton.Visibility = 'Visible'
         $controls.DevCfgButton.Visibility = 'Visible'
         $controls.DevWAUButton.Visibility = 'Visible'
+        $controls.DevUpdatesButton.Visibility = 'Visible'
         $controls.LinksStackPanel.Visibility = 'Visible'
         $window.Title = "$Script:WAU_TITLE - Dev Tools"
     } else {
@@ -2241,6 +2309,7 @@ function Set-DevToolsVisibility {
         $controls.DevMSIButton.Visibility = 'Collapsed'
         $controls.DevCfgButton.Visibility = 'Collapsed'
         $controls.DevWAUButton.Visibility = 'Collapsed'
+        $controls.DevUpdatesButton.Visibility = 'Collapsed'
         $controls.LinksStackPanel.Visibility = 'Collapsed'
         $window.Title = "$Script:WAU_TITLE"
     }
@@ -2803,6 +2872,35 @@ function Show-WAUSettingsGUI {
         catch {
             [System.Windows.MessageBox]::Show("Failed to process WAU installation/uninstallation: $($_.Exception.Message)", "Error", "OK", "Error")
         }        
+    })
+
+    $controls.DevUpdatesButton.Add_Click({
+        try {
+            Start-PopUp "Checking for updates..."
+            $updateInfo = Test-WAUGUIUpdate
+            Close-PopUp
+            
+            if ($updateInfo.Error) {
+                [System.Windows.MessageBox]::Show("Failed to check for updates: $($updateInfo.Error)", "Update Check Failed", "OK", "Warning")
+                return
+            }
+            
+            if ($updateInfo.UpdateAvailable) {
+                $message = "Update available!`n`nCurrent version: $($updateInfo.CurrentVersion)`nLatest version: $($updateInfo.LatestVersion)`n`nDo you want to download the update?"
+                $result = [System.Windows.MessageBox]::Show($message, "Update Available", "YesNo", "Question")
+                
+                if ($result -eq 'Yes') {
+                    Start-WAUGUIUpdate -updateInfo $updateInfo
+                }
+            }
+            else {
+                [System.Windows.MessageBox]::Show("You are running the latest version ($($updateInfo.CurrentVersion))", "No Updates Available", "OK", "Information")
+            }
+        }
+        catch {
+            Close-PopUp
+            [System.Windows.MessageBox]::Show("Failed to check for updates: $($_.Exception.Message)", "Error", "OK", "Error")
+        }
     })
 
     # Save button handler to save settings
