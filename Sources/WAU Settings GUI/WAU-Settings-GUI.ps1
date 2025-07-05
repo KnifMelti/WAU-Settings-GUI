@@ -59,6 +59,14 @@ $Script:WAIT_TIME = 1000 # 1 second wait time for UI updates
 # Get current script directory
 $Script:WorkingDir = $PSScriptRoot
 
+# Version information
+$versionFile = Join-Path $($Script:WorkingDir.TrimEnd('\')) "\config\version.txt"
+if (Test-Path $versionFile) {
+    $Script:WAU_GUI_VERSION = (Get-Content $versionFile -Raw).Trim()
+} else {
+    $Script:WAU_GUI_VERSION = "Unknown"
+}
+
 <# FUNCTIONS #>
 
 # 1. Utility functions (no dependencies)
@@ -1701,6 +1709,7 @@ function Update-WAUGUIFromConfig {
     }
 
     # Update information section
+    $Controls.SettingsVersion.Text = "WAU Settings Version: $Script:WAU_GUI_VERSION | "
     $Controls.VersionText.Text = "WAU Version: $Script:WAU_VERSION | "
  
     # Get last run time for the scheduled task 'Winget-AutoUpdate'
@@ -1708,18 +1717,18 @@ function Update-WAUGUIFromConfig {
         $task = Get-ScheduledTask -TaskName 'Winget-AutoUpdate' -ErrorAction Stop
         $lastRunTime = $task | Get-ScheduledTaskInfo | Select-Object -ExpandProperty LastRunTime
         if ($lastRunTime -and $lastRunTime -ne [datetime]::MinValue) {
-            $Controls.RunDate.Text = "Last Run: $($lastRunTime.ToString('yyyy-MM-dd HH:mm')) | "
+            $Controls.RunDate.Text = "WAU Last Run: $($lastRunTime.ToString('yyyy-MM-dd HH:mm'))"
         } else {
-            $Controls.RunDate.Text = "Last Run: Never | "
+            $Controls.RunDate.Text = "WAU Last Run: Never"
         }
     } catch {
-        $Controls.RunDate.Text = "Last Run: Unknown! | "
+        $Controls.RunDate.Text = "WAU Last Run: Unknown!"
     }
-    $Controls.WinGetVersion.Text = "WinGet Version: $Script:WINGET_VERSION"
-    $Controls.InstallLocationText.Text = "Install Location: $($updatedConfig.InstallLocation) | "
+    $Controls.WinGetVersion.Text = "WinGet Version: $Script:WINGET_VERSION | "
+    $Controls.InstallLocationText.Text = "WAU Install Location: $($updatedConfig.InstallLocation) | "
     if ($wauGPOListPathEnabled -and $wauActivateGPOManagementEnabled) {
         $Controls.LocalListText.Inlines.Clear()
-        $Controls.LocalListText.Inlines.Add("Local List: ")
+        $Controls.LocalListText.Inlines.Add("Current Local List: ")
         if ($updatedPolicies.WAU_UseWhiteList -eq 1) {
             $run = New-Object System.Windows.Documents.Run("'GPO (Included Apps)'")
         } else {
@@ -1735,13 +1744,13 @@ function Update-WAUGUIFromConfig {
                 $whiteListFile = Join-Path $installdir 'included_apps.txt'
                 if (Test-Path $whiteListFile) {
                     $Controls.LocalListText.Inlines.Clear()
-                    $Controls.LocalListText.Inlines.Add("Local List: ")
+                    $Controls.LocalListText.Inlines.Add("Current Local List: ")
                     $run = New-Object System.Windows.Documents.Run("'included_apps.txt'")
                     $run.Foreground = $Script:COLOR_ENABLED
                     $Controls.LocalListText.Inlines.Add($run)
                 } else {
                     $Controls.LocalListText.Inlines.Clear()
-                    $Controls.LocalListText.Inlines.Add("Missing Local List: ")
+                    $Controls.LocalListText.Inlines.Add("Missing Current Local List: ")
                     $run = New-Object System.Windows.Documents.Run("'included_apps.txt'")
                     $run.Foreground = $Script:COLOR_DISABLED
                     $Controls.LocalListText.Inlines.Add($run)
@@ -1751,13 +1760,13 @@ function Update-WAUGUIFromConfig {
                 $defaultExcludedFile = Join-Path $installdir 'config\default_excluded_apps.txt'
                 if (Test-Path $excludedFile) {
                     $Controls.LocalListText.Inlines.Clear()
-                    $Controls.LocalListText.Inlines.Add("Local List: ")
+                    $Controls.LocalListText.Inlines.Add("Current Local List: ")
                     $run = New-Object System.Windows.Documents.Run("'excluded_apps.txt'")
                     $run.Foreground = $Script:COLOR_ENABLED
                     $Controls.LocalListText.Inlines.Add($run)
                 } elseif (Test-Path $defaultExcludedFile) {
                     $Controls.LocalListText.Inlines.Clear()
-                    $Controls.LocalListText.Inlines.Add("Local List: ")
+                    $Controls.LocalListText.Inlines.Add("Current Local List: ")
                     $run = New-Object System.Windows.Documents.Run("'config\default_excluded_apps.txt'")
                     $run.Foreground = $Script:COLOR_ACTIVE
                     $Controls.LocalListText.Inlines.Add($run)
@@ -1772,7 +1781,7 @@ function Update-WAUGUIFromConfig {
         }
         catch {
             $Controls.LocalListText.Inlines.Clear()
-            $Controls.LocalListText.Inlines.Add("Local List: ")
+            $Controls.LocalListText.Inlines.Add("Current Local List: ")
             $run = New-Object System.Windows.Documents.Run("'Unknown'")
             $run.Foreground = $Script:COLOR_INACTIVE
             $Controls.LocalListText.Inlines.Add($run)
