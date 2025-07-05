@@ -699,6 +699,274 @@ function Set-WAUConfig {
 }
 
 # 3. WAU operation functions (depends on config functions)
+function New-MSITransformFromControls {
+    param(
+        [string]$msiFilePath,
+        $controls,
+        [bool]$createFiles = $false
+    )
+    
+    try {
+        # Create a Windows Installer object
+        $installer = New-Object -ComObject WindowsInstaller.Installer
+        $database = $installer.GetType().InvokeMember("OpenDatabase", "InvokeMethod", $null, $installer, @($msiFilePath, 0))
+        
+        # Extract Properties from MSI
+        $properties = @('ProductName', 'ProductVersion', 'ProductCode')
+        $views = @{}
+        $values = @{}
+        
+        # Create and execute views
+        foreach ($prop in $properties) {
+            $views[$prop] = $database.GetType().InvokeMember("OpenView", "InvokeMethod", $null, $database, "SELECT Value FROM Property WHERE Property = '$prop'")
+            $views[$prop].GetType().InvokeMember("Execute", "InvokeMethod", $null, $views[$prop], $null)
+            
+            # Fetch and extract value
+            $record = $views[$prop].GetType().InvokeMember("Fetch", "InvokeMethod", $null, $views[$prop], $null)
+            $values[$prop] = if ($record) {
+                $value = $record.GetType().InvokeMember("StringData", "GetProperty", $null, $record, 1)
+                [System.Runtime.InteropServices.Marshal]::ReleaseComObject($record) | Out-Null
+                $value
+            } else { $null }
+            
+            # Close and release view
+            $views[$prop].GetType().InvokeMember("Close", "InvokeMethod", $null, $views[$prop], $null)
+            [System.Runtime.InteropServices.Marshal]::ReleaseComObject($views[$prop]) | Out-Null
+        }
+        
+        # Assign variables
+        $name = $values['ProductName']
+        $version = $values['ProductVersion'] 
+        $guid = $values['ProductCode']
+        
+        if (-not $guid) {
+            throw "Could not extract Product Code from the MSI file"
+        }
+        
+        # Create transform file name
+        $transformName = if ($createFiles) {
+            if ($Script:WAU_TITLE -match '^(.+?)\s*\(') {
+                $matches[1].Trim() + '.mst'
+            } else {
+                $Script:WAU_TITLE.Trim() + '.mst'
+            }
+        } else {
+            [System.IO.Path]::GetTempFileName() + ".mst"
+        }
+        
+        # Get directory for transform
+        $msiDirectory = if ($createFiles) {
+            [System.IO.Path]::GetDirectoryName($msiFilePath)
+        } else {
+            [System.IO.Path]::GetTempPath()
+        }
+        $transformPath = [System.IO.Path]::Combine($msiDirectory, $transformName)
+        
+        # Create a copy of the MSI to modify
+        $tempFile = [System.IO.Path]::GetTempFileName()
+        Copy-Item $msiFilePath $tempFile -Force
+        $modifiedDb = $installer.GetType().InvokeMember("OpenDatabase", "InvokeMethod", $null, $installer, @($tempFile, 1))
+        
+        # Collect all properties from form controls
+        $properties = @{
+            'REBOOT' = 'R'  # Always set REBOOT=R
+        }
+        
+        # Map control values to MSI properties (ALL PROPERTIES IN UPPERCASE)
+        
+        # ComboBox selections
+        $properties['UPDATESINTERVAL'] = if ($controls.UpdateIntervalComboBox.SelectedItem) { 
+            $controls.UpdateIntervalComboBox.SelectedItem.Tag 
+        } else { 
+            'Never'  # Default value
+        }
+        
+        $properties['NOTIFICATIONLEVEL'] = if ($controls.NotificationLevelComboBox.SelectedItem) { 
+            $controls.NotificationLevelComboBox.SelectedItem.Tag 
+        } else { 
+            'Full'  # Default value
+        }
+        
+        # Time settings
+        $hour = "{0:D2}" -f ($controls.UpdateTimeHourComboBox.SelectedIndex + 1)
+        $minute = "{0:D2}" -f ($controls.UpdateTimeMinuteComboBox.SelectedIndex)
+        $properties['UPDATESATTIME'] = "$hour`:$minute`:00"
+
+        $hour = "{0:D2}" -f ($controls.RandomDelayHourComboBox.SelectedIndex)
+        $minute = "{0:D2}" -f ($controls.RandomDelayMinuteComboBox.SelectedIndex)
+        $properties['UPDATESATTIMEDELAY'] = "$hour`:$minute"
+
+        # Path settings
+        $properties['LISTPATH'] = if (![string]::IsNullOrWhiteSpace($controls.ListPathTextBox.Text)) {
+            $controls.ListPathTextBox.Text
+        } else {
+            ""
+        }
+
+        $properties['MODSPATH'] = if (![string]::IsNullOrWhiteSpace($controls.ModsPathTextBox.Text)) {
+            $controls.ModsPathTextBox.Text
+        } else {
+            ""
+        }
+
+        $properties['AZUREBLOBSASURL'] = if (![string]::IsNullOrWhiteSpace($controls.AzureBlobSASURLTextBox.Text)) {
+            $controls.AzureBlobSASURLTextBox.Text
+        } else {
+            ""
+        }
+        
+        # Checkbox properties
+        $properties['DISABLEWAUAUTOUPDATE'] = if ($controls.DisableWAUAutoUpdateCheckBox.IsChecked) { '1' } else { '0' }
+        $properties['UPDATEPRERELEASE'] = if ($controls.UpdatePreReleaseCheckBox.IsChecked) { '1' } else { '0' }
+        $properties['DONOTRUNONMETERED'] = if ($controls.DoNotRunOnMeteredCheckBox.IsChecked) { '1' } else { '0' }
+        $properties['STARTMENUSHORTCUT'] = if ($controls.StartMenuShortcutCheckBox.IsChecked) { '1' } else { '0' }
+        $properties['DESKTOPSHORTCUT'] = if ($controls.DesktopShortcutCheckBox.IsChecked) { '1' } else { '0' }
+        $properties['APPINSTALLERSHORTCUT'] = if ($controls.AppInstallerShortcutCheckBox.IsChecked) { '1' } else { '0' }
+        $properties['UPDATESATLOGON'] = if ($controls.UpdatesAtLogonCheckBox.IsChecked) { '1' } else { '0' }
+        $properties['USERCONTEXT'] = if ($controls.UserContextCheckBox.IsChecked) { '1' } else { '0' }
+        $properties['BYPASSLISTFORUSERS'] = if ($controls.BypassListForUsersCheckBox.IsChecked) { '1' } else { '0' }
+        $properties['USEWHITELIST'] = if ($controls.UseWhiteListCheckBox.IsChecked) { '1' } else { '0' }
+        
+        # Log settings
+        $properties['MAXLOGFILES'] = if ($controls.MaxLogFilesComboBox.SelectedItem) {
+            $controls.MaxLogFilesComboBox.SelectedItem.Content
+        } else {
+            '3'
+        }
+        
+        $properties['MAXLOGSIZE'] = if ($controls.MaxLogSizeComboBox.SelectedItem -and $controls.MaxLogSizeComboBox.SelectedItem.Tag) {
+            $controls.MaxLogSizeComboBox.SelectedItem.Tag
+        } elseif (![string]::IsNullOrWhiteSpace($controls.MaxLogSizeComboBox.Text)) {
+            $controls.MaxLogSizeComboBox.Text
+        } else {
+            '1048576'
+        }
+        
+        # Add/Update all properties in the modified database
+        foreach ($propName in $properties.Keys) {
+            $propValue = $properties[$propName]
+            
+            if ([string]::IsNullOrEmpty($propValue)) {
+                $propValue = ""
+            }
+            
+            try {
+                # Try INSERT first, then UPDATE if it fails
+                $insertView = $modifiedDb.GetType().InvokeMember("OpenView", "InvokeMethod", $null, $modifiedDb, "INSERT INTO Property (Property, Value) VALUES ('$propName', '$propValue')")
+                try {
+                    $insertView.GetType().InvokeMember("Execute", "InvokeMethod", $null, $insertView, $null)
+                }
+                catch {
+                    # Property might already exist, try UPDATE instead
+                    $insertView.GetType().InvokeMember("Close", "InvokeMethod", $null, $insertView, $null)
+                    [System.Runtime.InteropServices.Marshal]::ReleaseComObject($insertView) | Out-Null
+                    
+                    $updateView = $modifiedDb.GetType().InvokeMember("OpenView", "InvokeMethod", $null, $modifiedDb, "UPDATE Property SET Value = '$propValue' WHERE Property = '$propName'")
+                    $updateView.GetType().InvokeMember("Execute", "InvokeMethod", $null, $updateView, $null)
+                    $updateView.GetType().InvokeMember("Close", "InvokeMethod", $null, $updateView, $null)
+                    [System.Runtime.InteropServices.Marshal]::ReleaseComObject($updateView) | Out-Null
+                    continue
+                }
+                $insertView.GetType().InvokeMember("Close", "InvokeMethod", $null, $insertView, $null)
+                [System.Runtime.InteropServices.Marshal]::ReleaseComObject($insertView) | Out-Null
+            }
+            catch {
+                Write-Warning "Failed to set property $propName = $propValue"
+            }
+        }
+        
+        # Commit changes to modified database
+        $modifiedDb.GetType().InvokeMember("Commit", "InvokeMethod", $null, $modifiedDb, $null)
+        
+        # Generate transform between original and modified databases
+        $modifiedDb.GetType().InvokeMember("GenerateTransform", "InvokeMethod", $null, $modifiedDb, @($database, $transformPath))
+        
+        # Create transform summary info to make it valid
+        $modifiedDb.GetType().InvokeMember("CreateTransformSummaryInfo", "InvokeMethod", $null, $modifiedDb, @($database, $transformPath, 0, 0))
+        
+        # Create additional files if requested
+        if ($createFiles) {
+            # Copy GUID to clipboard
+            Set-Clipboard -Value $guid
+            
+            # Sort properties for display
+            $propertyOrder = @(
+                'UPDATESINTERVAL', 'NOTIFICATIONLEVEL', 'UPDATESATTIME', 'UPDATESATTIMEDELAY',
+                'LISTPATH', 'MODSPATH', 'AZUREBLOBSASURL',
+                'DISABLEWAUAUTOUPDATE', 'UPDATEPRERELEASE', 'DONOTRUNONMETERED',
+                'STARTMENUSHORTCUT', 'DESKTOPSHORTCUT', 'APPINSTALLERSHORTCUT',
+                'UPDATESATLOGON', 'USERCONTEXT', 'BYPASSLISTFORUSERS', 'USEWHITELIST',
+                'MAXLOGFILES', 'MAXLOGSIZE', 'REBOOT'
+            )
+            
+            $propertiesSummary = ($propertyOrder | ForEach-Object {
+                if ($properties.ContainsKey($_)) {
+                    if ($properties[$_] -eq "") {
+                        "$_=(empty)"
+                    } else {
+                        "$_=$($properties[$_])"
+                    }
+                }
+            }) -join "`n"
+
+            # Create Install.cmd
+            $cmdFileName = "Install.cmd"
+            $cmdFilePath = [System.IO.Path]::Combine($msiDirectory, $cmdFileName)
+            $msiFileName = [System.IO.Path]::GetFileName($msiFilePath)
+            $logFileName = [System.IO.Path]::GetFileNameWithoutExtension($transformName) + ".log"
+            $cmdContent = @"
+::MSI detection for $($version): $($guid)
+::Detection for ANY version: $($Script:WAU_REGISTRY_PATH),  Value Name: ProductVersion, Detection Method: Value exists
+
+msiexec /i "%~dp0$msiFileName" TRANSFORMS="%~dp0$transformName" /qn /l*v "%~dp0Inst-$logFileName"
+"@
+            Set-Content -Path $cmdFilePath -Value $cmdContent -Encoding ASCII
+
+            # Create Uninstall.cmd
+            $cmdFileName = "Uninstall.cmd"
+            $cmdFilePath = [System.IO.Path]::Combine($msiDirectory, $cmdFileName)
+            $cmdContent = @"
+::Uninstall for $($version):
+msiexec /x"$($guid)" REBOOT=R /qn /l*v "%~dp0Uninst-$logFileName"
+
+::Uninstall for ANY version:
+::powershell.exe -Command "Get-Package -Name "*Winget-AutoUpdate*" | Uninstall-Package -Force"
+"@
+            Set-Content -Path $cmdFilePath -Value $cmdContent -Encoding ASCII
+            
+            $message = "Transform file created successfully!`n`nTransform File: $transformName`nLocation: $transformPath`n`nInstall/Uninstall scripts created.`n`nProperties Set:`n$propertiesSummary`n`nProduct Name: $name`nProduct Version: $version`nProduct Code: $guid`n`nThe Product Code has been copied to your clipboard."
+        } else {
+            $message = "Transform created successfully for installation"
+        }
+        
+        return @{
+            Success = $true
+            TransformPath = $transformPath
+            Directory = $msiDirectory
+            Message = $message
+            GUID = $guid
+            ProductName = $name
+            ProductVersion = $version
+        }
+    }
+    catch {
+        return @{
+            Success = $false
+            Message = "Failed to create transform: $($_.Exception.Message)"
+        }
+    }
+    finally {
+        # Clean up temp file
+        if (Test-Path $tempFile) {
+            Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
+        }
+        
+        # Clean up COM objects
+        if ($modifiedDb) { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($modifiedDb) | Out-Null }
+        if ($database) { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($database) | Out-Null }
+        if ($installer) { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($installer) | Out-Null }
+    }
+}
 function Get-WAUMsi {
     # Configuration
     $msiDir = Join-Path $Script:USER_DIR "Msi"
@@ -747,9 +1015,16 @@ function Install-WAU {
         }
         
         # Check if we're in main application context
-        if ($Script:MainWindowStarted) {
-            # If in main window context; start installation process with the showing settings
-            Start-Process -FilePath "msiexec.exe" -ArgumentList "/i `"$msiFilePath`" /qb" -Wait
+        if ($Script:MainWindowStarted -and $controls) {
+            # If in main window context; create transform from current settings and start installation
+            $transformResult = New-MSITransformFromControls -msiFilePath $msiFilePath -controls $controls -createFiles $false
+            
+            if ($transformResult.Success) {
+                # Start installation process with transform
+                Start-Process -FilePath "msiexec.exe" -ArgumentList "/i `"$msiFilePath`" TRANSFORMS=`"$($transformResult.TransformPath)`" /qb" -Wait
+            } else {
+                throw "Failed to create transform: $($transformResult.Message)"
+            }
         } else {
             # If not in main window context; Start installation process with default settings
             Start-Process -FilePath "msiexec.exe" -ArgumentList "/i `"$msiFilePath`" /qb" -Wait
@@ -814,11 +1089,9 @@ function Uninstall-WAU {
         return $false
     }
 }
-
 function New-WAUTransformFile {
     param($controls)
     try {
-
         # Configuration
         $msiDir = Join-Path $Script:USER_DIR "Msi"
 
@@ -857,247 +1130,15 @@ function New-WAUTransformFile {
         
         if ($openFileDialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
             $selectedFile = $openFileDialog.FileName
-            
             Close-PopUp
             
-            try {
-                # Create a Windows Installer object
-                $installer = New-Object -ComObject WindowsInstaller.Installer
-                $database = $installer.GetType().InvokeMember("OpenDatabase", "InvokeMethod", $null, $installer, @($selectedFile, 0))
-                
-                # Extract Properties from $($MsiAsset.name)
-                $properties = @('ProductName', 'ProductVersion', 'ProductCode')
-                $views = @{}
-                $values = @{}
-                
-                # Create and execute views
-                foreach ($prop in $properties) {
-                    $views[$prop] = $database.GetType().InvokeMember("OpenView", "InvokeMethod", $null, $database, "SELECT Value FROM Property WHERE Property = '$prop'")
-                    $views[$prop].GetType().InvokeMember("Execute", "InvokeMethod", $null, $views[$prop], $null)
-                    
-                    # Fetch and extract value
-                    $record = $views[$prop].GetType().InvokeMember("Fetch", "InvokeMethod", $null, $views[$prop], $null)
-                    $values[$prop] = if ($record) {
-                        $value = $record.GetType().InvokeMember("StringData", "GetProperty", $null, $record, 1)
-                        [System.Runtime.InteropServices.Marshal]::ReleaseComObject($record) | Out-Null
-                        $value
-                    } else { $null }
-                    
-                    # Close and release view
-                    $views[$prop].GetType().InvokeMember("Close", "InvokeMethod", $null, $views[$prop], $null)
-                    [System.Runtime.InteropServices.Marshal]::ReleaseComObject($views[$prop]) | Out-Null
-                }
-                
-                # Assign variables
-                $name = $values['ProductName']
-                $version = $values['ProductVersion'] 
-                $guid = $values['ProductCode']
-                
-                if ($guid) {
-                    # Create transform file name by removing from '(' to end and trimming
-                    $transformName = if ($Script:WAU_TITLE -match '^(.+?)\s*\(') {
-                        $matches[1].Trim() + '.mst'
-                    } else {
-                        $Script:WAU_TITLE.Trim() + '.mst'
-                    }
-                    
-                    # Get directory of the selected MSI file
-                    $msiDirectory = [System.IO.Path]::GetDirectoryName($selectedFile)
-                    $transformPath = [System.IO.Path]::Combine($msiDirectory, $transformName)
-                    
-                    # Create a copy of the MSI to modify
-                    $tempFile = [System.IO.Path]::GetTempFileName()
-                    Copy-Item $selectedFile $tempFile -Force
-                    $modifiedDb = $installer.GetType().InvokeMember("OpenDatabase", "InvokeMethod", $null, $installer, @($tempFile, 1))
-                    
-                    # Collect all properties from form controls
-                    $properties = @{
-                        'REBOOT' = 'R'  # Always set REBOOT=R
-                    }
-                    
-                    # Map control values to MSI properties (ALL PROPERTIES IN UPPERCASE)
-                    # Always add properties, even if empty/default
-                    
-                    # ComboBox selections
-                    $properties['UPDATESINTERVAL'] = if ($controls.UpdateIntervalComboBox.SelectedItem) { 
-                        $controls.UpdateIntervalComboBox.SelectedItem.Tag 
-                    } else { 
-                        'Never'  # Default value
-                    }
-                    
-                    $properties['NOTIFICATIONLEVEL'] = if ($controls.NotificationLevelComboBox.SelectedItem) { 
-                        $controls.NotificationLevelComboBox.SelectedItem.Tag 
-                    } else { 
-                        'Full'  # Default value
-                    }
-                    
-                    # Time settings - always include even if empty
-                    $hour = "{0:D2}" -f ($controls.UpdateTimeHourComboBox.SelectedIndex + 1)
-                    $minute = "{0:D2}" -f ($controls.UpdateTimeMinuteComboBox.SelectedIndex)
-                    $properties['UPDATESATTIME'] = "$hour`:$minute`:00"
-
-                    $hour = "{0:D2}" -f ($controls.RandomDelayHourComboBox.SelectedIndex)
-                    $minute = "{0:D2}" -f ($controls.RandomDelayMinuteComboBox.SelectedIndex)
-                    $properties['UPDATESATTIMEDELAY'] = "$hour`:$minute"
-
-                    # Path settings - always include even if empty
-                    $properties['LISTPATH'] = if (![string]::IsNullOrWhiteSpace($controls.ListPathTextBox.Text)) {
-                        $controls.ListPathTextBox.Text
-                    } else {
-                        ""  # Empty string
-                    }
-
-                    $properties['MODSPATH'] = if (![string]::IsNullOrWhiteSpace($controls.ModsPathTextBox.Text)) {
-                        $controls.ModsPathTextBox.Text
-                    } else {
-                        ""  # Empty string
-                    }
-
-                    $properties['AZUREBLOBSASURL'] = if (![string]::IsNullOrWhiteSpace($controls.AzureBlobSASURLTextBox.Text)) {
-                        $controls.AzureBlobSASURLTextBox.Text
-                    } else {
-                        ""  # Empty string
-                    }
-                    
-                    # Checkbox properties - always include (1 for checked, 0 for unchecked)
-                    $properties['DISABLEWAUAUTOUPDATE'] = if ($controls.DisableWAUAutoUpdateCheckBox.IsChecked) { '1' } else { '0' }
-                    $properties['UPDATEPRERELEASE'] = if ($controls.UpdatePreReleaseCheckBox.IsChecked) { '1' } else { '0' }
-                    $properties['DONOTRUNONMETERED'] = if ($controls.DoNotRunOnMeteredCheckBox.IsChecked) { '1' } else { '0' }
-                    $properties['STARTMENUSHORTCUT'] = if ($controls.StartMenuShortcutCheckBox.IsChecked) { '1' } else { '0' }
-                    $properties['DESKTOPSHORTCUT'] = if ($controls.DesktopShortcutCheckBox.IsChecked) { '1' } else { '0' }
-                    $properties['APPINSTALLERSHORTCUT'] = if ($controls.AppInstallerShortcutCheckBox.IsChecked) { '1' } else { '0' }
-                    $properties['UPDATESATLOGON'] = if ($controls.UpdatesAtLogonCheckBox.IsChecked) { '1' } else { '0' }
-                    $properties['USERCONTEXT'] = if ($controls.UserContextCheckBox.IsChecked) { '1' } else { '0' }
-                    $properties['BYPASSLISTFORUSERS'] = if ($controls.BypassListForUsersCheckBox.IsChecked) { '1' } else { '0' }
-                    $properties['USEWHITELIST'] = if ($controls.UseWhiteListCheckBox.IsChecked) { '1' } else { '0' }
-                    
-                    # Log settings - always include
-                    $properties['MAXLOGFILES'] = if ($controls.MaxLogFilesComboBox.SelectedItem) {
-                        $controls.MaxLogFilesComboBox.SelectedItem.Content
-                    } else {
-                        '3'  # Default value
-                    }
-                    
-                    $properties['MAXLOGSIZE'] = if ($controls.MaxLogSizeComboBox.SelectedItem -and $controls.MaxLogSizeComboBox.SelectedItem.Tag) {
-                        $controls.MaxLogSizeComboBox.SelectedItem.Tag
-                    } elseif (![string]::IsNullOrWhiteSpace($controls.MaxLogSizeComboBox.Text)) {
-                        $controls.MaxLogSizeComboBox.Text
-                    } else {
-                        '1048576'  # Default 1MB in bytes
-                    }
-                    
-                    # Add/Update all properties in the modified database
-                    foreach ($propName in $properties.Keys) {
-                        $propValue = $properties[$propName]
-                        
-                        # Ensure empty strings are handled properly for MSI
-                        if ([string]::IsNullOrEmpty($propValue)) {
-                            $propValue = ""
-                        }
-                        
-                        try {
-                            # Try INSERT first, then UPDATE if it fails
-                            $insertView = $modifiedDb.GetType().InvokeMember("OpenView", "InvokeMethod", $null, $modifiedDb, "INSERT INTO Property (Property, Value) VALUES ('$propName', '$propValue')")
-                            try {
-                                $insertView.GetType().InvokeMember("Execute", "InvokeMethod", $null, $insertView, $null)
-                            }
-                            catch {
-                                # Property might already exist, try UPDATE instead
-                                $insertView.GetType().InvokeMember("Close", "InvokeMethod", $null, $insertView, $null)
-                                [System.Runtime.InteropServices.Marshal]::ReleaseComObject($insertView) | Out-Null
-                                
-                                $updateView = $modifiedDb.GetType().InvokeMember("OpenView", "InvokeMethod", $null, $modifiedDb, "UPDATE Property SET Value = '$propValue' WHERE Property = '$propName'")
-                                $updateView.GetType().InvokeMember("Execute", "InvokeMethod", $null, $updateView, $null)
-                                $updateView.GetType().InvokeMember("Close", "InvokeMethod", $null, $updateView, $null)
-                                [System.Runtime.InteropServices.Marshal]::ReleaseComObject($updateView) | Out-Null
-                                continue
-                            }
-                            $insertView.GetType().InvokeMember("Close", "InvokeMethod", $null, $insertView, $null)
-                            [System.Runtime.InteropServices.Marshal]::ReleaseComObject($insertView) | Out-Null
-                        }
-                        catch {
-                            Write-Warning "Failed to set property $propName = $propValue"
-                        }
-                    }
-                    
-                    # Commit changes to modified database
-                    $modifiedDb.GetType().InvokeMember("Commit", "InvokeMethod", $null, $modifiedDb, $null)
-                    
-                    # Generate transform between original and modified databases
-                    $modifiedDb.GetType().InvokeMember("GenerateTransform", "InvokeMethod", $null, $modifiedDb, @($database, $transformPath))
-                    
-                    # Create transform summary info to make it valid
-                    $modifiedDb.GetType().InvokeMember("CreateTransformSummaryInfo", "InvokeMethod", $null, $modifiedDb, @($database, $transformPath, 0, 0))
-                    
-                    # Copy GUID to clipboard
-                    Set-Clipboard -Value $guid
-                    
-                    # Sort properties for display according to the form order
-                    $propertyOrder = @(
-                        'UPDATESINTERVAL', 'NOTIFICATIONLEVEL', 'UPDATESATTIME', 'UPDATESATTIMEDELAY',
-                        'LISTPATH', 'MODSPATH', 'AZUREBLOBSASURL',
-                        'DISABLEWAUAUTOUPDATE', 'UPDATEPRERELEASE', 'DONOTRUNONMETERED',
-                        'STARTMENUSHORTCUT', 'DESKTOPSHORTCUT', 'APPINSTALLERSHORTCUT',
-                        'UPDATESATLOGON', 'USERCONTEXT', 'BYPASSLISTFORUSERS', 'USEWHITELIST',
-                        'MAXLOGFILES', 'MAXLOGSIZE', 'REBOOT'
-                    )
-                    # Create summary of properties set (in form order, show ALL values including empty ones)
-                    $propertiesSummary = ($propertyOrder | ForEach-Object {
-                        if ($properties.ContainsKey($_)) {
-                            if ($properties[$_] -eq "") {
-                                "$_=(empty)"
-                            } else {
-                                "$_=$($properties[$_])"
-                            }
-                        }
-                    }) -join "`n"
-
-                    #Create Install.cmd
-                    $cmdFileName = "Install.cmd"
-                    $cmdFilePath = [System.IO.Path]::Combine($msiDirectory, $cmdFileName)
-                    $msiFileName = [System.IO.Path]::GetFileName($selectedFile)
-                    $logFileName = [System.IO.Path]::GetFileNameWithoutExtension($transformName) + ".log"
-                    $cmdContent = @"
-::MSI detection for $($version): $($guid)
-::Detection for ANY version: $($Script:WAU_REGISTRY_PATH),  Value Name: ProductVersion, Detection Method: Value exists
-
-msiexec /i "%~dp0$msiFileName" TRANSFORMS="%~dp0$transformName" /qn /l*v "%~dp0Inst-$logFileName"
-"@
-                    Set-Content -Path $cmdFilePath -Value $cmdContent -Encoding ASCII
-
-                    #Create Uninstall.cmd
-                    $cmdFileName = "Uninstall.cmd"
-                    $cmdFilePath = [System.IO.Path]::Combine($msiDirectory, $cmdFileName)
-                    $msiFileName = [System.IO.Path]::GetFileName($selectedFile)
-                    $cmdContent = @"
-::Uninstall for $($version):
-msiexec /x"$($guid)" REBOOT=R /qn /l*v "%~dp0Uninst-$logFileName"
-
-::Uninstall for ANY version:
-::powershell.exe -Command "Get-Package -Name "*Winget-AutoUpdate*" | Uninstall-Package -Force"
-"@
-                    Set-Content -Path $cmdFilePath -Value $cmdContent -Encoding ASCII
-
-                    # Show success message with transform file path and properties summary
-                    [System.Windows.MessageBox]::Show("Transform file created successfully!`n`nTransform File: $transformName`nLocation: $transformPath`n`nInstall/Uninstall scripts created.`n`nProperties Set:`n$propertiesSummary`n`nProduct Name: $name`nProduct Version: $version`nProduct Code: $guid`n`nThe Product Code has been copied to your clipboard.", "Transform Created", "OK", "Information")
-                    Start-Process "explorer.exe" -ArgumentList "$msiDirectory"
-                } else {
-                    [System.Windows.MessageBox]::Show("Could not extract Product Code from the MSI file.", "Error", "OK", "Error")
-                }
-                
-                # Clean up temp file
-                if (Test-Path $tempFile) {
-                    Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
-                }
-            }
-            catch {
-                [System.Windows.MessageBox]::Show("Failed to process MSI file: $($_.Exception.Message)", "Error", "OK", "Error")
-            }
-            finally {
-                # Clean up all COM objects once at the end
-                if ($modifiedDb) { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($modifiedDb) | Out-Null }
-                if ($database) { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($database) | Out-Null }
-                if ($installer) { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($installer) | Out-Null }
+            # Use the new transform generation function
+            $result = New-MSITransformFromControls -msiFilePath $selectedFile -controls $controls -createFiles $true
+            if ($result.Success) {
+                [System.Windows.MessageBox]::Show($result.Message, "Transform Created", "OK", "Information")
+                Start-Process "explorer.exe" -ArgumentList $result.Directory
+            } else {
+                [System.Windows.MessageBox]::Show($result.Message, "Error", "OK", "Error")
             }
         } else {
             Close-PopUp
