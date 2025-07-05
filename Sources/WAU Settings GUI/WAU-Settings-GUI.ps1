@@ -22,8 +22,9 @@ Provides a user-friendly interface to modify every aspect of WAU settings includ
   - GUID path exploration
   - WinGet system wide installed application list
   - List file management
-  - MSI transform creation
+  - MSI transform creation (using current showing configuration)
   - Configuration backup/import (i.e. for sharing settings)
+  - Uninstall/install WAU (with current showing configuration)
 
 .NOTES
 Must be run as Administrator
@@ -35,6 +36,7 @@ Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName PresentationFramework
 
 # Constants of most used paths and arguments
+$Script:WAU_REPO = "Romanitho/Winget-AutoUpdate"
 $Script:WAU_REGISTRY_PATH = "HKLM:\SOFTWARE\Romanitho\Winget-AutoUpdate"
 $Script:WAU_POLICIES_PATH = "HKLM:\SOFTWARE\Policies\Romanitho\Winget-AutoUpdate"
 $Script:CONHOST_EXE = "${env:SystemRoot}\System32\conhost.exe"
@@ -194,16 +196,93 @@ function Get-DisplayValue {
 function Get-WAUCurrentConfig {
     try {
         $config = Get-ItemProperty -Path $Script:WAU_REGISTRY_PATH -ErrorAction SilentlyContinue
-        if (!$config) {
-            throw "WAU not found in registry"
+        if (!$config -or [string]::IsNullOrEmpty($config.ProductVersion)) {
+            throw "WAU not found in registry or ProductVersion missing"
         }
         return $config
-    }
+    }    
     catch {
-        [System.Windows.MessageBox]::Show("WAU configuration not found. Please ensure WAU is properly installed.", "Error", "OK", "Error")
-        exit 1
+        if (!$Script:MainWindowStarted) {
+            Close-PopUp
+        }
+        
+        # Show initial prompt
+        $userWantsToInstall = [System.Windows.MessageBox]::Show(
+            "WAU configuration not found. Please ensure WAU is properly installed.`n`nDo you want to download and install WAU now?", 
+            "WAU Not Found", 
+            "YesNo", 
+            "Question"
+        ) -eq 'Yes'
+        
+        if ($userWantsToInstall) {
+            # Download MSI file
+            $msiFilePath = Get-WAUMsi
+            
+            if ($msiFilePath) {
+                # Ask user if they want to install now
+                $userWantsToInstallNow = [System.Windows.MessageBox]::Show(
+                    "WAU MSI downloaded successfully to:`n$msiFilePath`n`nDo you want to install it now?", 
+                    "Install WAU", 
+                    "YesNo", 
+                    "Question"
+                ) -eq 'Yes'
+                
+                if ($userWantsToInstallNow) {
+                    # Install WAU using the downloaded MSI file
+                    $installResult = Install-WAU -msiFilePath $msiFilePath
+                    
+                    # Handle post-installation logic
+                    if ($Script:MainWindowStarted) {
+                        return $null  # Return to main window regardless of install result
+                    }
+                    
+                    # Create desktop shortcut for settings
+                    Add-Shortcut $Script:DESKTOP_WAU_SETTINGS $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$($Script:WorkingDir.TrimEnd('\'))\WAU-Settings-GUI.ps1`"" "$Script:GUI_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
+                    
+                    if ($installResult) {
+                        # Installation succeeded, try to get config again
+                        try {
+                            return Get-ItemProperty -Path $Script:WAU_REGISTRY_PATH -ErrorAction Stop
+                        }
+                        catch {
+                            [System.Windows.MessageBox]::Show("Installation succeeded but cannot read WAU configuration.", "Configuration Error", "OK", "Error")
+                            exit 1
+                        }
+                    } else {
+                        exit 1  # Installation failed
+                    }
+                } else {
+                    # User chose not to install now - open the directory where MSI is located
+                    Start-Process "explorer.exe" -ArgumentList "/select,`"$msiFilePath`""
+                    
+                    if ($Script:MainWindowStarted) {
+                        return $config  # Return to main window
+                    } else {
+                        Add-Shortcut $Script:DESKTOP_WAU_SETTINGS $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$($Script:WorkingDir.TrimEnd('\'))\WAU-Settings-GUI.ps1`"" "$Script:GUI_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
+                        exit 1
+                    }
+                }
+            } else {
+                # MSI download failed
+                if ($Script:MainWindowStarted) {
+                    return $null  # Return to main window
+                } else {
+                    Add-Shortcut $Script:DESKTOP_WAU_SETTINGS $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$($Script:WorkingDir.TrimEnd('\'))\WAU-Settings-GUI.ps1`"" "$Script:GUI_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
+                    exit 1
+                }
+            }
+        } else {
+            # User declined to install
+            if ($Script:MainWindowStarted) {
+                return $null  # Return to main window
+            } else {
+                Add-Shortcut $Script:DESKTOP_WAU_SETTINGS $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$($Script:WorkingDir.TrimEnd('\'))\WAU-Settings-GUI.ps1`"" "$Script:GUI_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
+                exit 1
+            }
+        }
     }
 }
+
 function Import-WAUSettingsFromFile {
     param(
         [string]$FilePath,
@@ -620,13 +699,401 @@ function Set-WAUConfig {
 }
 
 # 3. WAU operation functions (depends on config functions)
+function New-MSITransformFromControls {
+    param(
+        [string]$msiFilePath,
+        $controls,
+        [bool]$createFiles = $false
+    )
+    
+    try {
+        # Create a Windows Installer object
+        $installer = New-Object -ComObject WindowsInstaller.Installer
+        $database = $installer.GetType().InvokeMember("OpenDatabase", "InvokeMethod", $null, $installer, @($msiFilePath, 0))
+        
+        # Extract Properties from MSI
+        $properties = @('ProductName', 'ProductVersion', 'ProductCode')
+        $views = @{}
+        $values = @{}
+        
+        # Create and execute views
+        foreach ($prop in $properties) {
+            $views[$prop] = $database.GetType().InvokeMember("OpenView", "InvokeMethod", $null, $database, "SELECT Value FROM Property WHERE Property = '$prop'")
+            $views[$prop].GetType().InvokeMember("Execute", "InvokeMethod", $null, $views[$prop], $null)
+            
+            # Fetch and extract value
+            $record = $views[$prop].GetType().InvokeMember("Fetch", "InvokeMethod", $null, $views[$prop], $null)
+            $values[$prop] = if ($record) {
+                $value = $record.GetType().InvokeMember("StringData", "GetProperty", $null, $record, 1)
+                [System.Runtime.InteropServices.Marshal]::ReleaseComObject($record) | Out-Null
+                $value
+            } else { $null }
+            
+            # Close and release view
+            $views[$prop].GetType().InvokeMember("Close", "InvokeMethod", $null, $views[$prop], $null)
+            [System.Runtime.InteropServices.Marshal]::ReleaseComObject($views[$prop]) | Out-Null
+        }
+        
+        # Assign variables
+        $name = $values['ProductName']
+        $version = $values['ProductVersion'] 
+        $guid = $values['ProductCode']
+        
+        if (-not $guid) {
+            throw "Could not extract Product Code from the MSI file"
+        }
+        
+        # Create transform file name
+        $transformName = if ($createFiles) {
+            if ($Script:WAU_TITLE -match '^(.+?)\s*\(') {
+                $matches[1].Trim() + '.mst'
+            } else {
+                $Script:WAU_TITLE.Trim() + '.mst'
+            }
+        } else {
+            [System.IO.Path]::GetTempFileName() + ".mst"
+        }
+        
+        # Get directory for transform
+        $msiDirectory = if ($createFiles) {
+            [System.IO.Path]::GetDirectoryName($msiFilePath)
+        } else {
+            [System.IO.Path]::GetTempPath()
+        }
+        $transformPath = [System.IO.Path]::Combine($msiDirectory, $transformName)
+        
+        # Create a copy of the MSI to modify
+        $tempFile = [System.IO.Path]::GetTempFileName()
+        Copy-Item $msiFilePath $tempFile -Force
+        $modifiedDb = $installer.GetType().InvokeMember("OpenDatabase", "InvokeMethod", $null, $installer, @($tempFile, 1))
+        
+        # Collect all properties from form controls
+        $properties = @{
+            'REBOOT' = 'R'  # Always set REBOOT=R
+        }
+        
+        # Map control values to MSI properties (ALL PROPERTIES IN UPPERCASE)
+        
+        # ComboBox selections
+        $properties['UPDATESINTERVAL'] = if ($controls.UpdateIntervalComboBox.SelectedItem) { 
+            $controls.UpdateIntervalComboBox.SelectedItem.Tag 
+        } else { 
+            'Never'  # Default value
+        }
+        
+        $properties['NOTIFICATIONLEVEL'] = if ($controls.NotificationLevelComboBox.SelectedItem) { 
+            $controls.NotificationLevelComboBox.SelectedItem.Tag 
+        } else { 
+            'Full'  # Default value
+        }
+        
+        # Time settings
+        $hour = "{0:D2}" -f ($controls.UpdateTimeHourComboBox.SelectedIndex + 1)
+        $minute = "{0:D2}" -f ($controls.UpdateTimeMinuteComboBox.SelectedIndex)
+        $properties['UPDATESATTIME'] = "$hour`:$minute`:00"
+
+        $hour = "{0:D2}" -f ($controls.RandomDelayHourComboBox.SelectedIndex)
+        $minute = "{0:D2}" -f ($controls.RandomDelayMinuteComboBox.SelectedIndex)
+        $properties['UPDATESATTIMEDELAY'] = "$hour`:$minute"
+
+        # Path settings
+        $properties['LISTPATH'] = if (![string]::IsNullOrWhiteSpace($controls.ListPathTextBox.Text)) {
+            $controls.ListPathTextBox.Text
+        } else {
+            ""
+        }
+
+        $properties['MODSPATH'] = if (![string]::IsNullOrWhiteSpace($controls.ModsPathTextBox.Text)) {
+            $controls.ModsPathTextBox.Text
+        } else {
+            ""
+        }
+
+        $properties['AZUREBLOBSASURL'] = if (![string]::IsNullOrWhiteSpace($controls.AzureBlobSASURLTextBox.Text)) {
+            $controls.AzureBlobSASURLTextBox.Text
+        } else {
+            ""
+        }
+        
+        # Checkbox properties
+        $properties['DISABLEWAUAUTOUPDATE'] = if ($controls.DisableWAUAutoUpdateCheckBox.IsChecked) { '1' } else { '0' }
+        $properties['UPDATEPRERELEASE'] = if ($controls.UpdatePreReleaseCheckBox.IsChecked) { '1' } else { '0' }
+        $properties['DONOTRUNONMETERED'] = if ($controls.DoNotRunOnMeteredCheckBox.IsChecked) { '1' } else { '0' }
+        $properties['STARTMENUSHORTCUT'] = if ($controls.StartMenuShortcutCheckBox.IsChecked) { '1' } else { '0' }
+        $properties['DESKTOPSHORTCUT'] = if ($controls.DesktopShortcutCheckBox.IsChecked) { '1' } else { '0' }
+        $properties['APPINSTALLERSHORTCUT'] = if ($controls.AppInstallerShortcutCheckBox.IsChecked) { '1' } else { '0' }
+        $properties['UPDATESATLOGON'] = if ($controls.UpdatesAtLogonCheckBox.IsChecked) { '1' } else { '0' }
+        $properties['USERCONTEXT'] = if ($controls.UserContextCheckBox.IsChecked) { '1' } else { '0' }
+        $properties['BYPASSLISTFORUSERS'] = if ($controls.BypassListForUsersCheckBox.IsChecked) { '1' } else { '0' }
+        $properties['USEWHITELIST'] = if ($controls.UseWhiteListCheckBox.IsChecked) { '1' } else { '0' }
+        
+        # Log settings
+        $properties['MAXLOGFILES'] = if ($controls.MaxLogFilesComboBox.SelectedItem) {
+            $controls.MaxLogFilesComboBox.SelectedItem.Content
+        } else {
+            '3'
+        }
+        
+        $properties['MAXLOGSIZE'] = if ($controls.MaxLogSizeComboBox.SelectedItem -and $controls.MaxLogSizeComboBox.SelectedItem.Tag) {
+            $controls.MaxLogSizeComboBox.SelectedItem.Tag
+        } elseif (![string]::IsNullOrWhiteSpace($controls.MaxLogSizeComboBox.Text)) {
+            $controls.MaxLogSizeComboBox.Text
+        } else {
+            '1048576'
+        }
+        
+        # Add/Update all properties in the modified database
+        foreach ($propName in $properties.Keys) {
+            $propValue = $properties[$propName]
+            
+            if ([string]::IsNullOrEmpty($propValue)) {
+                $propValue = ""
+            }
+            
+            try {
+                # Try INSERT first, then UPDATE if it fails
+                $insertView = $modifiedDb.GetType().InvokeMember("OpenView", "InvokeMethod", $null, $modifiedDb, "INSERT INTO Property (Property, Value) VALUES ('$propName', '$propValue')")
+                try {
+                    $insertView.GetType().InvokeMember("Execute", "InvokeMethod", $null, $insertView, $null)
+                }
+                catch {
+                    # Property might already exist, try UPDATE instead
+                    $insertView.GetType().InvokeMember("Close", "InvokeMethod", $null, $insertView, $null)
+                    [System.Runtime.InteropServices.Marshal]::ReleaseComObject($insertView) | Out-Null
+                    
+                    $updateView = $modifiedDb.GetType().InvokeMember("OpenView", "InvokeMethod", $null, $modifiedDb, "UPDATE Property SET Value = '$propValue' WHERE Property = '$propName'")
+                    $updateView.GetType().InvokeMember("Execute", "InvokeMethod", $null, $updateView, $null)
+                    $updateView.GetType().InvokeMember("Close", "InvokeMethod", $null, $updateView, $null)
+                    [System.Runtime.InteropServices.Marshal]::ReleaseComObject($updateView) | Out-Null
+                    continue
+                }
+                $insertView.GetType().InvokeMember("Close", "InvokeMethod", $null, $insertView, $null)
+                [System.Runtime.InteropServices.Marshal]::ReleaseComObject($insertView) | Out-Null
+            }
+            catch {
+                Write-Warning "Failed to set property $propName = $propValue"
+            }
+        }
+        
+        # Commit changes to modified database
+        $modifiedDb.GetType().InvokeMember("Commit", "InvokeMethod", $null, $modifiedDb, $null)
+        
+        # Generate transform between original and modified databases
+        $modifiedDb.GetType().InvokeMember("GenerateTransform", "InvokeMethod", $null, $modifiedDb, @($database, $transformPath))
+        
+        # Create transform summary info to make it valid
+        $modifiedDb.GetType().InvokeMember("CreateTransformSummaryInfo", "InvokeMethod", $null, $modifiedDb, @($database, $transformPath, 0, 0))
+        
+        # Create additional files if requested
+        if ($createFiles) {
+            # Copy GUID to clipboard
+            Set-Clipboard -Value $guid
+            
+            # Sort properties for display
+            $propertyOrder = @(
+                'UPDATESINTERVAL', 'NOTIFICATIONLEVEL', 'UPDATESATTIME', 'UPDATESATTIMEDELAY',
+                'LISTPATH', 'MODSPATH', 'AZUREBLOBSASURL',
+                'DISABLEWAUAUTOUPDATE', 'UPDATEPRERELEASE', 'DONOTRUNONMETERED',
+                'STARTMENUSHORTCUT', 'DESKTOPSHORTCUT', 'APPINSTALLERSHORTCUT',
+                'UPDATESATLOGON', 'USERCONTEXT', 'BYPASSLISTFORUSERS', 'USEWHITELIST',
+                'MAXLOGFILES', 'MAXLOGSIZE', 'REBOOT'
+            )
+            
+            $propertiesSummary = ($propertyOrder | ForEach-Object {
+                if ($properties.ContainsKey($_)) {
+                    if ($properties[$_] -eq "") {
+                        "$_=(empty)"
+                    } else {
+                        "$_=$($properties[$_])"
+                    }
+                }
+            }) -join "`n"
+
+            # Create Install.cmd
+            $cmdFileName = "Install.cmd"
+            $cmdFilePath = [System.IO.Path]::Combine($msiDirectory, $cmdFileName)
+            $msiFileName = [System.IO.Path]::GetFileName($msiFilePath)
+            $logFileName = [System.IO.Path]::GetFileNameWithoutExtension($transformName) + ".log"
+            $cmdContent = @"
+::MSI detection for $($version): $($guid)
+::Detection for ANY version: $($Script:WAU_REGISTRY_PATH),  Value Name: ProductVersion, Detection Method: Value exists
+
+msiexec /i "%~dp0$msiFileName" TRANSFORMS="%~dp0$transformName" /qn /l*v "%~dp0Inst-$logFileName"
+"@
+            Set-Content -Path $cmdFilePath -Value $cmdContent -Encoding ASCII
+
+            # Create Uninstall.cmd
+            $cmdFileName = "Uninstall.cmd"
+            $cmdFilePath = [System.IO.Path]::Combine($msiDirectory, $cmdFileName)
+            $cmdContent = @"
+::Uninstall for $($version):
+msiexec /x"$($guid)" REBOOT=R /qn /l*v "%~dp0Uninst-$logFileName"
+
+::Uninstall for ANY version:
+::powershell.exe -Command "Get-Package -Name "*Winget-AutoUpdate*" | Uninstall-Package -Force"
+"@
+            Set-Content -Path $cmdFilePath -Value $cmdContent -Encoding ASCII
+            
+            $message = "Transform file created successfully!`n`nTransform File: $transformName`nLocation: $transformPath`n`nInstall/Uninstall scripts created.`n`nProperties Set:`n$propertiesSummary`n`nProduct Name: $name`nProduct Version: $version`nProduct Code: $guid`n`nThe Product Code has been copied to your clipboard."
+        } else {
+            $message = "Transform created successfully for installation"
+        }
+        
+        return @{
+            Success = $true
+            TransformPath = $transformPath
+            Directory = $msiDirectory
+            Message = $message
+            GUID = $guid
+            ProductName = $name
+            ProductVersion = $version
+        }
+    }
+    catch {
+        return @{
+            Success = $false
+            Message = "Failed to create transform: $($_.Exception.Message)"
+        }
+    }
+    finally {
+        # Clean up temp file
+        if (Test-Path $tempFile) {
+            Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
+        }
+        
+        # Clean up COM objects
+        if ($modifiedDb) { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($modifiedDb) | Out-Null }
+        if ($database) { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($database) | Out-Null }
+        if ($installer) { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($installer) | Out-Null }
+    }
+}
+function Get-WAUMsi {
+    # Configuration
+    $msiDir = Join-Path $Script:USER_DIR "Msi"
+
+    # Create temp directory
+    if (!(Test-Path $msiDir)) {
+        New-Item -ItemType Directory -Path $msiDir -Force | Out-Null
+    }
+
+    try {
+        # Get latest release info from GitHub API
+        $ApiUrl = "https://api.github.com/repos/$Script:WAU_REPO/releases/latest"
+        $Release = Invoke-RestMethod -Uri $ApiUrl -UseBasicParsing
+
+        # Find MSI download URL
+        $MsiAsset = $Release.assets | Where-Object { $_.name -like "*.msi" }
+        if (!$MsiAsset) {
+            throw "MSI file not found in latest release"
+        }
+        Start-PopUp "Downloading MSI: $($MsiAsset.name)..."
+        
+        $MsiUrl = $MsiAsset.browser_download_url
+        $msiFilePath = Join-Path $msiDir $MsiAsset.name
+        
+        Invoke-WebRequest -Uri $MsiUrl -OutFile $msiFilePath -UseBasicParsing
+        
+        Close-PopUp
+        
+        return $msiFilePath
+    } 
+    catch {
+        Close-PopUp
+        [System.Windows.MessageBox]::Show("Failed to download WAU: $($_.Exception.Message)", "Error", "OK", "Error")
+        return $null
+    }
+}
+function Install-WAU {
+    param(
+        [string]$msiFilePath,
+        $controls
+    )
+    
+    try {
+        if (-not (Test-Path $msiFilePath)) {
+            throw "MSI file not found: $msiFilePath"
+        }
+        
+        # Check if we're in main application context
+        if ($Script:MainWindowStarted -and $controls) {
+            # If in main window context; create transform from current settings and start installation
+            $transformResult = New-MSITransformFromControls -msiFilePath $msiFilePath -controls $controls -createFiles $false
+            
+            if ($transformResult.Success) {
+                # Start installation process with transform
+                Start-Process -FilePath "msiexec.exe" -ArgumentList "/i `"$msiFilePath`" TRANSFORMS=`"$($transformResult.TransformPath)`" /qb" -Wait
+            } else {
+                throw "Failed to create transform: $($transformResult.Message)"
+            }
+        } else {
+            # If not in main window context; Start installation process with default settings
+            Start-Process -FilePath "msiexec.exe" -ArgumentList "/i `"$msiFilePath`" /qb" -Wait
+        }                    
+        
+        # Check if installation was successful
+        $Script:WAU_INSTALL_INFO = Test-InstalledWAU -DisplayName "Winget-AutoUpdate"
+        if ($Script:WAU_INSTALL_INFO.Count -ge 1) {
+            [System.Windows.MessageBox]::Show("WAU installed successfully! Please configure the new installation.", "Installation Complete", "OK", "Information")
+
+            # Get WAU installation info and store as constants
+            $Script:WAU_VERSION = if ($Script:WAU_INSTALL_INFO.Count -ge 1) { $Script:WAU_INSTALL_INFO[0] } else { "Unknown" }
+            $Script:WAU_GUID = if ($Script:WAU_INSTALL_INFO.Count -ge 2) { $Script:WAU_INSTALL_INFO[1] } else { $null }
+            $wauIconPath = "${env:SystemRoot}\Installer\${Script:WAU_GUID}\icon.ico"
+            if (Test-Path $wauIconPath) {
+                $Script:WAU_ICON = $wauIconPath
+            }
+
+            # Reload configuration after successful installation
+            if ($Script:MainWindowStarted -and $controls) {
+                Update-WAUGUIFromConfig -Controls $controls 
+            }
+
+            return $true
+        } else {
+            [System.Windows.MessageBox]::Show("Installation may have failed. Please check the installation manually.", "Installation Status Unknown", "OK", "Warning")
+            return $false
+        }
+    } 
+    catch {
+        Close-PopUp
+        [System.Windows.MessageBox]::Show("Failed to install WAU: $($_.Exception.Message)", "Installation Failed", "OK", "Error")
+        return $false
+    }
+}
+function Uninstall-WAU {
+    try {
+        # Check if WAU is installed
+        $installedWAU = Test-InstalledWAU -DisplayName "Winget-AutoUpdate"
+        if ($installedWAU.Count -eq 0) {
+            [System.Windows.MessageBox]::Show("WAU is not installed.", "Uninstall WAU", "OK", "Information")
+            return $false
+        }
+        
+        Start-PopUp "Uninstalling WAU..."
+        
+        # Start uninstallation process
+        Start-Process -FilePath "msiexec.exe" -ArgumentList "/x `"$($installedWAU[1])`" /qb" -Wait
+        # After uninstall, verify WAU is no longer installed
+        $remainingWAU = Test-InstalledWAU -DisplayName "Winget-AutoUpdate"
+        if ($remainingWAU.Count -ne 0) {
+            throw "WAU is still detected as installed after uninstallation."
+        }
+        Close-PopUp
+        
+        [System.Windows.MessageBox]::Show("WAU uninstalled successfully.", "Uninstall Complete", "OK", "Information")
+        return $true
+    } 
+    catch {
+        Close-PopUp
+        [System.Windows.MessageBox]::Show("Failed to uninstall WAU: $($_.Exception.Message)", "Uninstall Failed", "OK", "Error")
+        return $false
+    }
+}
 function New-WAUTransformFile {
     param($controls)
     try {
-
         # Configuration
         $msiDir = Join-Path $Script:USER_DIR "Msi"
-        $GitHubRepo = "Romanitho/Winget-AutoUpdate"
 
         # Create temp directory
         if (!(Test-Path $msiDir)) {
@@ -639,24 +1106,13 @@ function New-WAUTransformFile {
         # If no MSI file was found download the latest MSI from GitHub
         if ([string]::IsNullOrEmpty($MsiAsset.name)) {
             try {
-            # Get latest release info from GitHub API
-            $ApiUrl = "https://api.github.com/repos/$GitHubRepo/releases/latest"
-            $Release = Invoke-RestMethod -Uri $ApiUrl -UseBasicParsing
-
-            # Find MSI download URL
-            $MsiAsset = $Release.assets | Where-Object { $_.name -like "*.msi" }
-            if (!$MsiAsset) {
-                throw "MSI file not found in latest release"
-            }
-            Start-PopUp "Downloading MSI: $($MsiAsset.name)..."
-            
-            $MsiUrl = $MsiAsset.browser_download_url
-            $msiFilePath = Join-Path $msiDir $MsiAsset.name
-            
-            Invoke-WebRequest -Uri $MsiUrl -OutFile $msiFilePath -UseBasicParsing
+                $msiFilePath = Get-WAUMsi
+                if (-not $msiFilePath) {
+                    throw "Failed to download MSI file"
+                }
             } catch {
                 Close-PopUp
-                [System.Windows.MessageBox]::Show("No MSI file found in $GitHubRepo latest release", "Error", "OK", "Error")
+                [System.Windows.MessageBox]::Show("No MSI file found in $Script:WAU_REPO latest release", "Error", "OK", "Error")
                 $MsiAsset = @{ name = '*.msi' }
                 Start-PopUp "Locate $($MsiAsset.name)..."
             }
@@ -674,247 +1130,15 @@ function New-WAUTransformFile {
         
         if ($openFileDialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
             $selectedFile = $openFileDialog.FileName
-            
             Close-PopUp
             
-            try {
-                # Create a Windows Installer object
-                $installer = New-Object -ComObject WindowsInstaller.Installer
-                $database = $installer.GetType().InvokeMember("OpenDatabase", "InvokeMethod", $null, $installer, @($selectedFile, 0))
-                
-                # Extract Properties from $($MsiAsset.name)
-                $properties = @('ProductName', 'ProductVersion', 'ProductCode')
-                $views = @{}
-                $values = @{}
-                
-                # Create and execute views
-                foreach ($prop in $properties) {
-                    $views[$prop] = $database.GetType().InvokeMember("OpenView", "InvokeMethod", $null, $database, "SELECT Value FROM Property WHERE Property = '$prop'")
-                    $views[$prop].GetType().InvokeMember("Execute", "InvokeMethod", $null, $views[$prop], $null)
-                    
-                    # Fetch and extract value
-                    $record = $views[$prop].GetType().InvokeMember("Fetch", "InvokeMethod", $null, $views[$prop], $null)
-                    $values[$prop] = if ($record) {
-                        $value = $record.GetType().InvokeMember("StringData", "GetProperty", $null, $record, 1)
-                        [System.Runtime.InteropServices.Marshal]::ReleaseComObject($record) | Out-Null
-                        $value
-                    } else { $null }
-                    
-                    # Close and release view
-                    $views[$prop].GetType().InvokeMember("Close", "InvokeMethod", $null, $views[$prop], $null)
-                    [System.Runtime.InteropServices.Marshal]::ReleaseComObject($views[$prop]) | Out-Null
-                }
-                
-                # Assign variables
-                $name = $values['ProductName']
-                $version = $values['ProductVersion'] 
-                $guid = $values['ProductCode']
-                
-                if ($guid) {
-                    # Create transform file name by removing from '(' to end and trimming
-                    $transformName = if ($Script:WAU_TITLE -match '^(.+?)\s*\(') {
-                        $matches[1].Trim() + '.mst'
-                    } else {
-                        $Script:WAU_TITLE.Trim() + '.mst'
-                    }
-                    
-                    # Get directory of the selected MSI file
-                    $msiDirectory = [System.IO.Path]::GetDirectoryName($selectedFile)
-                    $transformPath = [System.IO.Path]::Combine($msiDirectory, $transformName)
-                    
-                    # Create a copy of the MSI to modify
-                    $tempFile = [System.IO.Path]::GetTempFileName()
-                    Copy-Item $selectedFile $tempFile -Force
-                    $modifiedDb = $installer.GetType().InvokeMember("OpenDatabase", "InvokeMethod", $null, $installer, @($tempFile, 1))
-                    
-                    # Collect all properties from form controls
-                    $properties = @{
-                        'REBOOT' = 'R'  # Always set REBOOT=R
-                    }
-                    
-                    # Map control values to MSI properties (ALL PROPERTIES IN UPPERCASE)
-                    # Always add properties, even if empty/default
-                    
-                    # ComboBox selections
-                    $properties['UPDATESINTERVAL'] = if ($controls.UpdateIntervalComboBox.SelectedItem) { 
-                        $controls.UpdateIntervalComboBox.SelectedItem.Tag 
-                    } else { 
-                        'Never'  # Default value
-                    }
-                    
-                    $properties['NOTIFICATIONLEVEL'] = if ($controls.NotificationLevelComboBox.SelectedItem) { 
-                        $controls.NotificationLevelComboBox.SelectedItem.Tag 
-                    } else { 
-                        'Full'  # Default value
-                    }
-                    
-                    # Time settings - always include even if empty
-                    $hour = "{0:D2}" -f ($controls.UpdateTimeHourComboBox.SelectedIndex + 1)
-                    $minute = "{0:D2}" -f ($controls.UpdateTimeMinuteComboBox.SelectedIndex)
-                    $properties['UPDATESATTIME'] = "$hour`:$minute`:00"
-
-                    $hour = "{0:D2}" -f ($controls.RandomDelayHourComboBox.SelectedIndex)
-                    $minute = "{0:D2}" -f ($controls.RandomDelayMinuteComboBox.SelectedIndex)
-                    $properties['UPDATESATTIMEDELAY'] = "$hour`:$minute"
-
-                    # Path settings - always include even if empty
-                    $properties['LISTPATH'] = if (![string]::IsNullOrWhiteSpace($controls.ListPathTextBox.Text)) {
-                        $controls.ListPathTextBox.Text
-                    } else {
-                        ""  # Empty string
-                    }
-
-                    $properties['MODSPATH'] = if (![string]::IsNullOrWhiteSpace($controls.ModsPathTextBox.Text)) {
-                        $controls.ModsPathTextBox.Text
-                    } else {
-                        ""  # Empty string
-                    }
-
-                    $properties['AZUREBLOBSASURL'] = if (![string]::IsNullOrWhiteSpace($controls.AzureBlobSASURLTextBox.Text)) {
-                        $controls.AzureBlobSASURLTextBox.Text
-                    } else {
-                        ""  # Empty string
-                    }
-                    
-                    # Checkbox properties - always include (1 for checked, 0 for unchecked)
-                    $properties['DISABLEWAUAUTOUPDATE'] = if ($controls.DisableWAUAutoUpdateCheckBox.IsChecked) { '1' } else { '0' }
-                    $properties['UPDATEPRERELEASE'] = if ($controls.UpdatePreReleaseCheckBox.IsChecked) { '1' } else { '0' }
-                    $properties['DONOTRUNONMETERED'] = if ($controls.DoNotRunOnMeteredCheckBox.IsChecked) { '1' } else { '0' }
-                    $properties['STARTMENUSHORTCUT'] = if ($controls.StartMenuShortcutCheckBox.IsChecked) { '1' } else { '0' }
-                    $properties['DESKTOPSHORTCUT'] = if ($controls.DesktopShortcutCheckBox.IsChecked) { '1' } else { '0' }
-                    $properties['APPINSTALLERSHORTCUT'] = if ($controls.AppInstallerShortcutCheckBox.IsChecked) { '1' } else { '0' }
-                    $properties['UPDATESATLOGON'] = if ($controls.UpdatesAtLogonCheckBox.IsChecked) { '1' } else { '0' }
-                    $properties['USERCONTEXT'] = if ($controls.UserContextCheckBox.IsChecked) { '1' } else { '0' }
-                    $properties['BYPASSLISTFORUSERS'] = if ($controls.BypassListForUsersCheckBox.IsChecked) { '1' } else { '0' }
-                    $properties['USEWHITELIST'] = if ($controls.UseWhiteListCheckBox.IsChecked) { '1' } else { '0' }
-                    
-                    # Log settings - always include
-                    $properties['MAXLOGFILES'] = if ($controls.MaxLogFilesComboBox.SelectedItem) {
-                        $controls.MaxLogFilesComboBox.SelectedItem.Content
-                    } else {
-                        '3'  # Default value
-                    }
-                    
-                    $properties['MAXLOGSIZE'] = if ($controls.MaxLogSizeComboBox.SelectedItem -and $controls.MaxLogSizeComboBox.SelectedItem.Tag) {
-                        $controls.MaxLogSizeComboBox.SelectedItem.Tag
-                    } elseif (![string]::IsNullOrWhiteSpace($controls.MaxLogSizeComboBox.Text)) {
-                        $controls.MaxLogSizeComboBox.Text
-                    } else {
-                        '1048576'  # Default 1MB in bytes
-                    }
-                    
-                    # Add/Update all properties in the modified database
-                    foreach ($propName in $properties.Keys) {
-                        $propValue = $properties[$propName]
-                        
-                        # Ensure empty strings are handled properly for MSI
-                        if ([string]::IsNullOrEmpty($propValue)) {
-                            $propValue = ""
-                        }
-                        
-                        try {
-                            # Try INSERT first, then UPDATE if it fails
-                            $insertView = $modifiedDb.GetType().InvokeMember("OpenView", "InvokeMethod", $null, $modifiedDb, "INSERT INTO Property (Property, Value) VALUES ('$propName', '$propValue')")
-                            try {
-                                $insertView.GetType().InvokeMember("Execute", "InvokeMethod", $null, $insertView, $null)
-                            }
-                            catch {
-                                # Property might already exist, try UPDATE instead
-                                $insertView.GetType().InvokeMember("Close", "InvokeMethod", $null, $insertView, $null)
-                                [System.Runtime.InteropServices.Marshal]::ReleaseComObject($insertView) | Out-Null
-                                
-                                $updateView = $modifiedDb.GetType().InvokeMember("OpenView", "InvokeMethod", $null, $modifiedDb, "UPDATE Property SET Value = '$propValue' WHERE Property = '$propName'")
-                                $updateView.GetType().InvokeMember("Execute", "InvokeMethod", $null, $updateView, $null)
-                                $updateView.GetType().InvokeMember("Close", "InvokeMethod", $null, $updateView, $null)
-                                [System.Runtime.InteropServices.Marshal]::ReleaseComObject($updateView) | Out-Null
-                                continue
-                            }
-                            $insertView.GetType().InvokeMember("Close", "InvokeMethod", $null, $insertView, $null)
-                            [System.Runtime.InteropServices.Marshal]::ReleaseComObject($insertView) | Out-Null
-                        }
-                        catch {
-                            Write-Warning "Failed to set property $propName = $propValue"
-                        }
-                    }
-                    
-                    # Commit changes to modified database
-                    $modifiedDb.GetType().InvokeMember("Commit", "InvokeMethod", $null, $modifiedDb, $null)
-                    
-                    # Generate transform between original and modified databases
-                    $modifiedDb.GetType().InvokeMember("GenerateTransform", "InvokeMethod", $null, $modifiedDb, @($database, $transformPath))
-                    
-                    # Create transform summary info to make it valid
-                    $modifiedDb.GetType().InvokeMember("CreateTransformSummaryInfo", "InvokeMethod", $null, $modifiedDb, @($database, $transformPath, 0, 0))
-                    
-                    # Copy GUID to clipboard
-                    Set-Clipboard -Value $guid
-                    
-                    # Sort properties for display according to the form order
-                    $propertyOrder = @(
-                        'UPDATESINTERVAL', 'NOTIFICATIONLEVEL', 'UPDATESATTIME', 'UPDATESATTIMEDELAY',
-                        'LISTPATH', 'MODSPATH', 'AZUREBLOBSASURL',
-                        'DISABLEWAUAUTOUPDATE', 'UPDATEPRERELEASE', 'DONOTRUNONMETERED',
-                        'STARTMENUSHORTCUT', 'DESKTOPSHORTCUT', 'APPINSTALLERSHORTCUT',
-                        'UPDATESATLOGON', 'USERCONTEXT', 'BYPASSLISTFORUSERS', 'USEWHITELIST',
-                        'MAXLOGFILES', 'MAXLOGSIZE', 'REBOOT'
-                    )
-                    # Create summary of properties set (in form order, show ALL values including empty ones)
-                    $propertiesSummary = ($propertyOrder | ForEach-Object {
-                        if ($properties.ContainsKey($_)) {
-                            if ($properties[$_] -eq "") {
-                                "$_=(empty)"
-                            } else {
-                                "$_=$($properties[$_])"
-                            }
-                        }
-                    }) -join "`n"
-
-                    #Create Install.cmd
-                    $cmdFileName = "Install.cmd"
-                    $cmdFilePath = [System.IO.Path]::Combine($msiDirectory, $cmdFileName)
-                    $msiFileName = [System.IO.Path]::GetFileName($selectedFile)
-                    $logFileName = [System.IO.Path]::GetFileNameWithoutExtension($transformName) + ".log"
-                    $cmdContent = @"
-::MSI detection for $($version): $($guid)
-::Detection for ANY version: $($Script:WAU_REGISTRY_PATH),  Value Name: ProductVersion, Detection Method: Value exists
-
-msiexec /i "%~dp0$msiFileName" TRANSFORMS="%~dp0$transformName" /qn /l*v "%~dp0Inst-$logFileName"
-"@
-                    Set-Content -Path $cmdFilePath -Value $cmdContent -Encoding ASCII
-
-                    #Create Uninstall.cmd
-                    $cmdFileName = "Uninstall.cmd"
-                    $cmdFilePath = [System.IO.Path]::Combine($msiDirectory, $cmdFileName)
-                    $msiFileName = [System.IO.Path]::GetFileName($selectedFile)
-                    $cmdContent = @"
-::Uninstall for $($version):
-msiexec /x"$($guid)" REBOOT=R /qn /l*v "%~dp0Uninst-$logFileName"
-
-::Uninstall for ANY version:
-::powershell.exe -Command "Get-Package -Name "*Winget-AutoUpdate*" | Uninstall-Package -Force"
-"@
-                    Set-Content -Path $cmdFilePath -Value $cmdContent -Encoding ASCII
-
-                    # Show success message with transform file path and properties summary
-                    [System.Windows.MessageBox]::Show("Transform file created successfully!`n`nTransform File: $transformName`nLocation: $transformPath`n`nInstall/Uninstall scripts created.`n`nProperties Set:`n$propertiesSummary`n`nProduct Name: $name`nProduct Version: $version`nProduct Code: $guid`n`nThe Product Code has been copied to your clipboard.", "Transform Created", "OK", "Information")
-                    Start-Process "explorer.exe" -ArgumentList "$msiDirectory"
-                } else {
-                    [System.Windows.MessageBox]::Show("Could not extract Product Code from the MSI file.", "Error", "OK", "Error")
-                }
-                
-                # Clean up temp file
-                if (Test-Path $tempFile) {
-                    Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
-                }
-            }
-            catch {
-                [System.Windows.MessageBox]::Show("Failed to process MSI file: $($_.Exception.Message)", "Error", "OK", "Error")
-            }
-            finally {
-                # Clean up all COM objects once at the end
-                if ($modifiedDb) { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($modifiedDb) | Out-Null }
-                if ($database) { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($database) | Out-Null }
-                if ($installer) { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($installer) | Out-Null }
+            # Use the new transform generation function
+            $result = New-MSITransformFromControls -msiFilePath $selectedFile -controls $controls -createFiles $true
+            if ($result.Success) {
+                [System.Windows.MessageBox]::Show($result.Message, "Transform Created", "OK", "Information")
+                Start-Process "explorer.exe" -ArgumentList $result.Directory
+            } else {
+                [System.Windows.MessageBox]::Show($result.Message, "Error", "OK", "Error")
             }
         } else {
             Close-PopUp
@@ -1180,7 +1404,7 @@ function Update-StatusDisplay {
     } else {
         $controls.StatusText.Text = "Enabled"
         $controls.StatusText.Foreground = "Green"
-        $controls.StatusDescription.Text = "WAU will check for updates as scheduled"
+        $controls.StatusDescription.Text = "WAU will check for updates"
         $controls.UpdateTimeHourComboBox.IsEnabled = $true
         $controls.UpdateTimeMinuteComboBox.IsEnabled = $true
         $controls.RandomDelayHourComboBox.IsEnabled = $true
@@ -1404,7 +1628,12 @@ function Update-WAUGUIFromConfig {
         $controls.UpdateTimeMinuteComboBox.SelectedIndex = 0  # fallback to 00
     }
 
-    $randomDelay = (Get-DisplayValue -PropertyName "WAU_UpdatesTimeDelay" -Config $updatedConfig -Policies $updatedPolicies).ToString()
+    # Special case: 'WAU_UpdatesTimeDelay' isn't in the wild yet, so we handle it separately
+    $randomDelayValue = Get-DisplayValue -PropertyName "WAU_UpdatesTimeDelay" -Config $updatedConfig -Policies $updatedPolicies
+    $randomDelay = if ($null -ne $randomDelayValue) { $randomDelayValue.ToString() } else { "" }
+    if ($null -eq $randomDelay -or $randomDelay -eq "" -or $randomDelay.Length -lt 5) {
+        $randomDelay = "00:00"
+    }
     # Get the first 2 characters (hours), convert to int and set as SelectedIndex
     $hourIndex = [int]$randomDelay.Substring(0,2)
     if ($hourIndex -ge 0 -and $hourIndex -lt $controls.RandomDelayHourComboBox.Items.Count) {
@@ -1991,6 +2220,7 @@ function Set-DevToolsVisibility {
         $controls.DevListButton.Visibility = 'Visible'
         $controls.DevMSIButton.Visibility = 'Visible'
         $controls.DevCfgButton.Visibility = 'Visible'
+        $controls.DevWAUButton.Visibility = 'Visible'
         $controls.LinksStackPanel.Visibility = 'Visible'
         $window.Title = "$Script:WAU_TITLE - Dev Tools"
     } else {
@@ -2001,6 +2231,7 @@ function Set-DevToolsVisibility {
         $controls.DevListButton.Visibility = 'Collapsed'
         $controls.DevMSIButton.Visibility = 'Collapsed'
         $controls.DevCfgButton.Visibility = 'Collapsed'
+        $controls.DevWAUButton.Visibility = 'Collapsed'
         $controls.LinksStackPanel.Visibility = 'Collapsed'
         $window.Title = "$Script:WAU_TITLE"
     }
@@ -2088,6 +2319,14 @@ function Show-WAUSettingsGUI {
     # Get current configuration
     $currentConfig = Get-WAUCurrentConfig
     
+    # If config is null (WAU not found and user chose not to install), return gracefully
+    if ($null -eq $currentConfig) {
+        return
+    }
+    
+    # Set flag to indicate main window is starting/started (AFTER successful config retrieval)
+    $Script:MainWindowStarted = $true
+
     # Load XAML
     [xml]$xamlXML = $Script:WINDOW_XAML -replace 'x:N', 'N'
     $reader = (New-Object System.Xml.XmlNodeReader $xamlXML)
@@ -2497,6 +2736,66 @@ function Show-WAUSettingsGUI {
         Close-PopUp
     })
 
+    $controls.DevWAUButton.Add_Click({
+        # Check if WAU is installed and uninstall it
+        # If not installed, install it
+        try {
+            # Check if WAU is installed
+            $installedWAU = Test-InstalledWAU -DisplayName "Winget-AutoUpdate"
+            
+            if ($installedWAU.Count -gt 0) {
+                # WAU is installed - ask user if they want to uninstall
+                $result = [System.Windows.MessageBox]::Show(
+                    "WAU is currently installed. Do you want to uninstall it?", 
+                    "Uninstall WAU", 
+                    "YesNo", 
+                    "Question"
+                )
+                
+                if ($result -eq 'Yes') {
+                    $uninstallResult = Uninstall-WAU
+                    if ($uninstallResult) {
+                        # Update status to "Done"
+                        $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
+                        $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED
+                    }
+                }
+            } else {
+                # WAU is not installed - download and install
+                $result = [System.Windows.MessageBox]::Show(
+                    "WAU is not installed. Do you want to download and install it with current showing configuration?", 
+                    "Install WAU", 
+                    "YesNo", 
+                    "Question"
+                )
+                
+                if ($result -eq 'Yes') {
+                    # Download MSI file
+                    $msiFilePath = Get-WAUMsi
+                    if ($msiFilePath) {
+                        # Install WAU
+                        $installResult = Install-WAU -msiFilePath $msiFilePath -controls $controls
+                        if ($installResult) {
+                            # Update status to "Done"
+                            $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
+                            $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED
+                        }
+                    }
+                }
+            }
+            
+            # Create timer to reset status back to ready after standard wait time
+            $window.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Background, [Action]{
+                Start-Sleep -Milliseconds $Script:WAIT_TIME
+                $controls.StatusBarText.Text = $Script:STATUS_READY_TEXT
+                $controls.StatusBarText.Foreground = $Script:COLOR_INACTIVE
+            }) | Out-Null
+        }
+        catch {
+            [System.Windows.MessageBox]::Show("Failed to process WAU installation/uninstallation: $($_.Exception.Message)", "Error", "OK", "Error")
+        }        
+    })
+
     # Save button handler to save settings
     $controls.SaveButton.Add_Click({
         Save-WAUSettings -controls $controls
@@ -2617,7 +2916,7 @@ if (Test-Path $xamlConfigPath) {
     exit 1
 }
 
-# Get WAU installation info once and store as constants
+# Get WAU installation info and store as constants
 $Script:WAU_INSTALL_INFO = Test-InstalledWAU -DisplayName "Winget-AutoUpdate"
 $Script:WAU_VERSION = if ($Script:WAU_INSTALL_INFO.Count -ge 1) { $Script:WAU_INSTALL_INFO[0] } else { "Unknown" }
 $Script:WAU_GUID = if ($Script:WAU_INSTALL_INFO.Count -ge 2) { $Script:WAU_INSTALL_INFO[1] } else { $null }
