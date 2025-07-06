@@ -16,7 +16,7 @@ If **WAU** is not installed, the GUI prompts at startup to download and install 
 Significantly enhance **WAU's** usability for home users while maintaining enterprise-grade functionality.<br>
 Benefits from not having to manage the settings in several places when testing etc. (great for developers)...
 
-...a perfect companion for those supporting the community (if the community actually uses it!) - being able to ask for a screenshot of the settings because it comes with everything included (even a screenshot function with masking of potentially sensitive data)!
+...a perfect companion for those supporting the community (if the community actually uses it!) - being able to ask for a screenshot of the settings because it comes with all included (even a screenshot function with masking of potentially sensitive data)!
 
 Configure **WAU** settings after installation, including:
 - Update intervals and timing
