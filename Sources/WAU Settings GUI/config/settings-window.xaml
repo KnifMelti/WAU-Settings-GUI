@@ -258,32 +258,34 @@
 
     <!-- Information -->
     <GroupBox Grid.Row="7" Header="Information" Margin="0,0,0,10">
-        <StackPanel Margin="10">
-            <StackPanel Orientation="Horizontal">
-                <TextBlock x:Name="VersionLinksTextBlock" FontSize="9">
-                    Versions: [ WAU Settings: 
-                    <Hyperlink x:Name="WAUSettingsVersionLink" TextDecorations="None">
-                        <Run x:Name="WAUSettingsVersionText"/>
-                    </Hyperlink>
-                    | WAU: 
-                    <Hyperlink x:Name="WAUVersionLink" TextDecorations="None">
-                        <Run x:Name="WAUVersionText"/>
-                    </Hyperlink>
-                    | WinGet: 
-                    <Hyperlink x:Name="WinGetVersionLink" TextDecorations="None">
-                        <Run x:Name="WinGetVersionText"/>
-                    </Hyperlink>
-                    ]
-                </TextBlock>
-                <TextBlock x:Name="RunDate" Text=" WAU Last Run: " FontSize="9"/>
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="10">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock x:Name="VersionLinksTextBlock" FontSize="9">
+                        Versions: [ WAU Settings: 
+                        <Hyperlink x:Name="WAUSettingsVersionLink" TextDecorations="None">
+                            <Run x:Name="WAUSettingsVersionText"/>
+                        </Hyperlink>
+                        | WAU: 
+                        <Hyperlink x:Name="WAUVersionLink" TextDecorations="None">
+                            <Run x:Name="WAUVersionText"/>
+                        </Hyperlink>
+                        | WinGet: 
+                        <Hyperlink x:Name="WinGetVersionLink" TextDecorations="None">
+                            <Run x:Name="WinGetVersionText"/>
+                        </Hyperlink>
+                        ]
+                    </TextBlock>
+                    <TextBlock x:Name="RunDate" Text=" WAU Last Run: " FontSize="9"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock x:Name="InstallLocationText" Text="WAU Install Location: " FontSize="9"/>
+                    <TextBlock x:Name="LocalListText" Text="Current Local List: " FontSize="9"/>
+                </StackPanel>
+                
+                <TextBlock x:Name="WAUAutoUpdateText" Text="WAU AutoUpdate: " FontSize="9"/>
             </StackPanel>
-            <StackPanel Orientation="Horizontal">
-                <TextBlock x:Name="InstallLocationText" Text="WAU Install Location: " FontSize="9"/>
-                <TextBlock x:Name="LocalListText" Text="Current Local List: " FontSize="9"/>
-            </StackPanel>
-            
-            <TextBlock x:Name="WAUAutoUpdateText" Text="WAU AutoUpdate: " FontSize="9"/>
-        </StackPanel>
+        </ScrollViewer>
     </GroupBox>
 
 <!-- Status Bar -->

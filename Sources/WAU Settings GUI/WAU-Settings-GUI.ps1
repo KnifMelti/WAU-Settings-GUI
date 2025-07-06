@@ -48,7 +48,6 @@ $Script:WAU_TITLE = "WAU Settings (Administrator)"
 $Script:DESKTOP_WAU_SETTINGS = [System.IO.Path]::Combine([Environment]::GetFolderPath('Desktop'), "$Script:WAU_TITLE.lnk")
 $Script:DESKTOP_WAU_APPINSTALLER = "${env:Public}\Desktop\WAU App Installer.lnk"
 $Script:STARTMENU_WAU_DIR = "${env:PROGRAMDATA}\Microsoft\Windows\Start Menu\Programs\Winget-AutoUpdate"
-$Script:USER_DIR = "${env:APPDATA}\Winget-AutoUpdate"
 $Script:COLOR_ENABLED = "#228B22"  # Forest green
 $Script:COLOR_DISABLED = "#FF6666" # Light red
 $Script:COLOR_ACTIVE = "Orange"
@@ -276,8 +275,8 @@ function Start-WAUGUIUpdate {
         )
         
         if ($result -eq 'Ok') {
+            Start-Process "explorer.exe" "$Script:WorkingDir"
             Start-Process "explorer.exe" -ArgumentList "/select,`"$downloadPath`""
-            Start-Process "explorer.exe" "$($Script:WorkingDir.TrimEnd('\'))\updates"
             Close-WindowGracefully -controls $controls -window $window
         }
         
@@ -1089,7 +1088,7 @@ msiexec /x"$($guid)" REBOOT=R /qn /l*v "%~dp0Uninst-$logFileName"
 }
 function Get-WAUMsi {
     # Configuration
-    $msiDir = Join-Path $Script:USER_DIR "Msi"
+    $msiDir = Join-Path $Script:WorkingDir "msi"
 
     # Create temp directory
     if (!(Test-Path $msiDir)) {
@@ -1213,7 +1212,7 @@ function New-WAUTransformFile {
     param($controls)
     try {
         # Configuration
-        $msiDir = Join-Path $Script:USER_DIR "Msi"
+        $msiDir = Join-Path $Script:WorkingDir "msi"
 
         # Create temp directory
         if (!(Test-Path $msiDir)) {
@@ -2781,7 +2780,7 @@ function Show-WAUSettingsGUI {
     $controls.DevCfgButton.Add_Click({
         try {
             # Create backup directory for current settings
-            $cfgDir = Join-Path $Script:USER_DIR "Cfg"
+            $cfgDir = Join-Path $Script:WorkingDir "cfg"
             if (-not (Test-Path $cfgDir)) {
                 New-Item -Path $cfgDir -ItemType Directory -Force | Out-Null
             }
