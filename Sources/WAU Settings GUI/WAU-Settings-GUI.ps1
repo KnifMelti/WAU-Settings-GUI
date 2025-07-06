@@ -2886,11 +2886,11 @@ function Show-WAUSettingsGUI {
                 $result = [System.Windows.MessageBox]::Show(
                     "WAU is not installed. Do you want to download and install it with current showing configuration?", 
                     "Install WAU", 
-                    "YesNo", 
+                    "OkCancel", 
                     "Question"
                 )
                 
-                if ($result -eq 'Yes') {
+                if ($result -eq 'Ok') {
                     # Download MSI file
                     $msiFilePath = Get-WAUMsi
                     if ($msiFilePath) {
