@@ -1,6 +1,5 @@
 # Manual installation
-- Extract `Sources\WAU Settings GUI` (`Install.cmd`, `WAU-Settings-GUI.ps1` and `config`) to wherever you want to run **WAU Settings GUI** from
-- Don't place them in the **WAU** installation directory, as this will be overwritten on updates.
+- Extract `Sources\WAU Settings GUI` (`Install.cmd`, `WAU-Settings-GUI.ps1` and `config`) to wherever you want to run **WAU Settings GUI** from (must be writable for downloads, etc.)
 - Run `Install.cmd`
   - If **WAU** is not installed, it will prompt to download and install it with standard settings (creating a **WAU Settings (Administrator)** shortcut on your own **Desktop**).
   - Toggle the **☐|☑ Start Menu shortcuts** option in the GUI and `Save Settings`
