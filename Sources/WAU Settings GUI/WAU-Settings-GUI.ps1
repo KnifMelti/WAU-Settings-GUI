@@ -328,7 +328,7 @@ function Get-WAUCurrentConfig {
         $userWantsToInstall = [System.Windows.MessageBox]::Show(
             "WAU configuration not found. Please ensure WAU is properly installed.`n`nDo you want to download and install WAU now?", 
             "WAU Not Found", 
-            "YesNo", 
+            "OkCancel", 
             "Question"
         ) -eq 'Yes'
         
@@ -341,7 +341,7 @@ function Get-WAUCurrentConfig {
                 $userWantsToInstallNow = [System.Windows.MessageBox]::Show(
                     "WAU MSI downloaded successfully to:`n$msiFilePath`n`nDo you want to install it now?", 
                     "Install WAU", 
-                    "YesNo", 
+                    "OkCancel", 
                     "Question"
                 ) -eq 'Yes'
                 
