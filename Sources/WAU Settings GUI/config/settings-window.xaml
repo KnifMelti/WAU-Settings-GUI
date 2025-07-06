@@ -260,7 +260,7 @@
     <GroupBox Grid.Row="7" Header="Information" Margin="0,0,0,10">
         <StackPanel Margin="10">
             <StackPanel Orientation="Horizontal">
-                <TextBlock FontSize="9">
+                <TextBlock x:Name="VersionLinksTextBlock" FontSize="9">
                     Versions: [ WAU Settings: 
                     <Hyperlink x:Name="WAUSettingsVersionLink" TextDecorations="None">
                         <Run x:Name="WAUSettingsVersionText"/>

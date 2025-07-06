@@ -1538,7 +1538,8 @@ function Set-ControlsState {
 
     $alwaysEnabledControls = @(
         'ScreenshotButton', 'SaveButton', 'CancelButton', 'RunNowButton', 'OpenLogsButton',
-        'DevTaskButton', 'DevRegButton', 'DevGUIDButton', 'DevSysButton', 'DevListButton', 'DevMSIButton', 'DevVerButton'
+        'DevTaskButton', 'DevRegButton', 'DevGUIDButton', 'DevSysButton', 'DevListButton',
+        'DevMSIButton', 'DevVerButton', 'VersionLinksTextBlock'
     )
 
     function Get-Children($control) {
