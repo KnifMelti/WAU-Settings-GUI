@@ -1819,9 +1819,9 @@ function Update-WAUGUIFromConfig {
     }
 
     # Update information section
-    $Controls.SettingsVersion.Text = "Versions - WAU Settings: $Script:WAU_GUI_VERSION | "
+    $Controls.SettingsVersion.Text = "Versions: [ WAU Settings: $Script:WAU_GUI_VERSION | "
     $Controls.VersionText.Text = "WAU: $Script:WAU_VERSION | "
- 
+    $Controls.WinGetVersion.Text = "WinGet: $Script:WINGET_VERSION ] "
     # Get last run time for the scheduled task 'Winget-AutoUpdate'
     try {
         $task = Get-ScheduledTask -TaskName 'Winget-AutoUpdate' -ErrorAction Stop
@@ -1834,7 +1834,7 @@ function Update-WAUGUIFromConfig {
     } catch {
         $Controls.RunDate.Text = "WAU Last Run: Unknown!"
     }
-    $Controls.WinGetVersion.Text = "WinGet: $Script:WINGET_VERSION | "
+
     $Controls.InstallLocationText.Text = "WAU Install Location: $($updatedConfig.InstallLocation) | "
     if ($wauGPOListPathEnabled -and $wauActivateGPOManagementEnabled) {
         $Controls.LocalListText.Inlines.Clear()
