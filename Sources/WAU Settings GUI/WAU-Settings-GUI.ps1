@@ -86,7 +86,7 @@ Function Start-PopUp ($Message) {
         $Reader = (New-Object System.Xml.XmlNodeReader $XAML)
         $Script:PopUpWindow = [Windows.Markup.XamlReader]::Load($Reader)
         $PopUpWindow.Icon = $Script:GUI_ICON
-        $window.Background = $Script:COLOR_BACKGROUND
+        $PopUpWindow.Background = $Script:COLOR_BACKGROUND
 
         # Make sure window stays on top (redundant, but ensures behavior)
         $PopUpWindow.Topmost = $true
