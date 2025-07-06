@@ -1538,7 +1538,7 @@ function Set-ControlsState {
 
     $alwaysEnabledControls = @(
         'ScreenshotButton', 'SaveButton', 'CancelButton', 'RunNowButton', 'OpenLogsButton',
-        'DevTaskButton', 'DevRegButton', 'DevGUIDButton', 'DevSysButton', 'DevListButton', 'DevMSIButton'
+        'DevTaskButton', 'DevRegButton', 'DevGUIDButton', 'DevSysButton', 'DevListButton', 'DevMSIButton', 'DevVerButton'
     )
 
     function Get-Children($control) {
@@ -1819,20 +1819,26 @@ function Update-WAUGUIFromConfig {
     }
 
     # Update information section
-    $Controls.SettingsVersion.Text = "Versions: [ WAU Settings: $Script:WAU_GUI_VERSION | "
-    $Controls.VersionText.Text = "WAU: $Script:WAU_VERSION | "
-    $Controls.WinGetVersion.Text = "WinGet: $Script:WINGET_VERSION ] "
+    $Controls.WAUSettingsVersionText.Text = $Script:WAU_GUI_VERSION
+    $Controls.WAUVersionText.Text = $Script:WAU_VERSION  
+    $Controls.WinGetVersionText.Text = $Script:WINGET_VERSION
+
+    # Set links for version information
+    $Controls.WAUSettingsVersionLink.NavigateUri = "https://github.com/$($Script:WAU_GUI_REPO)/releases"
+    $Controls.WAUVersionLink.NavigateUri = "https://github.com/$($Script:WAU_REPO)/releases"
+    $Controls.WinGetVersionLink.NavigateUri = "https://github.com/microsoft/winget-cli/releases"
+
     # Get last run time for the scheduled task 'Winget-AutoUpdate'
     try {
         $task = Get-ScheduledTask -TaskName 'Winget-AutoUpdate' -ErrorAction Stop
         $lastRunTime = $task | Get-ScheduledTaskInfo | Select-Object -ExpandProperty LastRunTime
         if ($lastRunTime -and $lastRunTime -ne [datetime]::MinValue) {
-            $Controls.RunDate.Text = "WAU Last Run: $($lastRunTime.ToString('yyyy-MM-dd HH:mm'))"
+            $Controls.RunDate.Text = " WAU Last Run: $($lastRunTime.ToString('yyyy-MM-dd HH:mm'))"
         } else {
-            $Controls.RunDate.Text = "WAU Last Run: Never"
+            $Controls.RunDate.Text = " WAU Last Run: Never"
         }
     } catch {
-        $Controls.RunDate.Text = "WAU Last Run: Unknown!"
+        $Controls.RunDate.Text = " WAU Last Run: Unknown!"
     }
 
     $Controls.InstallLocationText.Text = "WAU Install Location: $($updatedConfig.InstallLocation) | "
@@ -2340,7 +2346,7 @@ function Set-DevToolsVisibility {
         $controls.DevMSIButton.Visibility = 'Visible'
         $controls.DevCfgButton.Visibility = 'Visible'
         $controls.DevWAUButton.Visibility = 'Visible'
-        $controls.DevUpdatesButton.Visibility = 'Visible'
+        $controls.DevVerButton.Visibility = 'Visible'
         $controls.LinksStackPanel.Visibility = 'Visible'
         $window.Title = "$Script:WAU_TITLE - Dev Tools"
     } else {
@@ -2352,7 +2358,7 @@ function Set-DevToolsVisibility {
         $controls.DevMSIButton.Visibility = 'Collapsed'
         $controls.DevCfgButton.Visibility = 'Collapsed'
         $controls.DevWAUButton.Visibility = 'Collapsed'
-        $controls.DevUpdatesButton.Visibility = 'Collapsed'
+        $controls.DevVerButton.Visibility = 'Collapsed'
         $controls.LinksStackPanel.Visibility = 'Collapsed'
         $window.Title = "$Script:WAU_TITLE"
     }
@@ -2917,7 +2923,7 @@ function Show-WAUSettingsGUI {
         }        
     })
 
-    $controls.DevUpdatesButton.Add_Click({
+    $controls.DevVerButton.Add_Click({
         try {
             Start-PopUp "Checking for updates..."
             $updateInfo = Test-WAUGUIUpdate
@@ -3004,6 +3010,40 @@ function Show-WAUSettingsGUI {
         catch {
             Close-PopUp
             [System.Windows.MessageBox]::Show("Failed to open logs: $($_.Exception.Message)", "Error", "OK", "Error")
+        }
+    })
+
+    # Event handlers for information links
+    $controls.WAUSettingsVersionLink.Add_RequestNavigate({
+        param($linkSource, $e)
+        try {
+            Start-Process $e.Uri.ToString()
+            $e.Handled = $true
+        }
+        catch {
+            [System.Windows.MessageBox]::Show("Failed to open link: $($_.Exception.Message)", "Error", "OK", "Error")
+        }
+    })
+
+    $controls.WAUVersionLink.Add_RequestNavigate({
+        param($linkSource, $e)
+        try {
+            Start-Process $e.Uri.ToString()
+            $e.Handled = $true
+        }
+        catch {
+            [System.Windows.MessageBox]::Show("Failed to open link: $($_.Exception.Message)", "Error", "OK", "Error")
+        }
+    })
+
+    $controls.WinGetVersionLink.Add_RequestNavigate({
+        param($linkSource, $e)
+        try {
+            Start-Process $e.Uri.ToString()
+            $e.Handled = $true
+        }
+        catch {
+            [System.Windows.MessageBox]::Show("Failed to open link: $($_.Exception.Message)", "Error", "OK", "Error")
         }
     })
 

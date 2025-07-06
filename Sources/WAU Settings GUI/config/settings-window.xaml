@@ -35,10 +35,10 @@
                 <!-- Vertical links stack (hidden by default) -->
                 <StackPanel x:Name="LinksStackPanel" Orientation="Vertical" VerticalAlignment="Top" Margin="0,0,10,0" Visibility="Collapsed">
                     <TextBlock FontSize="9">
-                        <Hyperlink x:Name="ManifestsLink" NavigateUri="https://github.com/microsoft/winget-pkgs/tree/master/manifests" ToolTip="open 'winget-pkgs' Manifests on GitHub">[manifests]</Hyperlink>
+                        <Hyperlink x:Name="ManifestsLink" NavigateUri="https://github.com/microsoft/winget-pkgs/tree/master/manifests" ToolTip="open 'winget-pkgs' Manifests on GitHub" TextDecorations="None">[manifests]</Hyperlink>
                     </TextBlock>
                     <TextBlock Margin="0,0,0,0" FontSize="9">
-                        <Hyperlink x:Name="IssuesLink" NavigateUri="https://github.com/microsoft/winget-pkgs/issues" ToolTip="open 'winget-pkgs' Issues on GitHub">[issues]</Hyperlink>
+                        <Hyperlink x:Name="IssuesLink" NavigateUri="https://github.com/microsoft/winget-pkgs/issues" ToolTip="open 'winget-pkgs' Issues on GitHub" TextDecorations="None">[issues]</Hyperlink>
                     </TextBlock>
                 </StackPanel>
                 <Button x:Name="DevTaskButton" Content="[task]" Width="34" Height="25" Visibility="Collapsed" Margin="0,0,3,0"
@@ -57,7 +57,7 @@
                     ToolTip="backup current &amp; import 'WAU' settings file"/>
                 <Button x:Name="DevWAUButton" Content="[wau]" Width="34" Height="25" Visibility="Collapsed" Margin="0,0,3,0"
                     ToolTip="uninstall/install 'WAU' with current showing configuration"/>
-                <Button x:Name="DevUpdatesButton" Content="[ver]" Width="34" Height="25" Visibility="Collapsed" Margin="0,0,0,0"
+                <Button x:Name="DevVerButton" Content="[ver]" Width="34" Height="25" Visibility="Collapsed" Margin="0,0,0,0"
                     ToolTip="check if there's a newer version of 'WAU Settings GUI' available"/>        
 
             </StackPanel>
@@ -260,10 +260,22 @@
     <GroupBox Grid.Row="7" Header="Information" Margin="0,0,0,10">
         <StackPanel Margin="10">
             <StackPanel Orientation="Horizontal">
-                <TextBlock x:Name="SettingsVersion" Text="WAU Settings: " FontSize="9"/>
-                <TextBlock x:Name="VersionText" Text="WAU: " FontSize="9"/>
-                <TextBlock x:Name="WinGetVersion" Text="WinGet: " FontSize="9"/>
-                <TextBlock x:Name="RunDate" Text="WAU Last Run: " FontSize="9"/>
+                <TextBlock FontSize="9">
+                    Versions: [ WAU Settings: 
+                    <Hyperlink x:Name="WAUSettingsVersionLink" TextDecorations="None">
+                        <Run x:Name="WAUSettingsVersionText"/>
+                    </Hyperlink>
+                    | WAU: 
+                    <Hyperlink x:Name="WAUVersionLink" TextDecorations="None">
+                        <Run x:Name="WAUVersionText"/>
+                    </Hyperlink>
+                    | WinGet: 
+                    <Hyperlink x:Name="WinGetVersionLink" TextDecorations="None">
+                        <Run x:Name="WinGetVersionText"/>
+                    </Hyperlink>
+                    ]
+                </TextBlock>
+                <TextBlock x:Name="RunDate" Text=" WAU Last Run: " FontSize="9"/>
             </StackPanel>
             <StackPanel Orientation="Horizontal">
                 <TextBlock x:Name="InstallLocationText" Text="WAU Install Location: " FontSize="9"/>
