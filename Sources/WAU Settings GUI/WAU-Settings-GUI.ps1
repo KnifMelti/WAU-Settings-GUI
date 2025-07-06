@@ -330,7 +330,7 @@ function Get-WAUCurrentConfig {
             "WAU Not Found", 
             "OkCancel", 
             "Question"
-        ) -eq 'Yes'
+        ) -eq 'Ok'
         
         if ($userWantsToInstall) {
             # Download MSI file
@@ -343,7 +343,7 @@ function Get-WAUCurrentConfig {
                     "Install WAU", 
                     "OkCancel", 
                     "Question"
-                ) -eq 'Yes'
+                ) -eq 'Ok'
                 
                 if ($userWantsToInstallNow) {
                     # Install WAU using the downloaded MSI file
@@ -2812,7 +2812,7 @@ function Show-WAUSettingsGUI {
             
             # Show messagebox about backup and ask if user wants to import another file
             $importMsg = "A backup of your current settings has been saved to:`n$backupFile`n`nDo you want to continue and import a WAU Settings file?"
-            $result = [System.Windows.MessageBox]::Show($importMsg, "Backup Created", "OKCancel", "Question", "OK")
+            $result = [System.Windows.MessageBox]::Show($importMsg, "Backup Created", "OKCancel", "Question", "Ok")
             if ($result -eq 'Cancel') {
                 # Open the folder containing the backup file
                 Start-Process "explorer.exe" -ArgumentList "/select,`"$backupFile`""
@@ -2869,11 +2869,11 @@ function Show-WAUSettingsGUI {
                 $result = [System.Windows.MessageBox]::Show(
                     "WAU is currently installed. Do you want to uninstall it?", 
                     "Uninstall WAU", 
-                    "YesNo", 
+                    "OkCancel", 
                     "Question"
                 )
                 
-                if ($result -eq 'Yes') {
+                if ($result -eq 'Ok') {
                     $uninstallResult = Uninstall-WAU
                     if ($uninstallResult) {
                         # Update status to "Done"
