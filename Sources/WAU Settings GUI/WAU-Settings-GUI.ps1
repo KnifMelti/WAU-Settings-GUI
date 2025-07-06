@@ -337,7 +337,10 @@ function Get-WAUCurrentConfig {
         
         if ($userWantsToInstall) {
             # Download MSI file
-            $msiFilePath = Get-WAUMsi
+            $result = Get-WAUMsi
+            if ($result) {
+                $msiFilePath = $result.MsiFilePath
+            }
             
             if ($msiFilePath) {
                 # Ask user if they want to install now
@@ -1116,7 +1119,11 @@ function Get-WAUMsi {
         
         Close-PopUp
         
-        return $msiFilePath
+        # Return both asset och filepath
+        return @{
+            MsiAsset = $MsiAsset
+            MsiFilePath = $msiFilePath
+        }
     } 
     catch {
         Close-PopUp
@@ -1227,7 +1234,11 @@ function New-WAUTransformFile {
         # If no MSI file was found download the latest MSI from GitHub
         if ([string]::IsNullOrEmpty($MsiAsset.name)) {
             try {
-                $msiFilePath = Get-WAUMsi
+                $result = Get-WAUMsi
+                if ($result) {
+                    $MsiAsset = $result.MsiAsset
+                    $msiFilePath = $result.MsiFilePath
+                }
                 if (-not $msiFilePath) {
                     throw "Failed to download MSI file"
                 }
@@ -2903,7 +2914,10 @@ function Show-WAUSettingsGUI {
                 
                 if ($result -eq 'Ok') {
                     # Download MSI file
-                    $msiFilePath = Get-WAUMsi
+                    $result = Get-WAUMsi
+                    if ($result) {
+                        $msiFilePath = $result.MsiFilePath
+                    }
                     if ($msiFilePath) {
                         # Install WAU
                         $installResult = Install-WAU -msiFilePath $msiFilePath -controls $controls
