@@ -271,12 +271,14 @@ function Start-WAUGUIUpdate {
         $result = [System.Windows.MessageBox]::Show(
             "Update downloaded successfully!`n`nFile: $fileName`nLocation: $downloadPath`n`nDo you want to extract and view the update now?",
             "Update Downloaded",
-            "YesNo",
+            "OkCancel",
             "Question"
         )
         
-        if ($result -eq 'Yes') {
+        if ($result -eq 'Ok') {
             Start-Process "explorer.exe" -ArgumentList "/select,`"$downloadPath`""
+            Start-Process "explorer.exe" -ArgumentList "/select,`"$Script:WorkingDir`""
+            Close-WindowGracefully -controls $controls -window $window
         }
         
         return $true
@@ -2937,9 +2939,9 @@ function Show-WAUSettingsGUI {
             
             if ($updateInfo.UpdateAvailable) {
                 $message = "Update available!`n`nCurrent version: $($updateInfo.CurrentVersion)`nLatest version: $($updateInfo.LatestVersion)`n`nDo you want to download the update?"
-                $result = [System.Windows.MessageBox]::Show($message, "Update Available", "YesNo", "Question")
+                $result = [System.Windows.MessageBox]::Show($message, "Update Available", "OkCancel", "Question")
                 
-                if ($result -eq 'Yes') {
+                if ($result -eq 'Ok') {
                     Start-WAUGUIUpdate -updateInfo $updateInfo
                 }
             }
