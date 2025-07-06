@@ -243,7 +243,7 @@ function Start-WAUGUIUpdate {
             throw "No download URL found in release"
         }
         
-        $downloadDir = Join-Path $Script:USER_DIR "Updates"
+        $downloadDir = Join-Path $Script:WorkingDir "updates"
         if (-not (Test-Path $downloadDir)) {
             New-Item -ItemType Directory -Path $downloadDir -Force | Out-Null
         }
@@ -277,7 +277,7 @@ function Start-WAUGUIUpdate {
         
         if ($result -eq 'Ok') {
             Start-Process "explorer.exe" -ArgumentList "/select,`"$downloadPath`""
-            Start-Process "explorer.exe" -ArgumentList "/select,`"$Script:WorkingDir`""
+            Start-Process "explorer.exe" "$($Script:WorkingDir.TrimEnd('\'))\updates"
             Close-WindowGracefully -controls $controls -window $window
         }
         
