@@ -52,6 +52,7 @@ $Script:COLOR_ENABLED = "#228B22"  # Forest green
 $Script:COLOR_DISABLED = "#FF6666" # Light red
 $Script:COLOR_ACTIVE = "Orange"
 $Script:COLOR_INACTIVE = "Gray" # Grey
+$Script:COLOR_BACKGROUND = "#F5F5F5"  # Set background color to light gray
 $Script:STATUS_READY_TEXT = "Ready (F5 Load/F12 Dev)"
 $Script:STATUS_DONE_TEXT = "Done"
 $Script:WAIT_TIME = 1000 # 1 second wait time for UI updates
@@ -85,6 +86,7 @@ Function Start-PopUp ($Message) {
         $Reader = (New-Object System.Xml.XmlNodeReader $XAML)
         $Script:PopUpWindow = [Windows.Markup.XamlReader]::Load($Reader)
         $PopUpWindow.Icon = $Script:GUI_ICON
+        $window.Background = $Script:COLOR_BACKGROUND
 
         # Make sure window stays on top (redundant, but ensures behavior)
         $PopUpWindow.Topmost = $true
@@ -2461,6 +2463,7 @@ function Show-WAUSettingsGUI {
     $reader = (New-Object System.Xml.XmlNodeReader $xamlXML)
     $window = [Windows.Markup.XamlReader]::Load($reader)
     $window.Icon = $Script:GUI_ICON
+    $window.Background = $Script:COLOR_BACKGROUND
     
     # Get controls
     $controls = @{}
