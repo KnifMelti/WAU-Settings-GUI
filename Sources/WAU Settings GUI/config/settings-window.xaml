@@ -1,6 +1,6 @@
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" 
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    Title="$Script:WAU_TITLE" Height="825" Width="600" ResizeMode="CanMinimize" WindowStartupLocation="CenterScreen"
+    Title="$Script:GUI_TITLE" Height="825" Width="600" ResizeMode="CanMinimize" WindowStartupLocation="CenterScreen"
     FontSize="11">
     <Grid Margin="10">
     <Grid.RowDefinitions>
@@ -189,7 +189,7 @@
             <TextBlock>
                 Create/delete Start Menu shortcuts:
                 <LineBreak/>
-                '$Script:WAU_TITLE' shortcut will be created on active User Desktop if deleted.
+                '$Script:GUI_TITLE' shortcut will be created on active User Desktop if deleted.
             </TextBlock>
             </CheckBox.ToolTip>
         </CheckBox>

@@ -36,6 +36,7 @@ Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName PresentationFramework
 
 # Constants of most used paths and arguments
+$Script:WAU_GUI_NAME = "WAU-Settings-GUI"
 $Script:WAU_GUI_REPO = "KnifMelti/WAU-Settings-GUI"
 $Script:WAU_REPO = "Romanitho/Winget-AutoUpdate"
 $Script:WAU_REGISTRY_PATH = "HKLM:\SOFTWARE\Romanitho\Winget-AutoUpdate"
@@ -44,8 +45,8 @@ $Script:CONHOST_EXE = "${env:SystemRoot}\System32\conhost.exe"
 $Script:POWERSHELL_ARGS = "--headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File"
 $Script:DESKTOP_RUN_WAU = "${env:Public}\Desktop\Run WAU.lnk"
 $Script:USER_RUN_SCRIPT = "User-Run.ps1"
-$Script:WAU_TITLE = "WAU Settings (Administrator)"
-$Script:DESKTOP_WAU_SETTINGS = [System.IO.Path]::Combine([Environment]::GetFolderPath('Desktop'), "$Script:WAU_TITLE.lnk")
+$Script:GUI_TITLE = "WAU Settings (Administrator)"
+$Script:DESKTOP_WAU_SETTINGS = [System.IO.Path]::Combine([Environment]::GetFolderPath('Desktop'), "$Script:GUI_TITLE.lnk")
 $Script:DESKTOP_WAU_APPINSTALLER = "${env:Public}\Desktop\WAU App Installer.lnk"
 $Script:STARTMENU_WAU_DIR = "${env:PROGRAMDATA}\Microsoft\Windows\Start Menu\Programs\Winget-AutoUpdate"
 $Script:COLOR_ENABLED = "#228B22"  # Forest green
@@ -213,7 +214,7 @@ function Test-WAUGUIUpdate {
             # GitHub automatically provides source code downloads at predictable URLs
             $downloadUrl = "https://github.com/$Script:WAU_GUI_REPO/archive/refs/tags/$($Release.tag_name).zip"
             $downloadAsset = [PSCustomObject]@{
-                name = "WAU-Settings-GUI-$($Release.tag_name)-source.zip"
+                name = "$($Script:WAU_GUI_NAME)-$($Release.tag_name).zip"
                 browser_download_url = $downloadUrl
             }
             Write-Host "Using GitHub automatic source code ZIP: $($downloadAsset.name)"
@@ -249,7 +250,7 @@ function Start-WAUGUIUpdate {
             New-Item -ItemType Directory -Path $downloadDir -Force | Out-Null
         }
         
-        $fileName = Split-Path $updateInfo.DownloadUrl -Leaf
+        $fileName = if ($updateInfo.AssetName) { $updateInfo.AssetName } else { Split-Path $updateInfo.DownloadUrl -Leaf }
         $downloadPath = Join-Path $downloadDir $fileName
         
         Start-PopUp "Downloading update: $fileName..."
@@ -278,7 +279,10 @@ function Start-WAUGUIUpdate {
         
         if ($result -eq 'Ok') {
             Start-Process "explorer.exe" "$Script:WorkingDir"
-            Start-Process "explorer.exe" -ArgumentList "/select,`"$downloadPath`""
+            # Prepare subfolder path
+            $subFolder = "$($Script:WAU_GUI_NAME)-$($updateInfo.LatestVersion)\Sources\WAU Settings GUI"
+            $zipSubPath = "$downloadPath\$subFolder"
+            Start-Process "explorer.exe" "$zipSubPath"
             Close-WindowGracefully -controls $controls -window $window
         }
         
@@ -738,7 +742,7 @@ function Set-WAUConfig {
                     Add-Shortcut "$Script:STARTMENU_WAU_DIR\Run WAU.lnk" $Script:CONHOST_EXE "$($currentConfig.InstallLocation)" "$Script:POWERSHELL_ARGS `"$($currentConfig.InstallLocation)$Script:USER_RUN_SCRIPT`"" "$Script:WAU_ICON" "Run Winget AutoUpdate" "Normal"
                     Add-Shortcut "$Script:STARTMENU_WAU_DIR\Open Logs.lnk" "$($currentConfig.InstallLocation)logs" "" "" "" "Open WAU Logs" "Normal"
                     Add-Shortcut "$Script:STARTMENU_WAU_DIR\WAU App Installer.lnk" $Script:CONHOST_EXE "$($currentConfig.InstallLocation)" "$Script:POWERSHELL_ARGS `"$($currentConfig.InstallLocation)WAU-Installer-GUI.ps1`"" "$Script:WAU_ICON" "Search for and Install WinGet Apps, etc..." "Normal"
-                    Add-Shortcut "$Script:STARTMENU_WAU_DIR\$Script:WAU_TITLE.lnk" $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$($Script:WorkingDir.TrimEnd('\'))\WAU-Settings-GUI.ps1`"" "$Script:GUI_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
+                    Add-Shortcut "$Script:STARTMENU_WAU_DIR\$Script:GUI_TITLE.lnk" $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$($Script:WorkingDir.TrimEnd('\'))\WAU-Settings-GUI.ps1`"" "$Script:GUI_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
                 }
                 else {
                     if (Test-Path $Script:STARTMENU_WAU_DIR) {
@@ -869,10 +873,10 @@ function New-MSITransformFromControls {
         
         # Create transform file name
         $transformName = if ($createFiles) {
-            if ($Script:WAU_TITLE -match '^(.+?)\s*\(') {
+            if ($Script:GUI_TITLE -match '^(.+?)\s*\(') {
                 $matches[1].Trim() + '.mst'
             } else {
-                $Script:WAU_TITLE.Trim() + '.mst'
+                $Script:GUI_TITLE.Trim() + '.mst'
             }
         } else {
             [System.IO.Path]::GetTempFileName() + ".mst"
@@ -2363,7 +2367,7 @@ function Set-DevToolsVisibility {
         $controls.DevWAUButton.Visibility = 'Visible'
         $controls.DevVerButton.Visibility = 'Visible'
         $controls.LinksStackPanel.Visibility = 'Visible'
-        $window.Title = "$Script:WAU_TITLE - Dev Tools"
+        $window.Title = "$Script:GUI_TITLE - Dev Tools"
     } else {
         $controls.DevTaskButton.Visibility = 'Collapsed'
         $controls.DevRegButton.Visibility = 'Collapsed'
@@ -2375,7 +2379,7 @@ function Set-DevToolsVisibility {
         $controls.DevWAUButton.Visibility = 'Collapsed'
         $controls.DevVerButton.Visibility = 'Collapsed'
         $controls.LinksStackPanel.Visibility = 'Collapsed'
-        $window.Title = "$Script:WAU_TITLE"
+        $window.Title = "$Script:GUI_TITLE"
     }
 
     # Reset status to "Done"
@@ -3100,10 +3104,10 @@ if (Test-Path $xamlConfigPath) {
     $inputXML = Get-Content $xamlConfigPath -Raw
     
     # Replace PowerShell variables with actual values
-    $inputXML = $inputXML -replace '\$Script:WAU_TITLE', $Script:WAU_TITLE
+    $inputXML = $inputXML -replace '\$Script:GUI_TITLE', $Script:GUI_TITLE
     $Script:POPUP_XAML = $inputXML.Trim()
 } else {
-    [System.Windows.MessageBox]::Show("PopUp XAML config file not found: $xamlConfigPath", "$Script:WAU_TITLE", "OK", "Warning")
+    [System.Windows.MessageBox]::Show("PopUp XAML config file not found: $xamlConfigPath", "$Script:GUI_TITLE", "OK", "Warning")
     exit 1
 }
 
@@ -3113,7 +3117,7 @@ if (Test-Path $xamlConfigPath) {
     $inputXML = Get-Content $xamlConfigPath -Raw
     
     # Replace PowerShell variables with actual values
-    $inputXML = $inputXML -replace '\$Script:WAU_TITLE', $Script:WAU_TITLE
+    $inputXML = $inputXML -replace '\$Script:GUI_TITLE', $Script:GUI_TITLE
     $inputXML = $inputXML -replace '\$Script:COLOR_ENABLED', $Script:COLOR_ENABLED
     $inputXML = $inputXML -replace '\$Script:COLOR_DISABLED', $Script:COLOR_DISABLED
     $inputXML = $inputXML -replace '\$Script:COLOR_ACTIVE', $Script:COLOR_ACTIVE
@@ -3121,7 +3125,7 @@ if (Test-Path $xamlConfigPath) {
     $inputXML = $inputXML -replace '\$Script:STATUS_READY_TEXT', $Script:STATUS_READY_TEXT
     $Script:WINDOW_XAML = $inputXML.Trim()
 } else {
-    [System.Windows.MessageBox]::Show("Window XAML config file not found: $xamlConfigPath", "$Script:WAU_TITLE", "OK", "Warning")
+    [System.Windows.MessageBox]::Show("Window XAML config file not found: $xamlConfigPath", "$Script:GUI_TITLE", "OK", "Warning")
     exit 1
 }
 
