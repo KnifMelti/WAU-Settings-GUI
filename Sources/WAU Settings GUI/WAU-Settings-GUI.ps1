@@ -25,6 +25,7 @@ Provides a user-friendly interface to modify every aspect of WAU settings includ
   - MSI transform creation (using current showing configuration)
   - Configuration backup/import (i.e. for sharing settings)
   - Uninstall/install WAU (with current showing configuration)
+  - Manual check for WAU Settings GUI updates
 
 .NOTES
 Must be run as Administrator
@@ -35,31 +36,54 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName PresentationFramework
 
-# Constants of most used paths and arguments
-$Script:WAU_GUI_NAME = "WAU-Settings-GUI"
-$Script:WAU_GUI_REPO = "KnifMelti/WAU-Settings-GUI"
-$Script:WAU_REPO = "Romanitho/Winget-AutoUpdate"
-$Script:WAU_REGISTRY_PATH = "HKLM:\SOFTWARE\Romanitho\Winget-AutoUpdate"
-$Script:WAU_POLICIES_PATH = "HKLM:\SOFTWARE\Policies\Romanitho\Winget-AutoUpdate"
-$Script:CONHOST_EXE = "${env:SystemRoot}\System32\conhost.exe"
-$Script:POWERSHELL_ARGS = "--headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File"
-$Script:DESKTOP_RUN_WAU = "${env:Public}\Desktop\Run WAU.lnk"
-$Script:USER_RUN_SCRIPT = "User-Run.ps1"
-$Script:GUI_TITLE = "WAU Settings (Administrator)"
-$Script:DESKTOP_WAU_SETTINGS = [System.IO.Path]::Combine([Environment]::GetFolderPath('Desktop'), "$Script:GUI_TITLE.lnk")
-$Script:DESKTOP_WAU_APPINSTALLER = "${env:Public}\Desktop\WAU App Installer.lnk"
-$Script:STARTMENU_WAU_DIR = "${env:PROGRAMDATA}\Microsoft\Windows\Start Menu\Programs\Winget-AutoUpdate"
-$Script:COLOR_ENABLED = "#228B22"  # Forest green
-$Script:COLOR_DISABLED = "#FF6666" # Light red
-$Script:COLOR_ACTIVE = "Orange"
-$Script:COLOR_INACTIVE = "Gray" # Grey
-$Script:COLOR_BACKGROUND = "#F5F5F5"  # Set background color to light gray
-$Script:STATUS_READY_TEXT = "Ready (F5 Load/F12 Dev)"
-$Script:STATUS_DONE_TEXT = "Done"
-$Script:WAIT_TIME = 1000 # 1 second wait time for UI updates
-
 # Get current script directory
 $Script:WorkingDir = $PSScriptRoot
+
+# Set modules path
+$modulesPath = Join-Path -Path $Script:WorkingDir -ChildPath "modules"
+
+# Verify that modules directory exists
+if (-not (Test-Path -Path $modulesPath)) {
+    Write-Error "Modules directory not found at: $modulesPath"
+    [System.Windows.Forms.MessageBox]::Show("Error: Modules directory not found at: $modulesPath. Please reinstall the application.", 
+        "Application Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+    exit 1
+}
+
+# Check if all required modules exist
+$requiredModules = @("config.psm1")
+$missingModules = @()
+
+foreach ($module in $requiredModules) {
+    $modulePath = Join-Path -Path $modulesPath -ChildPath $module
+    if (-not (Test-Path -Path $modulePath)) {
+        $missingModules += $module
+    }
+}
+
+if ($missingModules.Count -gt 0) {
+    Write-Error "Missing required modules: $($missingModules -join ', ')"
+    [System.Windows.Forms.MessageBox]::Show("Error: Missing required modules: $($missingModules -join ', '). Please reinstall the application.", 
+        "Application Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+    exit 1
+}
+
+# Import the Config module first
+Import-Module (Join-Path -Path $modulesPath -ChildPath "config.psm1") -Force
+
+$ModuleInfo = Get-Module "config"
+$ExportedVariables = $ModuleInfo.ExportedVariables.Keys
+
+foreach ($VarName in $ExportedVariables) {
+    Set-Variable -Name $VarName -Value (Get-Variable -Name $VarName -Scope Global).Value -Scope Script
+}
+
+# Then import other modules (yet to come... ...make a loop!)
+# Import-Module (Join-Path -Path $modulesPath -ChildPath "Utilities.psm1") -Force
+# Import-Module (Join-Path -Path $modulesPath -ChildPath "GUI.psm1") -Force
+# Import-Module (Join-Path -Path $modulesPath -ChildPath "Registry.psm1") -Force
+# Import-Module (Join-Path -Path $modulesPath -ChildPath "Logging.psm1") -Force
+# Import-Module (Join-Path -Path $modulesPath -ChildPath "Uninstaller.psm1") -Force
 
 # Version information
 $versionFile = Join-Path $($Script:WorkingDir.TrimEnd('\')) "\config\version.txt"
