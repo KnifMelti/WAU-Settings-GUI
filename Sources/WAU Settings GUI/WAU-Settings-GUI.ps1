@@ -31,69 +31,59 @@ Provides a user-friendly interface to modify every aspect of WAU settings includ
 Must be run as Administrator
 #>
 
-# Import required assemblies
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName System.Drawing
-Add-Type -AssemblyName PresentationFramework
-
-# Get current script directory
-$Script:WorkingDir = $PSScriptRoot
-
-# Set modules path
-$modulesPath = Join-Path -Path $Script:WorkingDir -ChildPath "modules"
-
-# Verify that modules directory exists
-if (-not (Test-Path -Path $modulesPath)) {
-    Write-Error "Modules directory not found at: $modulesPath"
-    [System.Windows.Forms.MessageBox]::Show("Error: Modules directory not found at: $modulesPath. Please reinstall the application.", 
-        "Application Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
-    exit 1
-}
-
-# Check if all required modules exist
-$requiredModules = @("config.psm1")
-$missingModules = @()
-
-foreach ($module in $requiredModules) {
-    $modulePath = Join-Path -Path $modulesPath -ChildPath $module
-    if (-not (Test-Path -Path $modulePath)) {
-        $missingModules += $module
-    }
-}
-
-if ($missingModules.Count -gt 0) {
-    Write-Error "Missing required modules: $($missingModules -join ', ')"
-    [System.Windows.Forms.MessageBox]::Show("Error: Missing required modules: $($missingModules -join ', '). Please reinstall the application.", 
-        "Application Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
-    exit 1
-}
-
-# Import the Config module first
-Import-Module (Join-Path -Path $modulesPath -ChildPath "config.psm1") -Force
-
-$ModuleInfo = Get-Module "config"
-$ExportedVariables = $ModuleInfo.ExportedVariables.Keys
-
-foreach ($VarName in $ExportedVariables) {
-    Set-Variable -Name $VarName -Value (Get-Variable -Name $VarName -Scope Global).Value -Scope Script
-}
-
-# Then import other modules (yet to come... ...make a loop!)
-# Import-Module (Join-Path -Path $modulesPath -ChildPath "Utilities.psm1") -Force
-# Import-Module (Join-Path -Path $modulesPath -ChildPath "GUI.psm1") -Force
-# Import-Module (Join-Path -Path $modulesPath -ChildPath "Registry.psm1") -Force
-# Import-Module (Join-Path -Path $modulesPath -ChildPath "Logging.psm1") -Force
-# Import-Module (Join-Path -Path $modulesPath -ChildPath "Uninstaller.psm1") -Force
-
-# Version information
-$versionFile = Join-Path $($Script:WorkingDir.TrimEnd('\')) "\config\version.txt"
-if (Test-Path $versionFile) {
-    $Script:WAU_GUI_VERSION = (Get-Content $versionFile -Raw).Trim()
-} else {
-    $Script:WAU_GUI_VERSION = "Unknown"
-}
 
 <# FUNCTIONS #>
+# 0. Initialization function
+function Initialize-GUI {
+    # Import required assemblies
+    Add-Type -AssemblyName System.Windows.Forms
+    Add-Type -AssemblyName System.Drawing
+    Add-Type -AssemblyName PresentationFramework
+
+    # Get current script directory
+    $Script:WorkingDir = $PSScriptRoot
+
+    # Set modules path
+    $modulesPath = Join-Path -Path $Script:WorkingDir -ChildPath "modules"
+
+    # Verify that modules directory exists
+    if (-not (Test-Path -Path $modulesPath)) {
+        throw "Modules directory not found at: $modulesPath"
+    }
+
+    # Check if all required modules exist
+    $requiredModules = @("config.psm1")
+    $missingModules = @()
+
+    foreach ($module in $requiredModules) {
+        $modulePath = Join-Path -Path $modulesPath -ChildPath $module
+        if (-not (Test-Path -Path $modulePath)) {
+            $missingModules += $module
+        }
+    }
+
+    if ($missingModules.Count -gt 0) {
+        throw "Missing required modules: $($missingModules -join ', ')"
+    }
+
+    # Import the Config module first
+    Import-Module (Join-Path -Path $modulesPath -ChildPath "config.psm1") -Force
+
+    $ModuleInfo = Get-Module "config"
+    $ExportedVariables = $ModuleInfo.ExportedVariables.Keys
+
+    foreach ($VarName in $ExportedVariables) {
+        Set-Variable -Name $VarName -Value (Get-Variable -Name $VarName -Scope Global).Value -Scope Script
+    }
+
+    # Then import other modules (yet to come... ...make a loop!)
+    # Import-Module (Join-Path -Path $modulesPath -ChildPath "Utilities.psm1") -Force
+    # Import-Module (Join-Path -Path $modulesPath -ChildPath "GUI.psm1") -Force
+    # Import-Module (Join-Path -Path $modulesPath -ChildPath "Registry.psm1") -Force
+    # Import-Module (Join-Path -Path $modulesPath -ChildPath "Logging.psm1") -Force
+    # Import-Module (Join-Path -Path $modulesPath -ChildPath "Uninstaller.psm1") -Force
+
+}
 
 # 1. Utility functions (no dependencies)
 function Test-Administrator {
@@ -134,7 +124,18 @@ Function Close-PopUp {
         $Script:PopUpWindow = $null
     }
 }
-function Add-Shortcut ($Shortcut, $Target, $StartIn, $Arguments, $Icon, $Description, $WindowStyle = "Normal", $RunAsAdmin = $false) {
+function Add-Shortcut {
+    param(
+        [string]$Shortcut,
+        [string]$Target,
+        [string]$StartIn,
+        [string]$Arguments,
+        [string]$Icon,
+        [string]$Description,
+        [string]$WindowStyle = "Normal",
+        [bool]$RunAsAdmin = $false
+    )
+
     $WScriptShell = New-Object -ComObject WScript.Shell
     $ShortcutObj = $WScriptShell.CreateShortcut($Shortcut)
     $ShortcutObj.TargetPath = $Target
@@ -434,7 +435,6 @@ function Get-WAUCurrentConfig {
         }
     }
 }
-
 function Import-WAUSettingsFromFile {
     param(
         [string]$FilePath,
@@ -3110,11 +3110,26 @@ function Show-WAUSettingsGUI {
 }
 
 <# MAIN #>
-
 # Check if running as administrator
 if (-not (Test-Administrator)) {
     [System.Windows.MessageBox]::Show("This application must be run as Administrator to modify WAU settings.", "Administrator Required", "OK", "Warning")
     exit 1
+}
+
+# Initialize
+try {
+    Initialize-GUI
+} catch {
+    [System.Windows.Forms.MessageBox]::Show("Error: $($_.Exception.Message)", "Application Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+    exit 1
+}
+
+# Version information
+$versionFile = Join-Path $($Script:WorkingDir.TrimEnd('\')) "\config\version.txt"
+if (Test-Path $versionFile) {
+    $Script:WAU_GUI_VERSION = (Get-Content $versionFile -Raw).Trim()
+} else {
+    $Script:WAU_GUI_VERSION = "Unknown"
 }
 
 # Set console encoding
