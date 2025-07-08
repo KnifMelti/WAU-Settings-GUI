@@ -13,6 +13,7 @@ $ConfigVariables = @{
 	'USER_RUN_SCRIPT' = "User-Run.ps1"
 	'GUI_TITLE' = "WAU Settings (Administrator)"
 	'AUTOUPDATE_CHECK' = $true # Enable version autoupdate check for WAU Settings GUI
+	'AUTOUPDATE_DAYS' = 7 # 7 for a week, 1 for a day, 30 for a month, 0 for every time the GUI is opened
 	'DESKTOP_WAU_APPINSTALLER' = "${env:Public}\Desktop\WAU App Installer.lnk"
 	'STARTMENU_WAU_DIR' = "${env:PROGRAMDATA}\Microsoft\Windows\Start Menu\Programs\Winget-AutoUpdate"
 	'COLOR_ENABLED' = "#228B22"  # Forest green
