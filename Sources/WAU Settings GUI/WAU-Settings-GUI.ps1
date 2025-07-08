@@ -31,24 +31,19 @@ Provides a user-friendly interface to modify every aspect of WAU settings includ
 Must be run as Administrator
 #>
 
-# --- Early bootstrap for PopUp ---
-$Script:GUI_TITLE = "WAU Settings (Administrator)"
-$Script:COLOR_BACKGROUND = "#F5F5F5"
-
-# Import required assemblies early
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName System.Drawing
-Add-Type -AssemblyName PresentationFramework
-
-# Get current script directory
-$Script:WorkingDir = $PSScriptRoot
-# --- Early bootstrap for PopUp End ---
-
 
 <# FUNCTIONS #>
 # 0. Initialization function
 function Initialize-GUI {
-     # Set modules path
+    # Import required assemblies
+    Add-Type -AssemblyName System.Windows.Forms
+    Add-Type -AssemblyName System.Drawing
+    Add-Type -AssemblyName PresentationFramework
+
+    # Get current script directory
+    $Script:WorkingDir = $PSScriptRoot
+
+    # Set modules path
     $modulesPath = Join-Path -Path $Script:WorkingDir -ChildPath "modules"
 
     # Verify that modules directory exists
@@ -81,8 +76,19 @@ function Initialize-GUI {
         Set-Variable -Name $VarName -Value (Get-Variable -Name $VarName -Scope Global).Value -Scope Script
     }
 
+    # Import config_user.psm1 only if it exists
+    $configUserModulePath = Join-Path -Path $modulesPath -ChildPath "config_user.psm1"
+    if (Test-Path $configUserModulePath) {
+        Import-Module $configUserModulePath -Force
+        $ModuleInfo = Get-Module "config_user"
+        $ExportedVariables = $ModuleInfo.ExportedVariables.Keys
+
+        foreach ($VarName in $ExportedVariables) {
+            Set-Variable -Name $VarName -Value (Get-Variable -Name $VarName -Scope Global).Value -Scope Script
+        }
+    }
+
     # Then import other modules (yet to come... ...make a loop!)
-    # Import-Module (Join-Path -Path $modulesPath -ChildPath "Utilities.psm1") -Force
     # Import-Module (Join-Path -Path $modulesPath -ChildPath "GUI.psm1") -Force
     # Import-Module (Join-Path -Path $modulesPath -ChildPath "Registry.psm1") -Force
     # Import-Module (Join-Path -Path $modulesPath -ChildPath "Logging.psm1") -Force
@@ -3220,6 +3226,15 @@ if (-not (Test-Administrator)) {
     exit 1
 }
 
+# Initialize
+try {
+    Initialize-GUI
+} catch {
+    Close-PopUp
+    [System.Windows.Forms.MessageBox]::Show("Error: $($_.Exception.Message)", "Application Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+    exit 1
+}
+
 # Set WAU Settings GUI icon
 $guiIconPath = Join-Path $Script:WorkingDir "config\WAU Settings GUI.ico"
 if (Test-Path $guiIconPath) {
@@ -3255,15 +3270,6 @@ if (Test-Path $xamlConfigPath) {
 
 #Pop "Starting..."
 Start-PopUp "Gathering WAU Data..."
-
-# Initialize
-try {
-    Initialize-GUI
-} catch {
-    Close-PopUp
-    [System.Windows.Forms.MessageBox]::Show("Error: $($_.Exception.Message)", "Application Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
-    exit 1
-}
 
 # Version information
 $versionFile = Join-Path $Script:WorkingDir "\config\version.txt"
