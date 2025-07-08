@@ -3115,6 +3115,11 @@ function Show-WAUSettingsGUI {
 }
 
 <# MAIN #>
+# Set console encoding
+$null = cmd /c ''
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$ProgressPreference = 'SilentlyContinue'
+
 # Check if running as administrator
 if (-not (Test-Administrator)) {
     [System.Windows.MessageBox]::Show("This application must be run as Administrator to modify WAU settings.", "Administrator Required", "OK", "Warning")
@@ -3173,11 +3178,6 @@ if (Test-Path $versionFile) {
 } else {
     $Script:WAU_GUI_VERSION = "Unknown"
 }
-
-# Set console encoding
-$null = cmd /c ''
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$ProgressPreference = 'SilentlyContinue'
 
 # Load Window XAML from config file and store as constant
 $xamlConfigPath = Join-Path $Script:WorkingDir "config\settings-window.xaml"
