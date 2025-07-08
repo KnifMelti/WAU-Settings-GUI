@@ -25,7 +25,7 @@ Provides a user-friendly interface to modify every aspect of WAU settings includ
   - MSI transform creation (using current showing configuration)
   - Configuration backup/import (i.e. for sharing settings)
   - Uninstall/install WAU (with current showing configuration)
-  - Manual check for WAU Settings GUI updates (checks every week as standard, can be managed via `config_user.psm1`)
+  - Manual check for WAU Settings GUI updates (checks every week as standard, can be managed via config_user.psm1)
 
 .NOTES
 Must be run as Administrator
