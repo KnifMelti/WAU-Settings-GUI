@@ -2,7 +2,7 @@
 
 # Basic variables
 $ConfigUserVariables = @{
-	'AUTOUPDATE_CHECK' = $true # Enable version autoupdate check for WAU Settings GUI
+	'AUTOUPDATE_CHECK' = $true # Enable version autoupdate check for WAU Settings GUI once a day
 	'COLOR_ENABLED' = "#228B22"  # Forest green
 	'COLOR_DISABLED' = "#FF6666" # Light red
 	'COLOR_ACTIVE' = "Orange"

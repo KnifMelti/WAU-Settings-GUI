@@ -272,7 +272,6 @@ function Test-WAUGUIUpdate {
         }
     }
 }
-
 function Start-WAUGUIUpdate {
     param($updateInfo)
     
@@ -2004,6 +2003,61 @@ function Update-WAUGUIFromConfig {
             # Popup might already be closed
         }
     }
+
+    # Optional: Check for updates on startup (async) once a day (can be disabled in config_user.psm1)
+    $window.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Background, [Action]{
+        try {
+            # Only check for updates if auto-update check is enabled
+            if (-not $Script:AUTOUPDATE_CHECK) {
+                return
+            }
+            
+            # Check if we've already checked for updates today
+            $timestampFile = Join-Path $Script:WorkingDir "config\last_update_check.txt"
+            $shouldCheck = $true
+            
+            if (Test-Path $timestampFile) {
+                try {
+                    $lastCheckDate = Get-Content $timestampFile -ErrorAction Stop
+                    $lastCheck = [DateTime]::ParseExact($lastCheckDate, "yyyy-MM-dd", $null)
+                    $today = Get-Date -Format "yyyy-MM-dd"
+                    
+                    if ($lastCheck.ToString("yyyy-MM-dd") -eq $today) {
+                        $shouldCheck = $false
+                    }
+                }
+                catch {
+                    # If file is corrupted or invalid, proceed with check
+                    $shouldCheck = $true
+                }
+            }
+            
+            if ($shouldCheck) {
+                $updateInfo = Test-WAUGUIUpdate
+                if ($updateInfo.UpdateAvailable -and -not $updateInfo.Error) {
+                    $controls.StatusBarText.Text = "GUI update available!"
+                    $controls.StatusBarText.Foreground = $Script:COLOR_ACTIVE
+                    Start-WAUGUIUpdate -updateInfo $updateInfo
+                }
+                
+                # Save today's date to timestamp file
+                try {
+                    $configDir = Join-Path $Script:WorkingDir "config"
+                    if (-not (Test-Path $configDir)) {
+                        New-Item -ItemType Directory -Path $configDir -Force | Out-Null
+                    }
+                    $today = Get-Date -Format "yyyy-MM-dd"
+                    Set-Content -Path $timestampFile -Value $today -Force
+                }
+                catch {
+                    # Silent fail if we can't write timestamp file
+                }
+            }
+        }
+        catch {
+            # Silent fail for background check
+        }
+    }) | Out-Null    
 }
 function Test-WAULists {
     param($controls, $updatedConfig)
