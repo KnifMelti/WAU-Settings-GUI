@@ -51,7 +51,6 @@ NB: Must be run as Administrator (shortcut creation sets the flag)
 - The **WAU Settings (Administrator)** shortcut has now been created under **Start Menu\Programs\Winget-AutoUpdate** folder (along with the other **WAU** shortcuts) or on your own **Desktop**.
 - In `config_user.psm1` you can set the `AUTOUPDATE_CHECK` variable to `$true/$false` to enable/disable version autoupdate check for **WAU Settings GUI** once every `AUTOUPDATE_DAYS` and other user-specific settings (i.e. colors).
 - Move `config_user.psm1` to the `modules` folder to enable it.
-- Move `config_user.psm1` to the `modules` folder to enable it.
 
 ### Screenshots
 Managed by Registry (local):  
