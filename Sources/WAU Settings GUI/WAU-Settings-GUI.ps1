@@ -1999,6 +1999,58 @@ function Update-WAUGUIFromConfig {
         }
     }
 }
+function Test-WAULists {
+    param($controls, $updatedConfig)
+
+    # Only run if main window is NOT started and not in GPO mode
+    $updatedPolicies = $null
+    try {
+        $updatedPolicies = Get-ItemProperty -Path $Script:WAU_POLICIES_PATH -ErrorAction SilentlyContinue
+    } catch {}
+
+    $wauActivateGPOManagementEnabled = ($updatedPolicies.WAU_ActivateGPOManagement -eq 1)
+    $wauRunGPOManagementEnabled = ($updatedConfig.WAU_RunGPOManagement -eq 1)
+    $gpoControlsActive = $wauActivateGPOManagementEnabled -and $wauRunGPOManagementEnabled
+
+    if (-not $gpoControlsActive -and $Script:MainWindowStarted) {
+        $currentListPath = (Get-DisplayValue -PropertyName "WAU_ListPath" -Config $updatedConfig)
+        $installLocation = $updatedConfig.InstallLocation
+        $excludedFile = Join-Path $installLocation "excluded_apps.txt"
+        $includedFile = Join-Path $installLocation "included_apps.txt"
+        $defaultExcluded = Join-Path $installLocation "config\default_excluded_apps.txt"
+        $listsDir = Join-Path $Script:WorkingDir "lists"
+        $appsExcluded = Join-Path $listsDir "excluded_apps.txt"
+
+        $hasListPath = -not [string]::IsNullOrWhiteSpace($currentListPath)
+        $hasAnyListFile = (Test-Path $excludedFile) -or (Test-Path $includedFile)
+
+        # Only prompt if ListPath is empty AND no list file exists in WAU installation folder
+        if (-not $hasListPath -and -not $hasAnyListFile) {
+            $msg = "No WAU ListPath is set and no list file exists under $installLocation.`n`nDo you want to create a 'lists' folder with an editable excluded_apps.txt?`n`n'default_excluded_apps.txt' will be overwritten when 'WAU' updates itself!"
+            $result = [System.Windows.MessageBox]::Show($msg, "Create lists folder?", "OKCancel", "Question")
+            if ($result -eq 'OK') {
+                if (-not (Test-Path $listsDir)) {
+                    New-Item -Path $listsDir -ItemType Directory | Out-Null
+                }
+                # Create excluded_apps.txt in the new lists folder
+                if (-not (Test-Path $appsExcluded)) {
+                    if (Test-Path $defaultExcluded) {
+                        Copy-Item $defaultExcluded $appsExcluded -Force
+                    } else {
+                        Set-Content $appsExcluded "# Add apps to exclude, one per line."
+                    }
+                }
+
+                # Set WAU_ListPath to the new lists folder
+                Set-ItemProperty -Path $Script:WAU_REGISTRY_PATH -Name "WAU_ListPath" -Value $listsDir -Force
+                # Update the controls to reflect the new path
+                Invoke-SettingsLoad -controls $controls
+                # Open excluded_apps.txt for editing
+                Start-Process "explorer.exe" $appsExcluded
+            }
+        }
+    }
+}
 
 # 5. GUI action functions (depends on config + GUI helper functions)
 function New-WindowScreenshot {
@@ -2767,27 +2819,67 @@ function Show-WAUSettingsGUI {
                 # GPO registry key doesn't exist or can't be read
             }
             $installdir = $updatedConfig.InstallLocation
+            
+            # Get the ListPath from config or policies
+            $listPath = Get-DisplayValue -PropertyName "WAU_ListPath" -Config $updatedConfig -Policies $updatedPolicies
+            
             if ($updatedConfig.WAU_UseWhiteList -eq 1 -or $updatedPolicies.WAU_UseWhiteList -eq 1) {
-                $whiteListFile = Join-Path $installdir 'included_apps.txt'
-                if (Test-Path $whiteListFile) {
-                    Start-PopUp "WAU included apps list opening..."
-                    Start-Process "explorer.exe" -ArgumentList $whiteListFile
+                # Check if ListPath is set to a local or UNC path for whitelist
+                if (-not [string]::IsNullOrWhiteSpace($listPath) -and 
+                    $listPath -ne "GPO" -and 
+                    $listPath -ne "AzureBlob" -and
+                    ($listPath -match '^[a-zA-Z]:\\' -or $listPath -match '^\\\\')) {
+                    
+                    # Use the external ListPath for whitelist
+                    $whiteListFile = Join-Path $listPath 'included_apps.txt'
+                    if (Test-Path $whiteListFile) {
+                        Start-PopUp "WAU included apps list opening..."
+                        Start-Process "explorer.exe" -ArgumentList $whiteListFile
+                    } else {
+                        [System.Windows.MessageBox]::Show("No included apps list found in external path ('$listPath\included_apps.txt')", "File Not Found", "OK", "Warning")
+                        return
+                    }
                 } else {
-                    [System.Windows.MessageBox]::Show("No included apps list found ('included_apps.txt')", "File Not Found", "OK", "Warning")
-                    return
+                    # Use the default WAU installation directory for whitelist
+                    $whiteListFile = Join-Path $installdir 'included_apps.txt'
+                    if (Test-Path $whiteListFile) {
+                        Start-PopUp "WAU included apps list opening..."
+                        Start-Process "explorer.exe" -ArgumentList $whiteListFile
+                    } else {
+                        [System.Windows.MessageBox]::Show("No included apps list found ('included_apps.txt')", "File Not Found", "OK", "Warning")
+                        return
+                    }
                 }
             } else {
-                $excludedFile = Join-Path $installdir 'excluded_apps.txt'
-                $defaultExcludedFile = Join-Path $installdir 'config\default_excluded_apps.txt'
-                if (Test-Path $excludedFile) {
-                    Start-PopUp "WAU excluded apps list opening..."
-                    Start-Process "explorer.exe" -ArgumentList $excludedFile
-                } elseif (Test-Path $defaultExcludedFile) {
-                    Start-PopUp "WAU default excluded apps List opening..."
-                    Start-Process "explorer.exe" -ArgumentList $defaultExcludedFile
+                # Check if ListPath is set to a local or UNC path for excluded list
+                if (-not [string]::IsNullOrWhiteSpace($listPath) -and 
+                    $listPath -ne "GPO" -and 
+                    $listPath -ne "AzureBlob" -and
+                    ($listPath -match '^[a-zA-Z]:\\' -or $listPath -match '^\\\\')) {
+                    
+                    # Use the external ListPath for excluded list
+                    $excludedFile = Join-Path $listPath 'excluded_apps.txt'
+                    if (Test-Path $excludedFile) {
+                        Start-PopUp "WAU excluded apps list opening..."
+                        Start-Process "explorer.exe" -ArgumentList $excludedFile
+                    } else {
+                        [System.Windows.MessageBox]::Show("No excluded apps list found in external path ('$listPath\excluded_apps.txt')", "File Not Found", "OK", "Warning")
+                        return
+                    }
                 } else {
-                    [System.Windows.MessageBox]::Show("No excluded apps list found (neither 'excluded_apps.txt' nor 'config\default_excluded_apps.txt').", "File Not Found", "OK", "Warning")
-                    return
+                    # Use the default WAU installation directory for excluded list
+                    $excludedFile = Join-Path $installdir 'excluded_apps.txt'
+                    $defaultExcludedFile = Join-Path $installdir 'config\default_excluded_apps.txt'
+                    if (Test-Path $excludedFile) {
+                        Start-PopUp "WAU excluded apps list opening..."
+                        Start-Process "explorer.exe" -ArgumentList $excludedFile
+                    } elseif (Test-Path $defaultExcludedFile) {
+                        Start-PopUp "WAU default excluded apps List opening..."
+                        Start-Process "explorer.exe" -ArgumentList $defaultExcludedFile
+                    } else {
+                        [System.Windows.MessageBox]::Show("No excluded apps list found (neither 'excluded_apps.txt' nor 'config\default_excluded_apps.txt').", "File Not Found", "OK", "Warning")
+                        return
+                    }
                 }
             }
 
@@ -3110,7 +3202,9 @@ function Show-WAUSettingsGUI {
 
    }) | Out-Null
     
-    # Show window
+    Test-WAULists -controls $controls -updatedConfig $currentConfig
+
+   # Show window
     $window.ShowDialog() | Out-Null
 }
 
