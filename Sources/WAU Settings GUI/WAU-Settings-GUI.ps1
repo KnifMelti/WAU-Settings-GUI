@@ -2004,7 +2004,7 @@ function Update-WAUGUIFromConfig {
         }
     }
 
-    # Optional: Check for updates on startup (async) once a day (can be disabled in config_user.psm1)
+    # Optional: Check for updates on startup (async) - configurable interval (can be disabled in config_user.psm1)
     $window.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Background, [Action]{
         try {
             # Only check for updates if auto-update check is enabled
@@ -2012,7 +2012,7 @@ function Update-WAUGUIFromConfig {
                 return
             }
             
-            # Check if we've already checked for updates today
+            # Check if we've already checked for updates within the configured interval
             $timestampFile = Join-Path $Script:WorkingDir "config\last_update_check.txt"
             $shouldCheck = $true
             
@@ -2020,9 +2020,13 @@ function Update-WAUGUIFromConfig {
                 try {
                     $lastCheckDate = Get-Content $timestampFile -ErrorAction Stop
                     $lastCheck = [DateTime]::ParseExact($lastCheckDate, "yyyy-MM-dd", $null)
-                    $today = Get-Date -Format "yyyy-MM-dd"
+                    $today = Get-Date
                     
-                    if ($lastCheck.ToString("yyyy-MM-dd") -eq $today) {
+                    # Calculate days since last check
+                    $daysSinceLastCheck = ($today - $lastCheck).Days
+                    
+                    # Only check if it's been the configured number of days or more since last check
+                    if ($daysSinceLastCheck -lt $Script:AUTOUPDATE_DAYS) {
                         $shouldCheck = $false
                     }
                 }
@@ -2057,7 +2061,7 @@ function Update-WAUGUIFromConfig {
         catch {
             # Silent fail for background check
         }
-    }) | Out-Null    
+    }) | Out-Null
 }
 function Test-WAULists {
     param($controls, $updatedConfig)
