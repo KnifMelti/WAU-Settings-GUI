@@ -31,19 +31,24 @@ Provides a user-friendly interface to modify every aspect of WAU settings includ
 Must be run as Administrator
 #>
 
+# --- Early bootstrap for PopUp ---
+$Script:GUI_TITLE = "WAU Settings (Administrator)"
+$Script:COLOR_BACKGROUND = "#F5F5F5"
+
+# Import required assemblies early
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName PresentationFramework
+
+# Get current script directory
+$Script:WorkingDir = $PSScriptRoot
+# --- Early bootstrap for PopUp End ---
+
 
 <# FUNCTIONS #>
 # 0. Initialization function
 function Initialize-GUI {
-    # Import required assemblies
-    Add-Type -AssemblyName System.Windows.Forms
-    Add-Type -AssemblyName System.Drawing
-    Add-Type -AssemblyName PresentationFramework
-
-    # Get current script directory
-    $Script:WorkingDir = $PSScriptRoot
-
-    # Set modules path
+     # Set modules path
     $modulesPath = Join-Path -Path $Script:WorkingDir -ChildPath "modules"
 
     # Verify that modules directory exists
@@ -3116,10 +3121,47 @@ if (-not (Test-Administrator)) {
     exit 1
 }
 
+# Set WAU Settings GUI icon
+$guiIconPath = Join-Path $Script:WorkingDir "config\WAU Settings GUI.ico"
+if (Test-Path $guiIconPath) {
+    $Script:GUI_ICON = $guiIconPath
+} else {
+    # If missing, fallback and extract icon from PowerShell.exe and save as icon.ico in SYSTEM TEMP
+    $iconSource = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
+    $systemTemp = [System.Environment]::GetEnvironmentVariable("TEMP", [System.EnvironmentVariableTarget]::Machine)
+    if (-not $systemTemp) { $systemTemp = "$env:SystemRoot\Temp" }
+    $iconDest = Join-Path $systemTemp "icon.ico"
+    # Only extract if the icon doesn't already exist
+    if (-not (Test-Path $iconDest)) {
+        $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($iconSource)
+        $fs = [System.IO.File]::Open($iconDest, [System.IO.FileMode]::Create)
+        $icon.Save($fs)
+        $fs.Close()
+    }
+    $Script:GUI_ICON = $iconDest
+}
+
+# Load PopUp XAML from config file and store as constant
+$xamlConfigPath = Join-Path $Script:WorkingDir "config\settings-popup.xaml"
+if (Test-Path $xamlConfigPath) {
+    $inputXML = Get-Content $xamlConfigPath -Raw
+    
+    # Replace PowerShell variables with actual values
+    $inputXML = $inputXML -replace '\$Script:GUI_TITLE', $Script:GUI_TITLE
+    $Script:POPUP_XAML = $inputXML.Trim()
+} else {
+    [System.Windows.MessageBox]::Show("PopUp XAML config file not found: $xamlConfigPath", "$Script:GUI_TITLE", "OK", "Warning")
+    exit 1
+}
+
+#Pop "Starting..."
+Start-PopUp "Gathering WAU Data..."
+
 # Initialize
 try {
     Initialize-GUI
 } catch {
+    Close-PopUp
     [System.Windows.Forms.MessageBox]::Show("Error: $($_.Exception.Message)", "Application Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
     exit 1
 }
@@ -3136,19 +3178,6 @@ if (Test-Path $versionFile) {
 $null = cmd /c ''
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $ProgressPreference = 'SilentlyContinue'
-
-# Load PopUp XAML from config file and store as constant
-$xamlConfigPath = Join-Path $Script:WorkingDir "config\settings-popup.xaml"
-if (Test-Path $xamlConfigPath) {
-    $inputXML = Get-Content $xamlConfigPath -Raw
-    
-    # Replace PowerShell variables with actual values
-    $inputXML = $inputXML -replace '\$Script:GUI_TITLE', $Script:GUI_TITLE
-    $Script:POPUP_XAML = $inputXML.Trim()
-} else {
-    [System.Windows.MessageBox]::Show("PopUp XAML config file not found: $xamlConfigPath", "$Script:GUI_TITLE", "OK", "Warning")
-    exit 1
-}
 
 # Load Window XAML from config file and store as constant
 $xamlConfigPath = Join-Path $Script:WorkingDir "config\settings-window.xaml"
@@ -3190,29 +3219,6 @@ if (Test-Path $wauIconPath) {
     }
     $Script:WAU_ICON = $iconDest
 }
-
-# Set WAU Settings GUI icon
-$guiIconPath = Join-Path $Script:WorkingDir "config\WAU Settings GUI.ico"
-if (Test-Path $guiIconPath) {
-    $Script:GUI_ICON = $guiIconPath
-} else {
-    # If missing, fallback and extract icon from PowerShell.exe and save as icon.ico in SYSTEM TEMP
-    $iconSource = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
-    $systemTemp = [System.Environment]::GetEnvironmentVariable("TEMP", [System.EnvironmentVariableTarget]::Machine)
-    if (-not $systemTemp) { $systemTemp = "$env:SystemRoot\Temp" }
-    $iconDest = Join-Path $systemTemp "icon.ico"
-    # Only extract if the icon doesn't already exist
-    if (-not (Test-Path $iconDest)) {
-        $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($iconSource)
-        $fs = [System.IO.File]::Open($iconDest, [System.IO.FileMode]::Create)
-        $icon.Save($fs)
-        $fs.Close()
-    }
-    $Script:GUI_ICON = $iconDest
-}
-
-#Pop "Starting..."
-Start-PopUp "Gathering WAU Data..."
 
 # Get WinGet version by running 'winget -v'
 try {
