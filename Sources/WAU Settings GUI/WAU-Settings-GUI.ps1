@@ -3413,6 +3413,10 @@ $ProgressPreference = 'SilentlyContinue'
 
 # Check if running as administrator
 if (-not (Test-Administrator)) {
+    # Import required assemblies
+    Add-Type -AssemblyName System.Windows.Forms
+    Add-Type -AssemblyName System.Drawing
+    Add-Type -AssemblyName PresentationFramework
     [System.Windows.MessageBox]::Show("This application must be run as Administrator to modify WAU settings.", "Administrator Required", "OK", "Warning")
     exit 1
 }
