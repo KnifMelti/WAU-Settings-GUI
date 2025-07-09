@@ -382,49 +382,30 @@ function Get-WAUCurrentConfig {
             }
             
             if ($msiFilePath) {
-                # Ask user if they want to install now
-                $userWantsToInstallNow = [System.Windows.MessageBox]::Show(
-                    "WAU MSI downloaded successfully to:`n$msiFilePath`n`nDo you want to install it now?", 
-                    "Install WAU", 
-                    "OkCancel", 
-                    "Question"
-                ) -eq 'Ok'
+                # Install WAU using the downloaded MSI file
+                $installResult = Install-WAU -msiFilePath $msiFilePath
                 
-                if ($userWantsToInstallNow) {
-                    # Install WAU using the downloaded MSI file
-                    $installResult = Install-WAU -msiFilePath $msiFilePath
-                    
-                    # Handle post-installation logic
-                    if ($Script:MainWindowStarted) {
-                        return $null  # Return to main window regardless of install result
+                # Handle post-installation logic
+                if ($Script:MainWindowStarted) {
+                    return $null  # Return to main window regardless of install result
+                }
+                
+                # Create desktop shortcut for settings
+                Add-Shortcut $Script:DESKTOP_WAU_SETTINGS $Script:CONHOST_EXE $Script:WorkingDir "$Script:POWERSHELL_ARGS `"$((Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'))`"" $Script:GUI_ICON "Configure Winget-AutoUpdate settings after installation" "Normal" $true
+                
+                if ($installResult) {
+                    # Installation succeeded, try to get config again
+                    try {
+                        return Get-ItemProperty -Path $Script:WAU_REGISTRY_PATH -ErrorAction Stop
                     }
-                    
-                    # Create desktop shortcut for settings
-                    Add-Shortcut $Script:DESKTOP_WAU_SETTINGS $Script:CONHOST_EXE $Script:WorkingDir "$Script:POWERSHELL_ARGS `"$((Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'))`"" $Script:GUI_ICON "Configure Winget-AutoUpdate settings after installation" "Normal" $true
-                    
-                    if ($installResult) {
-                        # Installation succeeded, try to get config again
-                        try {
-                            return Get-ItemProperty -Path $Script:WAU_REGISTRY_PATH -ErrorAction Stop
-                        }
-                        catch {
-                            [System.Windows.MessageBox]::Show("Installation succeeded but cannot read WAU configuration.", "Configuration Error", "OK", "Error")
-                            exit 1
-                        }
-                    } else {
-                        exit 1  # Installation failed
-                    }
-                } else {
-                    # User chose not to install now - open the directory where MSI is located
-                    Start-Process "explorer.exe" -ArgumentList "/select,`"$msiFilePath`""
-                    
-                    if ($Script:MainWindowStarted) {
-                        return $config  # Return to main window
-                    } else {
-                        Add-Shortcut $Script:DESKTOP_WAU_SETTINGS $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$((Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'))`"" "$Script:GUI_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
+                    catch {
+                        [System.Windows.MessageBox]::Show("Installation succeeded but cannot read WAU configuration.", "Configuration Error", "OK", "Error")
                         exit 1
                     }
+                } else {
+                    exit 1  # Installation failed
                 }
+                exit 0
             } else {
                 # MSI download failed
                 if ($Script:MainWindowStarted) {
@@ -1129,13 +1110,92 @@ msiexec /x"$($guid)" REBOOT=R /qn /l*v "%~dp0Uninst-$logFileName"
         if ($installer) { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($installer) | Out-Null }
     }
 }
+function Test-LocalMSIVersion {
+    param(
+        [string]$msiDirectory = (Join-Path $Script:WorkingDir "msi")
+    )
+    
+    try {
+        # Find local MSI file
+        $localMSI = Get-ChildItem -Path $msiDirectory -Filter "*.msi" -File | Select-Object -First 1
+        if (-not $localMSI) {
+            return @{
+                UpdateNeeded = $true
+                Reason = "No local MSI found"
+                LocalVersion = $null
+                LatestVersion = $null
+            }
+        }
+        
+        # Extract version from local MSI
+        $installer = New-Object -ComObject WindowsInstaller.Installer
+        $database = $installer.GetType().InvokeMember("OpenDatabase", "InvokeMethod", $null, $installer, @($localMSI.FullName, 0))
+        
+        $view = $database.GetType().InvokeMember("OpenView", "InvokeMethod", $null, $database, "SELECT Value FROM Property WHERE Property = 'ProductVersion'")
+        $view.GetType().InvokeMember("Execute", "InvokeMethod", $null, $view, $null)
+        
+        $record = $view.GetType().InvokeMember("Fetch", "InvokeMethod", $null, $view, $null)
+        $localVersion = $record.GetType().InvokeMember("StringData", "GetProperty", $null, $record, 1)
+        
+        # Clean up COM objects
+        [System.Runtime.InteropServices.Marshal]::ReleaseComObject($record) | Out-Null
+        [System.Runtime.InteropServices.Marshal]::ReleaseComObject($view) | Out-Null
+        [System.Runtime.InteropServices.Marshal]::ReleaseComObject($database) | Out-Null
+        [System.Runtime.InteropServices.Marshal]::ReleaseComObject($installer) | Out-Null
+        
+        # Get latest version from GitHub
+        $ApiUrl = "https://api.github.com/repos/$Script:WAU_REPO/releases/latest"
+        $Release = Invoke-RestMethod -Uri $ApiUrl -UseBasicParsing
+        $latestVersion = $Release.tag_name.TrimStart('v')
+        
+        # Compare versions (3 digits: major.minor.patch)
+        $localVer = [Version]$localVersion
+        $latestVer = [Version]$latestVersion
+        
+        return @{
+            UpdateNeeded = ($latestVer -gt $localVer)
+            Reason = if ($latestVer -gt $localVer) { "Local version ($localVersion) is older than latest ($latestVersion)" } else { "Local version is current" }
+            LocalVersion = $localVersion
+            LatestVersion = $latestVersion
+            LocalMSIPath = $localMSI.FullName
+        }
+    }
+    catch {
+        return @{
+            UpdateNeeded = $true
+            Reason = "Error checking version: $($_.Exception.Message)"
+            LocalVersion = $null
+            LatestVersion = $null
+        }
+    }
+}
 function Get-WAUMsi {
+    param(
+        [switch]$ForceDownload
+    )
+    
     # Configuration
     $msiDir = Join-Path $Script:WorkingDir "msi"
 
     # Create temp directory
     if (!(Test-Path $msiDir)) {
         New-Item -ItemType Directory -Path $msiDir -Force | Out-Null
+    }
+
+    # Check if we need to download unless forced
+    if (-not $ForceDownload) {
+        $versionCheck = Test-LocalMSIVersion -msiDirectory $msiDir
+        
+        if (-not $versionCheck.UpdateNeeded) {
+            # Local MSI is current, return existing file
+            return @{
+                MsiAsset = @{ name = (Split-Path -Leaf $versionCheck.LocalMSIPath) }
+                MsiFilePath = $versionCheck.LocalMSIPath
+                VersionInfo = "Using local MSI: $($versionCheck.LocalVersion)"
+            }
+        }
+        
+        Start-PopUp "Local MSI outdated ($($versionCheck.LocalVersion) < $($versionCheck.LatestVersion)). Downloading latest..."
     }
 
     try {
@@ -1148,10 +1208,16 @@ function Get-WAUMsi {
         if (!$MsiAsset) {
             throw "MSI file not found in latest release"
         }
-        Start-PopUp "Downloading MSI: $($MsiAsset.name)..."
+        
+        if (-not $ForceDownload) {
+            Start-PopUp "Downloading latest MSI: $($MsiAsset.name)..."
+        }
         
         $MsiUrl = $MsiAsset.browser_download_url
         $msiFilePath = Join-Path $msiDir $MsiAsset.name
+        
+        # Remove old MSI files first
+        Get-ChildItem -Path $msiDir -Filter "*.msi" | Remove-Item -Force -ErrorAction SilentlyContinue
         
         Invoke-WebRequest -Uri $MsiUrl -OutFile $msiFilePath -UseBasicParsing
         
@@ -1161,6 +1227,7 @@ function Get-WAUMsi {
         return @{
             MsiAsset = $MsiAsset
             MsiFilePath = $msiFilePath
+            VersionInfo = "Downloaded latest MSI: $($Release.tag_name.TrimStart('v'))"
         }
     } 
     catch {
@@ -1266,16 +1333,32 @@ function New-WAUTransformFile {
             New-Item -ItemType Directory -Path $msiDir -Force | Out-Null
         }
         
-        # Check if there is an MSI file in the temp folder
-        $MsiAsset = @{ name = Get-ChildItem -Path $msiDir -Filter "*.msi" -File -ErrorAction SilentlyContinue | Select-Object -First 1 }
-
-        # If no MSI file was found download the latest MSI from GitHub
-        if ([string]::IsNullOrEmpty($MsiAsset.name)) {
+        # Check if we have a current MSI file or need to download
+        $versionCheck = Test-LocalMSIVersion -msiDirectory $msiDir
+        $msiFilePath = $null
+        $MsiAsset = @{}
+        
+        if (-not $versionCheck.UpdateNeeded -and $versionCheck.LocalMSIPath) {
+            # We have a current local MSI
+            $msiFilePath = $versionCheck.LocalMSIPath
+            $MsiAsset = @{ name = Split-Path -Leaf $msiFilePath }
+            Start-PopUp "Using current local MSI: v$($versionCheck.LocalVersion)"
+            Start-Sleep -Milliseconds ($Script:WAIT_TIME / 2)
+        } else {
+            # Need to download latest MSI
+            if ($versionCheck.LocalVersion) {
+                Start-PopUp "Local MSI outdated (v$($versionCheck.LocalVersion) < v$($versionCheck.LatestVersion)). Downloading latest..."
+            } else {
+                Start-PopUp "No local MSI found. Downloading latest..."
+            }
+            
             try {
-                $result = Get-WAUMsi
+                $result = Get-WAUMsi -ForceDownload
                 if ($result) {
                     $MsiAsset = $result.MsiAsset
                     $msiFilePath = $result.MsiFilePath
+                    Start-PopUp "Downloaded v$($versionCheck.LatestVersion). Ready to create transform..."
+                    Start-Sleep -Milliseconds ($Script:WAIT_TIME / 2)
                 }
                 if (-not $msiFilePath) {
                     throw "Failed to download MSI file"
@@ -1286,32 +1369,56 @@ function New-WAUTransformFile {
                 $MsiAsset = @{ name = '*.msi' }
                 Start-PopUp "Locate $($MsiAsset.name)..."
             }
-        } else {
-            Start-PopUp "Locate $($MsiAsset.name)..."
         }
         
-        # Open a file selection dialog to choose a location for WAU.msi
-        $openFileDialog = New-Object System.Windows.Forms.OpenFileDialog
-        $openFileDialog.Title = "Locate $($MsiAsset.name)"
-        $openFileDialog.Filter = "$($MsiAsset.name)|$($MsiAsset.name)"
-        $openFileDialog.FileName = "$($MsiAsset.name)"
-        $openFileDialog.InitialDirectory = $msiDir
-        $openFileDialog.RestoreDirectory = $true
-        
-        if ($openFileDialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-            $selectedFile = $openFileDialog.FileName
+        # If we have a valid MSI file path, skip the file dialog and create transform directly
+        if ($msiFilePath -and (Test-Path $msiFilePath)) {
+            Close-PopUp
+            Start-PopUp "Creating transform file..."
+            
+            # Use the transform generation function directly
+            $result = New-MSITransformFromControls -msiFilePath $msiFilePath -controls $controls -createFiles $true
             Close-PopUp
             
-            # Use the new transform generation function
-            $result = New-MSITransformFromControls -msiFilePath $selectedFile -controls $controls -createFiles $true
             if ($result.Success) {
-                [System.Windows.MessageBox]::Show($result.Message, "Transform Created", "OK", "Information")
+                $versionInfo = if ($versionCheck.LocalVersion) { 
+                    "Using WAU v$($versionCheck.LocalVersion)"
+                } else { 
+                    "Using latest WAU version"
+                }
+                $fullMessage = "$($result.Message)`n`n$versionInfo"
+                [System.Windows.MessageBox]::Show($fullMessage, "Transform Created", "OK", "Information")
                 Start-Process "explorer.exe" -ArgumentList $result.Directory
             } else {
                 [System.Windows.MessageBox]::Show($result.Message, "Error", "OK", "Error")
             }
         } else {
-            Close-PopUp
+            # Fallback to file dialog if something went wrong with automatic download/detection
+            Start-PopUp "Locate $($MsiAsset.name)..."
+            
+            # Open a file selection dialog to choose a location for WAU.msi
+            $openFileDialog = New-Object System.Windows.Forms.OpenFileDialog
+            $openFileDialog.Title = "Locate $($MsiAsset.name)"
+            $openFileDialog.Filter = "$($MsiAsset.name)|$($MsiAsset.name)"
+            $openFileDialog.FileName = "$($MsiAsset.name)"
+            $openFileDialog.InitialDirectory = $msiDir
+            $openFileDialog.RestoreDirectory = $true
+            
+            if ($openFileDialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+                $selectedFile = $openFileDialog.FileName
+                Close-PopUp
+                
+                # Use the transform generation function
+                $result = New-MSITransformFromControls -msiFilePath $selectedFile -controls $controls -createFiles $true
+                if ($result.Success) {
+                    [System.Windows.MessageBox]::Show($result.Message, "Transform Created", "OK", "Information")
+                    Start-Process "explorer.exe" -ArgumentList $result.Directory
+                } else {
+                    [System.Windows.MessageBox]::Show($result.Message, "Error", "OK", "Error")
+                }
+            } else {
+                Close-PopUp
+            }
         }
         
         return $true
@@ -2066,7 +2173,7 @@ function Update-WAUGUIFromConfig {
 function Test-WAULists {
     param($controls, $updatedConfig)
 
-    # Only run if main window is NOT started and not in GPO mode
+    # Only run if main window is started and not in GPO mode
     $updatedPolicies = $null
     try {
         $updatedPolicies = Get-ItemProperty -Path $Script:WAU_POLICIES_PATH -ErrorAction SilentlyContinue
@@ -2090,7 +2197,7 @@ function Test-WAULists {
 
         # Only prompt if ListPath is empty AND no list file exists in WAU installation folder
         if (-not $hasListPath -and -not $hasAnyListFile) {
-            $msg = "No WAU ListPath is set and no list file exists under $installLocation.`n`nDo you want to create a 'lists' folder with an editable excluded_apps.txt?`n`n'default_excluded_apps.txt' will be overwritten when 'WAU' updates itself!"
+            $msg = "No 'External List Path' is set and no list file exists under $installLocation.`n`nDo you want to create a local 'lists' folder with an editable 'excluded_apps.txt' to use?`n`n'default_excluded_apps.txt' will always be overwritten when 'WAU' updates itself!"
             $result = [System.Windows.MessageBox]::Show($msg, "Create lists folder?", "OKCancel", "Question")
             if ($result -eq 'OK') {
                 if (-not (Test-Path $listsDir)) {
