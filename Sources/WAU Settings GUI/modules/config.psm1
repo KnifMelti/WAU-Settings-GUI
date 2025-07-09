@@ -26,14 +26,16 @@ $ConfigVariables = @{
 	'WAIT_TIME' = 1000 # 1 second wait time for UI updates
 }
 
-# Set basic variables
+$Global:Config = $ConfigVariables
+
+# Create combined variables after basic ones exist
+$Global:DESKTOP_WAU_SETTINGS = [System.IO.Path]::Combine([Environment]::GetFolderPath('Desktop'), "$($Config.GUI_TITLE).lnk")
+
+# Create individual global variables from hashtable for backward compatibility
 $ConfigVariables.GetEnumerator() | ForEach-Object {
     Set-Variable -Name $_.Key -Value $_.Value -Scope Global
 }
 
-# Create combined variables after basic ones exist
-$Global:DESKTOP_WAU_SETTINGS = [System.IO.Path]::Combine([Environment]::GetFolderPath('Desktop'), "$Global:GUI_TITLE.lnk")
-
-# Export all
-$AllVariables = $ConfigVariables.Keys + @('DESKTOP_WAU_SETTINGS')
-Export-ModuleMember -Variable $AllVariables
+# Export hashtable, combined variables AND individual variables
+$variablesToExport = @('Config', 'DESKTOP_WAU_SETTINGS') + $ConfigVariables.Keys
+Export-ModuleMember -Variable $variablesToExport

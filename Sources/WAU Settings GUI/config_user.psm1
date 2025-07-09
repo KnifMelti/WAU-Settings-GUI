@@ -11,11 +11,13 @@ $ConfigUserVariables = @{
 	'COLOR_BACKGROUND' = "#F5F5F5"  # Set background color to light gray
 }
 
-# Set basic variables
-$ConfigUserVariables.GetEnumerator() | ForEach-Object {
+$Global:ConfigUser = $ConfigUserVariables
+
+# Create individual global variables from hashtable for backward compatibility
+$ConfigVariables.GetEnumerator() | ForEach-Object {
     Set-Variable -Name $_.Key -Value $_.Value -Scope Global
 }
 
-# Export all
-$AllVariables = $ConfigUserVariables.Keys
-Export-ModuleMember -Variable $AllVariables
+# Export hashtable AND individual variables
+$variablesToExport = @('ConfigUser') + $ConfigVariables.Keys
+Export-ModuleMember -Variable $variablesToExport

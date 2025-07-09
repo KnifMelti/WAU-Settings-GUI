@@ -30,7 +30,12 @@ Provides a user-friendly interface to modify every aspect of WAU settings includ
 .NOTES
 Must be run as Administrator
 #>
+param(
+    [switch]$Portable
+)
 
+# Set portable mode flag
+$Script:PORTABLE_MODE = $Portable.IsPresent
 
 <# FUNCTIONS #>
 # 0. Initialization function
@@ -391,7 +396,9 @@ function Get-WAUCurrentConfig {
                 }
                 
                 # Create desktop shortcut for settings
-                Add-Shortcut $Script:DESKTOP_WAU_SETTINGS $Script:CONHOST_EXE $Script:WorkingDir "$Script:POWERSHELL_ARGS `"$((Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'))`"" $Script:GUI_ICON "Configure Winget-AutoUpdate settings after installation" "Normal" $true
+                if (-not $Script:PORTABLE_MODE) {
+                    Add-Shortcut $Script:DESKTOP_WAU_SETTINGS $Script:CONHOST_EXE $Script:WorkingDir "$Script:POWERSHELL_ARGS `"$((Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'))`"" $Script:GUI_ICON "Configure Winget-AutoUpdate settings after installation" "Normal" $true
+                }
                 
                 if ($installResult) {
                     # Installation succeeded, try to get config again
@@ -411,7 +418,9 @@ function Get-WAUCurrentConfig {
                 if ($Script:MainWindowStarted) {
                     return $null  # Return to main window
                 } else {
-                    Add-Shortcut $Script:DESKTOP_WAU_SETTINGS $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$((Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'))`"" "$Script:GUI_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
+                    if (-not $Script:PORTABLE_MODE) {
+                        Add-Shortcut $Script:DESKTOP_WAU_SETTINGS $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$((Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'))`"" "$Script:GUI_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
+                    }
                     exit 1
                 }
             }
@@ -420,7 +429,9 @@ function Get-WAUCurrentConfig {
             if ($Script:MainWindowStarted) {
                 return $null  # Return to main window
             } else {
-                Add-Shortcut $Script:DESKTOP_WAU_SETTINGS $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$((Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'))`"" "$Script:GUI_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
+                if (-not $Script:PORTABLE_MODE) {
+                    Add-Shortcut $Script:DESKTOP_WAU_SETTINGS $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$((Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'))`"" "$Script:GUI_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
+                }
                 exit 1
             }
         }
@@ -757,7 +768,9 @@ function Set-WAUConfig {
                     Add-Shortcut "$Script:STARTMENU_WAU_DIR\Run WAU.lnk" $Script:CONHOST_EXE "$($currentConfig.InstallLocation)" "$Script:POWERSHELL_ARGS `"$($currentConfig.InstallLocation)$Script:USER_RUN_SCRIPT`"" "$Script:WAU_ICON" "Run Winget AutoUpdate" "Normal"
                     Add-Shortcut "$Script:STARTMENU_WAU_DIR\Open Logs.lnk" "$($currentConfig.InstallLocation)logs" "" "" "" "Open WAU Logs" "Normal"
                     Add-Shortcut "$Script:STARTMENU_WAU_DIR\WAU App Installer.lnk" $Script:CONHOST_EXE "$($currentConfig.InstallLocation)" "$Script:POWERSHELL_ARGS `"$($currentConfig.InstallLocation)WAU-Installer-GUI.ps1`"" "$Script:WAU_ICON" "Search for and Install WinGet Apps, etc..." "Normal"
-                    Add-Shortcut "$Script:STARTMENU_WAU_DIR\$Script:GUI_TITLE.lnk" $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$((Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'))`"" "$Script:GUI_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
+                    if (-not $Script:PORTABLE_MODE) {
+                        Add-Shortcut "$Script:STARTMENU_WAU_DIR\$Script:GUI_TITLE.lnk" $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$((Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'))`"" "$Script:GUI_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
+                    }
                 }
                 else {
                     if (Test-Path $Script:STARTMENU_WAU_DIR) {
@@ -765,7 +778,7 @@ function Set-WAUConfig {
                     }
                     
                     # Create desktop shortcut for WAU Settings if Start Menu shortcuts are removed
-                    if (-not (Test-Path $Script:DESKTOP_WAU_SETTINGS)) {
+                    if (-not $Script:PORTABLE_MODE -and -not (Test-Path $Script:DESKTOP_WAU_SETTINGS)) {
                         Add-Shortcut $Script:DESKTOP_WAU_SETTINGS $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$((Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'))`"" "$Script:GUI_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
                     }
                 }
@@ -2195,8 +2208,8 @@ function Test-WAULists {
         $hasListPath = -not [string]::IsNullOrWhiteSpace($currentListPath)
         $hasAnyListFile = (Test-Path $excludedFile) -or (Test-Path $includedFile)
 
-        # Only prompt if ListPath is empty AND no list file exists in WAU installation folder
-        if (-not $hasListPath -and -not $hasAnyListFile) {
+        # Only prompt if ListPath is empty AND no list file exists in WAU installation folder And not in portable mode
+        if (-not $hasListPath -and -not $hasAnyListFile -and -not $Script:PORTABLE_MODE) {
             $msg = "No 'External List Path' is set and no list file exists under $installLocation.`n`nDo you want to create a local 'lists' folder with an editable 'excluded_apps.txt' to use?`n`n'default_excluded_apps.txt' will always be overwritten when 'WAU' updates itself!"
             $result = [System.Windows.MessageBox]::Show($msg, "Create lists folder?", "OKCancel", "Question")
             if ($result -eq 'OK') {
@@ -2619,7 +2632,11 @@ function Set-DevToolsVisibility {
         $controls.DevWAUButton.Visibility = 'Visible'
         $controls.DevVerButton.Visibility = 'Visible'
         $controls.LinksStackPanel.Visibility = 'Visible'
-        $window.Title = "$Script:GUI_TITLE - Dev Tools"
+        if ($Script:PORTABLE_MODE) {
+            $window.Title = "$Script:GUI_TITLE - Dev Tools - Portable Mode"
+        } else {
+            $window.Title = "$Script:GUI_TITLE - Dev Tools"
+        }
     } else {
         $controls.DevTaskButton.Visibility = 'Collapsed'
         $controls.DevRegButton.Visibility = 'Collapsed'
@@ -2631,7 +2648,11 @@ function Set-DevToolsVisibility {
         $controls.DevWAUButton.Visibility = 'Collapsed'
         $controls.DevVerButton.Visibility = 'Collapsed'
         $controls.LinksStackPanel.Visibility = 'Collapsed'
-        $window.Title = "$Script:GUI_TITLE"
+        if ($Script:PORTABLE_MODE) {
+            $window.Title = "$Script:GUI_TITLE - Portable Mode"
+        } else {
+            $window.Title = "$Script:GUI_TITLE"
+        }
     }
 
     # Reset status to "Done"
@@ -2736,6 +2757,11 @@ function Show-WAUSettingsGUI {
     $controls = @{}
     $xamlXML.SelectNodes("//*[@Name]") | ForEach-Object {
         $controls[$_.Name] = $window.FindName($_.Name)
+    }
+
+    # Update window title if in portable mode
+    if ($Script:PORTABLE_MODE) {
+        $window.Title = "$Script:GUI_TITLE - Portable Mode"
     }
     
     # Set initial values for Update Time Hour ComboBox programmatically
@@ -3387,6 +3413,10 @@ $ProgressPreference = 'SilentlyContinue'
 
 # Check if running as administrator
 if (-not (Test-Administrator)) {
+    # Import required assemblies
+    Add-Type -AssemblyName System.Windows.Forms
+    Add-Type -AssemblyName System.Drawing
+    Add-Type -AssemblyName PresentationFramework
     [System.Windows.MessageBox]::Show("This application must be run as Administrator to modify WAU settings.", "Administrator Required", "OK", "Warning")
     exit 1
 }

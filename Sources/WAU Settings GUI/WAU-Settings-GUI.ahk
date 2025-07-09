@@ -1,0 +1,105 @@
+#Requires AutoHotkey v2.0
+#SingleInstance
+SetWorkingDir A_ScriptDir  ; Ensures a consistent starting directory.
+SplitPath(A_ScriptName, , , , &name_no_ext)
+FileEncoding "UTF-8"
+; Initialize the tray menu
+A_TrayMenu.Delete() ; Remove all default menu items
+A_TrayMenu.Add("Exit", (*) => ExitApp())
+
+; name_no_ext contains the Script name to use
+
+;Variables
+shortcutDesktop := A_Desktop "\WAU Settings (Administrator).lnk"
+shortcutStartMenu := A_ProgramsCommon "\Winget-AutoUpdate\WAU Settings (Administrator).lnk"
+psScriptPath := A_WorkingDir "\" name_no_ext ".ps1"
+runCommand := '*RunAs C:\Windows\System32\conhost.exe --headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' psScriptPath '"'
+portableCommand := '*RunAs C:\Windows\System32\conhost.exe --headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' psScriptPath '" -Portable'
+
+; Check if both shortcuts exist
+if FileExist(shortcutDesktop) && FileExist(shortcutStartMenu) {
+    Run shortcutDesktop
+} else if FileExist(shortcutDesktop) {
+    ; Only desktop shortcut exists
+    Run shortcutDesktop
+} else if FileExist(shortcutStartMenu) {
+    ; Only start menu shortcut exists
+    Run shortcutStartMenu
+} else {
+    ; Check if running from portable media
+    drive := SubStr(A_WorkingDir, 1, 2)
+    driveType := DriveGetType(drive)
+    
+    if (driveType = "Removable" || driveType = "CDRom") {
+        Run portableCommand
+        ExitApp
+    }
+
+    ; Check if working dir is under any user's 'AppData\Local\Microsoft\WinGet\Packages'
+    if InStr(A_WorkingDir, "\AppData\Local\Microsoft\WinGet\Packages\", false) > 0 {
+        FileAppend("This directory was created by 'WAU Settings GUI' WinGet installer.", A_WorkingDir "\installed.txt")
+    }
+
+    ; Check if "installed.txt" exists in working directory
+    if FileExist(A_WorkingDir "\installed.txt") {
+        Run runCommand
+    } else {
+        ; Ask the user if they want to install or run portable
+        choice := MsgBox(
+            "Do you want to install WAU Settings GUI?" . "`n`nChoose Yes to install, No to run as Portable, or Cancel to exit.",
+            name_no_ext,
+            0x103  ; Yes/No/Cancel with No as default
+        )
+        if (choice = "Cancel") {
+            ExitApp
+        }
+        if (choice = "Yes") {
+            ; Show a folder select dialog for base directory
+            targetBaseDir := FileSelect("D", , "Select base directory for installation ('WAU Settings GUI' will be created here)")
+            if !targetBaseDir {
+                ; User cancelled
+                ExitApp
+            }
+            ; Define the target directory as a new folder inside the selected base directory
+            targetDir := targetBaseDir "\WAU Settings GUI"
+
+            ; Create the target directory if it doesn't exist
+            DirCreate(targetDir)
+
+            ; Copy all files and subfolders from current script directory to targetDir
+            CopyFilesAndFolders(A_WorkingDir, targetDir)
+
+            ; Create installed.txt file in the target directory
+            FileAppend("This directory was created by 'WAU Settings GUI' local installer.", targetDir "\installed.txt")
+
+            ; Open install directory in Explorer
+            Run targetDir
+            ExitApp
+        } else {
+            Run portableCommand
+        }
+    }
+}
+
+; Helper function to recursively copy files and folders
+CopyFilesAndFolders(src, dst) {
+    Loop Files src "\*", "FR" {
+        relPath := SubStr(A_LoopFileFullPath, StrLen(src) + 2)
+        destPath := dst "\" relPath
+        if (A_LoopFileAttrib ~= "D") {
+            DirCreate(destPath)
+        } else {
+            ; Ensure parent directories exist
+            parts := StrSplit(destPath, "\")
+            if (parts.Length > 1) {
+                parentDir := parts[1]
+                Loop parts.Length - 1 {
+                    parentDir .= "\" parts[A_Index + 1]
+                }
+                parentDir := SubStr(parentDir, 1, -StrLen(parts[parts.Length]) - 1)
+                DirCreate(parentDir)
+            }
+            FileCopy(A_LoopFileFullPath, destPath, 1)
+        }
+    }
+}
