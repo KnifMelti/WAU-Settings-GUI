@@ -46,7 +46,7 @@ if FileExist(shortcutDesktop) && FileExist(shortcutStartMenu) {
     } else {
         ; Ask the user if they want to install or run portable
         choice := MsgBox(
-            "Do you want to install WAU Settings?" . "`n`nChoose Yes to install, No to run as Portable, or Cancel to exit.",
+            "Do you want to install WAU Settings GUI?" . "`n`nChoose Yes to install, No to run as Portable, or Cancel to exit.",
             name_no_ext,
             0x103  ; Yes/No/Cancel with No as default
         )
