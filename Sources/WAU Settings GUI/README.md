@@ -3,7 +3,7 @@
 - Standalone Installer/Portable (i.e. no need to install **WAU Settings GUI**)
 - Detects if running from USB drive, etc.
 - Run `WAU-Settings-GUI.exe`:
-  - <img src="../assets//WAU-Settings-GUI.png" alt="Installer/Runner">
+  - <img src="../assets//WAU-Settings-GUI.png" alt="Installer/Portable">
   - Select a base directory for the installation (it must be writable for downloads, etc.) or run it directly in portable mode
   - The files will be extracted to the selected directory where you can run `WAU-Settings-GUI.exe` directly afterwards (now it knows it's installed)
   - If **WAU** is not installed, it will prompt to download and install it with standard settings (creating a **WAU Settings (Administrator)** shortcut on your own **Desktop**).
