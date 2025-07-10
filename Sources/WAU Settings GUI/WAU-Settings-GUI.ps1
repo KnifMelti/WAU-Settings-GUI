@@ -3356,7 +3356,7 @@ function Show-WAUSettingsGUI {
             }
             
             if ($updateInfo.UpdateAvailable) {
-                $message = "Update available!`n`nCurrent version: $($updateInfo.CurrentVersion)`nLatest version: $($updateInfo.LatestVersion)`nRelease notes:`n$($updateInfo.ReleaseNotes -split "`n" | Where-Object { $_ -match '^\*[^*]' })`n`nDo you want to download the update?"
+                $message = "Update available!`n`nCurrent version: $($updateInfo.CurrentVersion)`nLatest version: $($updateInfo.LatestVersion)`nRelease notes:`n$($updateInfo.ReleaseNotes -split "`n" | Where-Object { $_ -match '^(?:\*|-)[^*-]' })`n`nDo you want to download the update?"
                 $result = [System.Windows.MessageBox]::Show($message, "Update Available", "OkCancel", "Question")
                 
                 if ($result -eq 'Ok') {
