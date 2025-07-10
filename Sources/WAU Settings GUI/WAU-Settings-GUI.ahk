@@ -74,6 +74,11 @@ if FileExist(shortcutDesktop) && FileExist(shortcutStartMenu) {
 
             ; Open install directory in Explorer
             Run targetDir
+            MsgBox(
+                "Installation complete! Please start the program by running 'WAU-Settings-GUI.exe' from the installation folder.",
+                name_no_ext,
+                0x40000  ; Information icon
+            )
             ExitApp
         } else {
             Run portableCommand
@@ -83,6 +88,7 @@ if FileExist(shortcutDesktop) && FileExist(shortcutStartMenu) {
 
 ; Helper function to recursively copy files and folders
 CopyFilesAndFolders(src, dst) {
+    ; First, copy all files and folders
     Loop Files src "\*", "FR" {
         relPath := SubStr(A_LoopFileFullPath, StrLen(src) + 2)
         destPath := dst "\" relPath
@@ -100,18 +106,18 @@ CopyFilesAndFolders(src, dst) {
                 DirCreate(parentDir)
             }
             FileCopy(A_LoopFileFullPath, destPath, 1)
-            
-            ; Remove Zone.Identifier (Mark of the Web) from copied file
-            try {
-                RunWait('powershell.exe -Command "Unblock-File -Path \\"' destPath '\\""', , "Hide")
-            } catch {
-                ; If PowerShell command fails, try alternative method
-                try {
-                    FileDelete(destPath ":Zone.Identifier")
-                } catch {
-                    ; Ignore if alternate data stream doesn't exist or can't be deleted
-                }
-            }
+        }
+    }
+    
+    ; Then remove Zone.Identifier from all copied files in one operation
+    try {
+        RunWait('powershell.exe -Command "Get-ChildItem -Path \\"' dst '\\" -Recurse -File | Unblock-File"', , "Hide")
+    } catch {
+        ; If PowerShell command fails, try alternative method
+        try {
+            RunWait('powershell.exe -Command "Get-ChildItem -Path \\"' dst '\\" -Recurse -File | ForEach-Object { Remove-Item -Path ($_.FullName + \\\":Zone.Identifier\\") -ErrorAction SilentlyContinue }"', , "Hide")
+        } catch {
+            ; Ignore if both methods fail
         }
     }
 }
