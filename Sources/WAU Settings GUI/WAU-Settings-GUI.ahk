@@ -100,6 +100,18 @@ CopyFilesAndFolders(src, dst) {
                 DirCreate(parentDir)
             }
             FileCopy(A_LoopFileFullPath, destPath, 1)
+            
+            ; Remove Zone.Identifier (Mark of the Web) from copied file
+            try {
+                RunWait('powershell.exe -Command "Unblock-File -Path \\"' destPath '\\""', , "Hide")
+            } catch {
+                ; If PowerShell command fails, try alternative method
+                try {
+                    FileDelete(destPath ":Zone.Identifier")
+                } catch {
+                    ; Ignore if alternate data stream doesn't exist or can't be deleted
+                }
+            }
         }
     }
 }
