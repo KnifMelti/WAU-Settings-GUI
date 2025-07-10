@@ -1709,9 +1709,9 @@ function Set-ControlsState {
     )
 
     $alwaysEnabledControls = @(
-        'ScreenshotButton', 'SaveButton', 'CancelButton', 'RunNowButton', 'OpenLogsButton',
+        'ScreenshotButton', 'SaveButton', 'CancelButton', 'RunNowButton', 'OpenLogsButton', 'GUIPng',
         'DevTaskButton', 'DevRegButton', 'DevGUIDButton', 'DevSysButton', 'DevListButton',
-        'DevMSIButton', 'DevVerButton', 'VersionLinksTextBlock'
+        'DevMSIButton', 'DevVerButton', 'DevSrcButton', 'VersionLinksTextBlock'
     )
 
     function Get-Children($control) {
@@ -2631,6 +2631,7 @@ function Set-DevToolsVisibility {
         $controls.DevCfgButton.Visibility = 'Visible'
         $controls.DevWAUButton.Visibility = 'Visible'
         $controls.DevVerButton.Visibility = 'Visible'
+        $controls.DevSrcButton.Visibility = 'Visible'
         $controls.LinksStackPanel.Visibility = 'Visible'
         if ($Script:PORTABLE_MODE) {
             $window.Title = "$Script:GUI_TITLE - Dev Tools - Portable Mode"
@@ -2647,6 +2648,7 @@ function Set-DevToolsVisibility {
         $controls.DevCfgButton.Visibility = 'Collapsed'
         $controls.DevWAUButton.Visibility = 'Collapsed'
         $controls.DevVerButton.Visibility = 'Collapsed'
+        $controls.DevSrcButton.Visibility = 'Collapsed'
         $controls.LinksStackPanel.Visibility = 'Collapsed'
         if ($Script:PORTABLE_MODE) {
             $window.Title = "$Script:GUI_TITLE - Portable Mode"
@@ -2884,6 +2886,10 @@ function Show-WAUSettingsGUI {
     })
 
     # Dev button event handlers
+    $controls.GUIPng.Add_Click({
+        Set-DevToolsVisibility -controls $controls -window $window
+    })
+
     $controls.DevTaskButton.Add_Click({
         try {
             Start-PopUp "Task scheduler opening, look in WAU folder..."
@@ -3293,6 +3299,23 @@ function Show-WAUSettingsGUI {
         }
     })
 
+    $controls.DevSrcButton.Add_Click({
+        Start-PopUp "WAU Settings GUI install folder opening..."
+        Start-Process "explorer.exe" -ArgumentList $Script:WorkingDir
+        # Update status to "Done"
+        $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
+        $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED
+        
+        # Create timer to reset status back to "$Script:STATUS_READY_TEXT" after standard wait time
+        # Use Invoke-Async to avoid blocking
+        $window.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Background, [Action]{
+            Start-Sleep -Milliseconds $Script:WAIT_TIME
+            $controls.StatusBarText.Text = "$Script:STATUS_READY_TEXT"
+            $controls.StatusBarText.Foreground = "$Script:COLOR_INACTIVE"
+            Close-PopUp
+        }) | Out-Null
+    })
+
     # Save button handler to save settings
     $controls.SaveButton.Add_Click({
         Save-WAUSettings -controls $controls
@@ -3476,11 +3499,16 @@ if (Test-Path $versionFile) {
 
 # Load Window XAML from config file and store as constant
 $xamlConfigPath = Join-Path $Script:WorkingDir "config\settings-window.xaml"
+$guiPngPath = Join-Path $Script:WorkingDir "config\WAU Settings GUI.png"
+if (Test-Path $guiPngPath) {
+    $Script:WAU_GUI_PNG = $guiPngPath
+}
 if (Test-Path $xamlConfigPath) {
     $inputXML = Get-Content $xamlConfigPath -Raw
     
     # Replace PowerShell variables with actual values
     $inputXML = $inputXML -replace '\$Script:GUI_TITLE', $Script:GUI_TITLE
+    $inputXML = $inputXML -replace '\$Script:WAU_GUI_PNG', $Script:WAU_GUI_PNG
     $inputXML = $inputXML -replace '\$Script:COLOR_ENABLED', $Script:COLOR_ENABLED
     $inputXML = $inputXML -replace '\$Script:COLOR_DISABLED', $Script:COLOR_DISABLED
     $inputXML = $inputXML -replace '\$Script:COLOR_ACTIVE', $Script:COLOR_ACTIVE
