@@ -230,6 +230,24 @@ function Test-WAUGUIUpdate {
         $currentVer = [Version]$Script:WAU_GUI_VERSION
         $latestVer = [Version]$latestVersion
         
+        # Check if we already have the latest version downloaded
+        $downloadDir = Join-Path $Script:WorkingDir "updates"
+        $alreadyDownloaded = $false
+        $existingFilePath = $null
+        
+        if (Test-Path $downloadDir) {
+            # Look for files with the latest version in the name
+            $existingFiles = Get-ChildItem -Path $downloadDir -Filter "*.zip" | Where-Object {
+                $_.Name -like "*$latestVersion*" -or $_.Name -like "*$($Release.tag_name)*"
+            }
+            
+            if ($existingFiles) {
+                $alreadyDownloaded = $true
+                $existingFilePath = $existingFiles[0].FullName
+                Write-Host "Found existing download for version $latestVersion`: $($existingFiles[0].Name)"
+            }
+        }
+        
         # Find download URL - GitHub automatically creates source code assets
         $downloadAsset = $null
         
@@ -255,7 +273,7 @@ function Test-WAUGUIUpdate {
             # GitHub automatically provides source code downloads at predictable URLs
             $downloadUrl = "https://github.com/$Script:WAU_GUI_REPO/archive/refs/tags/$($Release.tag_name).zip"
             $downloadAsset = [PSCustomObject]@{
-                name = "$($Script:WAU_GUI_NAME)-$($Release.tag_name).zip"
+                name = "$($Script:WAU_GUI_NAME)-Source-$($Release.tag_name).zip"
                 browser_download_url = $downloadUrl
             }
             Write-Host "Using GitHub automatic source code ZIP: $($downloadAsset.name)"
@@ -268,6 +286,8 @@ function Test-WAUGUIUpdate {
             DownloadUrl = $downloadAsset.browser_download_url
             ReleaseNotes = $Release.body
             AssetName = $downloadAsset.name
+            AlreadyDownloaded = $alreadyDownloaded
+            ExistingFilePath = $existingFilePath
         }
     }
     catch {
@@ -293,35 +313,40 @@ function Start-WAUGUIUpdate {
         $fileName = if ($updateInfo.AssetName) { $updateInfo.AssetName } else { Split-Path $updateInfo.DownloadUrl -Leaf }
         $downloadPath = Join-Path $downloadDir $fileName
         
-        Start-PopUp "Downloading update: $fileName..."
-        
-        # Add User-Agent header for better GitHub API compatibility
-        $headers = @{
-            'User-Agent' = 'WAU-Settings-GUI-Updater/1.0'
+        # Check if we already have the file downloaded
+        if ($updateInfo.AlreadyDownloaded -and $updateInfo.ExistingFilePath -and (Test-Path $updateInfo.ExistingFilePath)) {
+            $downloadPath = $updateInfo.ExistingFilePath
+            $fileName = Split-Path $downloadPath -Leaf
+            Write-Host "Using existing download: $fileName"
+        } else {
+            Start-PopUp "Downloading update: $fileName..."
+            
+            # Add User-Agent header for better GitHub API compatibility
+            $headers = @{
+                'User-Agent' = 'WAU-Settings-GUI-Updater/1.0'
+            }
+            
+            Invoke-WebRequest -Uri $updateInfo.DownloadUrl -OutFile $downloadPath -UseBasicParsing -Headers $headers
+            
+            # Verify download was successful
+            if (-not (Test-Path $downloadPath) -or (Get-Item $downloadPath).Length -eq 0) {
+                throw "Downloaded file is missing or empty"
+            }
         }
-        
-        Invoke-WebRequest -Uri $updateInfo.DownloadUrl -OutFile $downloadPath -UseBasicParsing -Headers $headers
         
         Close-PopUp
         
-        # Verify download was successful
-        if (-not (Test-Path $downloadPath) -or (Get-Item $downloadPath).Length -eq 0) {
-            throw "Downloaded file is missing or empty"
-        }
-        
         # Ask user if they want to install now
+        $statusText = if ($updateInfo.AlreadyDownloaded) { "existing" } else { "downloaded successfully" }
         $result = [System.Windows.MessageBox]::Show(
-            "Update downloaded successfully!`n`nFile: $fileName`nLocation: $downloadPath`n`nDo you want to extract and view the update now?",
-            "Update Downloaded",
+            "Update $statusText!`n`nFile: $fileName`nLocation: $downloadPath`n`nDo you want to extract and manage the update now?",
+            "Update Ready",
             "OkCancel",
             "Question"
         )
         
         if ($result -eq 'Ok') {
             Start-Process "explorer.exe" "$Script:WorkingDir"
-            # Prepare subfolder path
-            # $subFolder = "$($Script:WAU_GUI_NAME)-$($updateInfo.LatestVersion)\Sources\WAU Settings GUI"
-            # $zipSubPath = "$downloadPath\$subFolder"
             Start-Process "explorer.exe" "$downloadPath"
             Close-WindowGracefully -controls $controls -window $window
         }
@@ -334,6 +359,7 @@ function Start-WAUGUIUpdate {
         return $false
     }
 }
+
 # 2. Configuration functions
 function Get-DisplayValue {
     param (

@@ -42,21 +42,6 @@
                     </TextBlock>
                 </StackPanel>
                 
-                <!-- WAU Settings GUI PNG (visible by default) -->
-                <StackPanel x:Name="GUIPngPanel" Orientation="Vertical" VerticalAlignment="Top" Margin="0,0,10,0" Visibility="Visible">
-                    <Button x:Name="GUIPng" 
-                            Width="48" Height="48" 
-                            Margin="0,0,0,0"
-                            ToolTip="WAU Settings GUI - Click or F12 for developer tools"
-                            Cursor="Hand"
-                            Background="Transparent"
-                            BorderThickness="0"
-                            Padding="0">
-                        <Image Source="$Script:WAU_GUI_PNG" 
-                               Width="48" Height="48"/>
-                    </Button>
-                </StackPanel>
-
                 <!-- Dev buttons in a Grid with 2 rows -->
                 <Grid VerticalAlignment="Top" Height="42">
                     <Grid.RowDefinitions>
@@ -93,6 +78,21 @@
                     </StackPanel>
                 </Grid>
                 
+                <!-- WAU Settings GUI PNG (visible by default) -->
+                <StackPanel x:Name="GUIPngPanel" Orientation="Vertical" VerticalAlignment="Top" Margin="0,0,10,0" Visibility="Visible">
+                    <Button x:Name="GUIPng" 
+                            Width="48" Height="48" 
+                            Margin="10,0,0,0"
+                            ToolTip="WAU Settings GUI - Click or F12 for developer tools"
+                            Cursor="Hand"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Padding="0">
+                        <Image Source="$Script:WAU_GUI_PNG" 
+                               Width="48" Height="48"/>
+                    </Button>
+                </StackPanel>
+
             </StackPanel>            
         </Grid>
     </GroupBox>

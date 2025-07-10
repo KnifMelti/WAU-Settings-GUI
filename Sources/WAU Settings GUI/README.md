@@ -1,4 +1,4 @@
-# Installation
+## Installation
 - Extract `Sources\WAU Settings GUI`
 - Standalone Installer/Portable (i.e. no need to install **WAU Settings GUI**)
 - Detects if running from USB drive, etc.
@@ -12,3 +12,8 @@
 - The **WAU Settings (Administrator)** shortcut has now been created under **Start Menu\Programs\Winget-AutoUpdate** folder (along with the other **WAU** shortcuts) or on your own **Desktop**.
 - In `config_user.psm1` you can set the `AUTOUPDATE_CHECK` variable to `$true/$false` to enable/disable version autoupdate check for **WAU Settings GUI** once every `AUTOUPDATE_DAYS` and other user-specific settings (i.e. colors).
 - Move `config_user.psm1` to the `modules` folder to enable it.
+
+## Upgrade
+- Download the latest released version
+- Extract the files to the same directory as before (overwrite existing files)
+- It looks for updates automatically every week (can be managed via `config_user.psm1`)
