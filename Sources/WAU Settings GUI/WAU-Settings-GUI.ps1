@@ -26,6 +26,7 @@ Provides a user-friendly interface to modify every aspect of WAU settings includ
   - Configuration backup/import (i.e. for sharing settings)
   - Uninstall/install WAU (with current showing configuration)
   - Manual check for WAU Settings GUI updates (checks every week as standard, can be managed via config_user.psm1)
+  - Direct access to the **WAU Settings GUI** install folder
 
 .NOTES
 Must be run as Administrator
