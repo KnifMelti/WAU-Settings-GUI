@@ -39,6 +39,7 @@ Configure **WAU** settings after installation, including:
   - Configuration backup/import (i.e. for sharing settings)
   - Uninstall/install **WAU** (with current showing configuration)
   - Manual/automatic check for **WAU Settings GUI** updates (checks every week as standard, can be managed via `config_user.psm1`)
+  - Direct access to the **WAU Settings GUI** install folder
 
 NB: Must be run as Administrator (shortcut creation sets the flag)
 
