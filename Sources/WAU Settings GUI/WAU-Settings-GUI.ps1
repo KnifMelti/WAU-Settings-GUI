@@ -2213,10 +2213,58 @@ function Test-WAULists {
             $msg = "No 'External List Path' is set and no list file exists under $installLocation.`n`nDo you want to create a local 'lists' folder with an editable 'excluded_apps.txt' to use?`n`n'default_excluded_apps.txt' will always be overwritten when 'WAU' updates itself!"
             $result = [System.Windows.MessageBox]::Show($msg, "Create lists folder?", "OKCancel", "Question")
             if ($result -eq 'OK') {
+                $listsDir = Join-Path $Script:WorkingDir "lists"
+                
+                # Check if the proposed lists directory would be under user profile
+                $userProfile = [Environment]::GetFolderPath('UserProfile')
+                if ($listsDir.StartsWith($userProfile, [StringComparison]::OrdinalIgnoreCase)) {
+                    # Lists directory would be under user profile, need to choose alternative location
+                    $folderMsg = "The default location would be under your user profile which is not recommended.`n`nPlease select a folder where the 'lists' folder should be created (must be outside your user profile):"
+                    [System.Windows.MessageBox]::Show($folderMsg, "Select Location", "OK", "Information")
+                    
+                    $folderDialog = New-Object System.Windows.Forms.FolderBrowserDialog
+                    $folderDialog.Description = "Select folder where 'lists' folder will be created (must be outside user profile)"
+                    $folderDialog.ShowNewFolderButton = $true
+                    $folderDialog.SelectedPath = "C:\"
+                    
+                    do {
+                        $dialogResult = $folderDialog.ShowDialog()
+                        if ($dialogResult -eq [System.Windows.Forms.DialogResult]::OK) {
+                            $selectedPath = $folderDialog.SelectedPath
+                            
+                            # Check if selected path is under user profile
+                            if ($selectedPath.StartsWith($userProfile, [StringComparison]::OrdinalIgnoreCase)) {
+                                [System.Windows.MessageBox]::Show("Selected folder is under your user profile. Please choose a different location.", "Invalid Location", "OK", "Warning")
+                                continue
+                            }
+                            
+                            # Check if we have write access to the selected path
+                            try {
+                                $testFile = Join-Path $selectedPath "test_write_access.tmp"
+                                Set-Content -Path $testFile -Value "test" -ErrorAction Stop
+                                Remove-Item -Path $testFile -Force -ErrorAction SilentlyContinue
+                                
+                                # Valid location found
+                                $listsDir = Join-Path $selectedPath "lists"
+                                break
+                            }
+                            catch {
+                                [System.Windows.MessageBox]::Show("No write access to selected folder. Please choose a different location.", "Access Denied", "OK", "Warning")
+                                continue
+                            }
+                        }
+                        else {
+                            # User cancelled folder selection
+                            return
+                        }
+                    } while ($true)
+                }
+                
                 if (-not (Test-Path $listsDir)) {
                     New-Item -Path $listsDir -ItemType Directory | Out-Null
                 }
                 # Create excluded_apps.txt in the new lists folder
+                $appsExcluded = Join-Path $listsDir "excluded_apps.txt"
                 if (-not (Test-Path $appsExcluded)) {
                     if (Test-Path $defaultExcluded) {
                         Copy-Item $defaultExcluded $appsExcluded -Force
@@ -2224,7 +2272,7 @@ function Test-WAULists {
                         Set-Content $appsExcluded "# Add apps to exclude, one per line."
                     }
                 }
-
+        
                 # Set WAU_ListPath to the new lists folder
                 Set-ItemProperty -Path $Script:WAU_REGISTRY_PATH -Name "WAU_ListPath" -Value $listsDir -Force
                 # Update the controls to reflect the new path
