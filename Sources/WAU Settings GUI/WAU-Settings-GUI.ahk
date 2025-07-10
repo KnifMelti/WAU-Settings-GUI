@@ -109,15 +109,26 @@ CopyFilesAndFolders(src, dst) {
         }
     }
     
-    ; Then remove Zone.Identifier from all copied files in one operation
+    ; Remove Zone.Identifier from all copied files in one operation
     try {
-        RunWait('powershell.exe -Command "Get-ChildItem -Path \\"' dst '\\" -Recurse -File | Unblock-File"', , "Hide")
+        ; Try PowerShell Unblock-File (works on most systems)
+        RunWait('powershell.exe -NoProfile -Command "Get-ChildItem -Path \"' dst '\" -Recurse -File | Unblock-File"', , "Hide")
     } catch {
-        ; If PowerShell command fails, try alternative method
+        ; If Unblock-File fails, try removing the stream directly
         try {
-            RunWait('powershell.exe -Command "Get-ChildItem -Path \\"' dst '\\" -Recurse -File | ForEach-Object { Remove-Item -Path ($_.FullName + \\\":Zone.Identifier\\") -ErrorAction SilentlyContinue }"', , "Hide")
+            RunWait('powershell.exe -NoProfile -Command "Get-ChildItem -Path \"' dst '\" -Recurse -File | ForEach-Object { Remove-Item -Path ($_.FullName + \":Zone.Identifier\") -ErrorAction SilentlyContinue }"', , "Hide")
         } catch {
-            ; Ignore if both methods fail
+            ; Last resort: process each file individually
+            Loop Files dst "\*", "FR" {
+                if !(A_LoopFileAttrib ~= "D") {  ; Only process files, not directories
+                    try {
+                        ; Try to delete the Zone.Identifier stream for each file
+                        RunWait('powershell.exe -NoProfile -Command "Remove-Item -Path \"' A_LoopFileFullPath ':Zone.Identifier\" -ErrorAction SilentlyContinue"', , "Hide")
+                    } catch {
+                        ; Ignore individual file failures
+                    }
+                }
+            }
         }
     }
 }

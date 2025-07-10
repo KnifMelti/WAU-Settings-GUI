@@ -2,7 +2,7 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.9.0.schema.json
 
 PackageIdentifier: KnifMelti.WAU-Settings-GUI
-PackageVersion: 1.7.8
+PackageVersion: 1.7.9
 Scope: user
 InstallModes:
 - interactive
@@ -15,8 +15,8 @@ InstallerSwitches:
   SilentWithProgress: '""'
 Installers:
 - Architecture: x64
-  InstallerUrl: https://github.com/KnifMelti/WAU-Settings-GUI/releases/download/v1.7.8/WAU-Settings-GUI-v1.7.8.zip
+  InstallerUrl: https://github.com/KnifMelti/WAU-Settings-GUI/releases/download/v1.7.9/WAU-Settings-GUI-v1.7.9.zip
   InstallerSha256: 79a7f2376e8e51957632a5bc18134e35925a47d8a8f03c85ba4520543c042ea2
-  ElevationRequirement: elevationRequired
+  ElevationRequirement: elevatesSelf
 ManifestType: installer
 ManifestVersion: 1.9.0
