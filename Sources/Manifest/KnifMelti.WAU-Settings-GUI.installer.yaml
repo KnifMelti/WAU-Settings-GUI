@@ -16,7 +16,7 @@ InstallerSwitches:
 Installers:
 - Architecture: x64
   InstallerUrl: https://github.com/KnifMelti/WAU-Settings-GUI/releases/download/v1.7.9/WAU-Settings-GUI-v1.7.9.zip
-  InstallerSha256: 79a7f2376e8e51957632a5bc18134e35925a47d8a8f03c85ba4520543c042ea2
+  InstallerSha256: 0f3ba8f55d2d03842c507ad9bc30d455e88ec201a111d112d84f28c67b213810
   ElevationRequirement: elevatesSelf
 ManifestType: installer
 ManifestVersion: 1.9.0
