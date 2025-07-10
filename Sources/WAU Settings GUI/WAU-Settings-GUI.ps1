@@ -320,9 +320,9 @@ function Start-WAUGUIUpdate {
         if ($result -eq 'Ok') {
             Start-Process "explorer.exe" "$Script:WorkingDir"
             # Prepare subfolder path
-            $subFolder = "$($Script:WAU_GUI_NAME)-$($updateInfo.LatestVersion)\Sources\WAU Settings GUI"
-            $zipSubPath = "$downloadPath\$subFolder"
-            Start-Process "explorer.exe" "$zipSubPath"
+            # $subFolder = "$($Script:WAU_GUI_NAME)-$($updateInfo.LatestVersion)\Sources\WAU Settings GUI"
+            # $zipSubPath = "$downloadPath\$subFolder"
+            Start-Process "explorer.exe" "$downloadPath"
             Close-WindowGracefully -controls $controls -window $window
         }
         
