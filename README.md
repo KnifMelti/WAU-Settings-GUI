@@ -59,11 +59,25 @@ NB: Must be run as **Administrator** (exe and shortcuts have the flag set)
 - Move `config_user.psm1` to the `modules` folder to enable it.
 
 ### Automatic Installation (coming...)
-- Use **WinGet CLI** from **Command Prompt** (Run as **Administrator**!) to install the latest version of **WAU Settings GUI**:
+- Use **WinGet CLI** from **Command Prompt** to install the latest version of **WAU Settings GUI**:
+  ```bash
+  winget install KnifMelti.WAU-Settings-GUI --scope user
+  ```
+  This will install it to:
+  
+   `%USERPROFILE%\AppData\Local\Microsoft\WinGet\Packages\KnifMelti.WAU-Settings-GUI__DefaultSource`.
+
+- Alternatively, you can install it for anyone from **Command Prompt** (Run as **administrator**):
+  
   ```bash
   winget install KnifMelti.WAU-Settings-GUI
   ```
-After installation, you can start the GUI by running `WAU-Settings-GUI.exe` from the installation directory (`%ProgramFiles%\WinGet\Packages\KnifMelti.WAU-Settings-GUI__DefaultSource`) or via an ordinary **Command Prompt** using the PortableCommandAlias: **WAU-Settings-GUI**
+  This will install it to:
+  
+  `%ProgramFiles%\WinGet\Packages\KnifMelti.WAU-Settings-GUI__DefaultSource`.
+
+
+After installation, you can start the GUI by running `WAU-Settings-GUI.exe` from the installation directory or via an ordinary **Command Prompt** using the `PortableCommandAlias` from `WinGet`: **WAU-Settings-GUI**
 
 Shortcuts can be managed via the GUI, allowing you to create or remove shortcuts on your own **Desktop** or in the **Start Menu** (pin to taskbar when running maybe?).
 
