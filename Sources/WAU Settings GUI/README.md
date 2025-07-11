@@ -14,7 +14,7 @@
 - Move `config_user.psm1` to the `modules` folder to enable it.
 
 ### Automatic Installation (coming...)
-- Use **WinGet CLI** from **Command Prompt** (Run as Administrator!) to install the latest version of **WAU Settings GUI**:
+- Use **WinGet CLI** from **Command Prompt** (Run as **Administrator**!) to install the latest version of **WAU Settings GUI**:
   ```bash
   winget install KnifMelti.WAU-Settings-GUI
   ```
@@ -27,7 +27,7 @@ Shortcuts can be managed via the GUI, allowing you to create or remove shortcuts
 - Checks automatically every week as standard (can be managed via `config_user.psm1`)
 
 ### Uninstall (coming...)
-- Use **WinGet CLI** from **Command Prompt** (Run as Administrator!) to uninstall **WAU Settings GUI**:
+- Use **WinGet CLI** from **Command Prompt** (Run as **Administrator**!) to uninstall **WAU Settings GUI**:
   ```bash
   winget uninstall KnifMelti.WAU-Settings-GUI
   ```
