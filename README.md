@@ -52,7 +52,7 @@ NB: Must be run as **Administrator** (exe and shortcuts have the flag set)
   
    `%USERPROFILE%\AppData\Local\Microsoft\WinGet\Packages\KnifMelti.WAU-Settings-GUI__DefaultSource`.
 
-- Alternatively, you can install it for **All Users (64-Bit)** from **Command Prompt** (Run as **administrator**):
+- Alternatively, you can install for **All Users (64-Bit)** from **Command Prompt** (Run as **administrator**):
   
   ```bash
   winget install KnifMelti.WAU-Settings-GUI
@@ -84,6 +84,7 @@ NB: Must be run as **Administrator** (exe and shortcuts have the flag set)
 
 ### Uninstall ([Review required](https://github.com/microsoft/winget-pkgs/pull/273462))
 - Use **WinGet CLI** from **Command Prompt** (Run as **Administrator**!) to uninstall:
+  
   ```bash
   winget uninstall KnifMelti.WAU-Settings-GUI
   ```
