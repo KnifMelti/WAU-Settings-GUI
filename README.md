@@ -38,7 +38,7 @@ Configure **WAU** settings after installation, including:
   - MSI transform creation (using current showing configuration)
   - Configuration backup/import (i.e. for sharing settings)
   - Uninstall/install **WAU** (with current showing configuration)
-  - Manual/automatic check for **WAU Settings GUI** updates (checks every week as standard, can be managed via `config_user.psm1`)
+  - Manual/automatic check for updates (checks automatically every week as standard, can be managed via `config_user.psm1`)
   - Direct access to the **WAU Settings GUI** install folder
 
 NB: Must be run as Administrator (exe and shortcuts have the flag set)
@@ -69,7 +69,7 @@ Shortcuts can be managed via the GUI, allowing you to create or remove shortcuts
 
 ### Update
 - Dev Tools (F12): Click the button `[ver]`
-- It looks for updates automatically every week (can be managed via `config_user.psm1`)
+- Checks automatically every week as standard (can be managed via `config_user.psm1`)
 
 ### Uninstall (coming...)
 - Use **WinGet CLI** from **Command Prompt** (Run as Administrator!) to uninstall the latest version of **WAU Settings GUI**:
