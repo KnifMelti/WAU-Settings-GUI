@@ -14,10 +14,10 @@ $ConfigUserVariables = @{
 $Global:ConfigUser = $ConfigUserVariables
 
 # Create individual global variables from hashtable for backward compatibility
-$ConfigVariables.GetEnumerator() | ForEach-Object {
+$ConfigUserVariables.GetEnumerator() | ForEach-Object {
     Set-Variable -Name $_.Key -Value $_.Value -Scope Global
 }
 
 # Export hashtable AND individual variables
-$variablesToExport = @('ConfigUser') + $ConfigVariables.Keys
+$variablesToExport = @('ConfigUser') + $ConfigUserVariables.Keys
 Export-ModuleMember -Variable $variablesToExport
