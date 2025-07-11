@@ -6,6 +6,7 @@
 ;@Ahk2Exe-Set FileVersion, 1.7.9.2
 ;@Ahk2Exe-Set ProductVersion, 1.7.9.2
 ;@Ahk2Exe-Set InternalName, WAU-Settings-GUI
+;@Ahk2Exe-SetMainIcon ..\assets\WAU Settings GUI.ico
 ;@Ahk2Exe-UpdateManifest 1
 
 SetWorkingDir A_ScriptDir  ; Ensures a consistent starting directory.
