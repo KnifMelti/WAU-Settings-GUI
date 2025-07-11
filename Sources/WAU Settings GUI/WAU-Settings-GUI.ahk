@@ -3,8 +3,8 @@
 ;@Ahk2Exe-Set CompanyName, KnifMelti
 ;@Ahk2Exe-Set ProductName, WAU Settings GUI
 ;@Ahk2Exe-Set FileDescription, WAU Settings GUI
-;@Ahk2Exe-Set FileVersion, 1.7.9.1
-;@Ahk2Exe-Set ProductVersion, 1.7.9.1
+;@Ahk2Exe-Set FileVersion, 1.7.9.2
+;@Ahk2Exe-Set ProductVersion, 1.7.9.2
 ;@Ahk2Exe-Set InternalName, WAU-Settings-GUI
 ;@Ahk2Exe-UpdateManifest 1
 
