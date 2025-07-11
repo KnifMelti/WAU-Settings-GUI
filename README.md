@@ -68,8 +68,7 @@ After installation, you can start the GUI by running `WAU-Settings-GUI.exe` from
 Shortcuts can be managed via the GUI, allowing you to create or remove shortcuts on your own **Desktop** or in the **Start Menu**.
 
 ### Update
-- Download the latest released version
-- Extract the files to the same directory as before (overwrite existing files)
+- Dev Tools (F12): Click the button `[ver]`
 - It looks for updates automatically every week (can be managed via `config_user.psm1`)
 
 ### Uninstall (coming...)
