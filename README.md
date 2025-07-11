@@ -41,7 +41,7 @@ Configure **WAU** settings after installation, including:
   - Manual/automatic check for **WAU Settings GUI** updates (checks every week as standard, can be managed via `config_user.psm1`)
   - Direct access to the **WAU Settings GUI** install folder
 
-NB: Must be run as Administrator (shortcut creation sets the flag)
+NB: Must be run as Administrator (exe and shortcut creation sets the flag)
 
 ### Manual Installation
 - Extract `Sources\WAU Settings GUI`
