@@ -1,0 +1,14 @@
+name: WinGet Releaser
+on:
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    steps:
+      - uses: vedantmgoyal9/winget-releaser@main
+        with:
+          identifier: KnifMelti.WAU-Settings-GUI
+          max-versions-to-keep: 5 # keep only latest 5 versions
+          token: ${{ secrets.WINGET_TOKEN }}
+          installers-regex: .(zip|exe|msi|msix|appx)(bundle){0,1}$ # default is .(exe|msi|msix|appx)(bundle){0,1}$
