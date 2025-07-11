@@ -65,7 +65,7 @@ NB: Must be run as Administrator (exe and shortcuts have the flag set)
   ```
 After installation, you can start the GUI by running `WAU-Settings-GUI.exe` from the installation directory (`%ProgramFiles%\WinGet\Packages\KnifMelti.WAU-Settings-GUI__DefaultSource`) or via an ordinary **Command Prompt** using the PortableCommandAlias: **WAU-Settings-GUI**
 
-Shortcuts can be managed via the GUI, allowing you to create or remove shortcuts on your own **Desktop** or in the **Start Menu**.
+Shortcuts can be managed via the GUI, allowing you to create or remove shortcuts on your own **Desktop** or in the **Start Menu** (pin to taskbar when running maybe?).
 
 ### Update
 - Dev Tools (F12): Click the button `[ver]`
