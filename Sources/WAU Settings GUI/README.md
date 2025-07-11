@@ -9,7 +9,7 @@
   - If **WAU** is not installed, it will prompt to download and install it with standard settings (creating a **WAU Settings (Administrator)** shortcut on your own **Desktop**).
   - Toggle the **☐|☑ Start Menu shortcuts** option in the GUI and `Save Settings`
   - Retoggle **☑|☐** and `Save Settings` again (depending on your choice)
-- The **WAU Settings (Administrator)** shortcut has now been created under **Start Menu\Programs\Winget-AutoUpdate** folder (along with the other **WAU** shortcuts) or on your own **Desktop**.
+- The **WAU Settings (Administrator)** shortcut has now been created under **Start Menu\Programs\Winget-AutoUpdate** folder (along with the other **WAU** shortcuts) or on your own **Desktop** (pin to taskbar when running maybe?).
 - In `config_user.psm1` you can set the `AUTOUPDATE_CHECK` variable to `$true/$false` to enable/disable version autoupdate check once every `AUTOUPDATE_DAYS` and other user-specific settings (i.e. colors).
 - Move `config_user.psm1` to the `modules` folder to enable it.
 
@@ -20,7 +20,7 @@
   ```
 After installation, you can start the GUI by running `WAU-Settings-GUI.exe` from the installation directory (`%ProgramFiles%\WinGet\Packages\KnifMelti.WAU-Settings-GUI__DefaultSource`) or via an ordinary **Command Prompt** using the PortableCommandAlias: **WAU-Settings-GUI**
 
-Shortcuts can be managed via the GUI, allowing you to create or remove shortcuts on your own **Desktop** or in the **Start Menu**.
+Shortcuts can be managed via the GUI, allowing you to create or remove shortcuts on your own **Desktop** or in the **Start Menu** (pin to taskbar when running maybe?).
 
 ### Update
 - Dev Tools (F12): Click the button `[ver]`
