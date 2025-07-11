@@ -44,7 +44,7 @@ if FileExist(shortcutDesktop) && FileExist(shortcutStartMenu) {
         ExitApp
     }
 
-    ; Check if working dir is under 'C:\Program Files\WinGet\Packages'
+    ; Check if working dir is under '\WinGet\Packages'
     if InStr(A_WorkingDir, "\WinGet\Packages\", false) > 0 {
         FileAppend("This directory was created by 'WAU Settings GUI' WinGet installer.", A_WorkingDir "\installed.txt")
     }
