@@ -1,22 +1,20 @@
-# Created using wingetcreate 1.9.14.0
-# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.9.0.schema.json
+# Created using wingetcreate 1.10.2.0
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.10.0.schema.json
 
 PackageIdentifier: KnifMelti.WAU-Settings-GUI
-PackageVersion: 1.7.9
-Scope: user
+PackageVersion: 1.7.9.1
 InstallModes:
 - interactive
 InstallerType: zip
-NestedInstallerType: exe
+NestedInstallerType: portable
 NestedInstallerFiles:
 - RelativeFilePath: WAU-Settings-GUI.exe
-InstallerSwitches:
-  Silent: '""'
-  SilentWithProgress: '""'
+  PortableCommandAlias: WAU-Settings-GUI
+ArchiveBinariesDependOnPath: true
 Installers:
 - Architecture: x64
-  InstallerUrl: https://github.com/KnifMelti/WAU-Settings-GUI/releases/download/v1.7.9/WAU-Settings-GUI-v1.7.9.zip
-  InstallerSha256: 0f3ba8f55d2d03842c507ad9bc30d455e88ec201a111d112d84f28c67b213810
+  InstallerUrl: https://github.com/KnifMelti/WAU-Settings-GUI/releases/download/v1.7.9.1/WAU-Settings-GUI-v1.7.9.1.zip
+  InstallerSha256: 0F3BA8F55D2D03842C507AD9BC30D455E88EC201A111D112D84F28C67B213810
   ElevationRequirement: elevatesSelf
 ManifestType: installer
-ManifestVersion: 1.9.0
+ManifestVersion: 1.10.0

@@ -1,5 +1,13 @@
 #Requires AutoHotkey v2.0
 #SingleInstance
+;@Ahk2Exe-Set CompanyName, KnifMelti
+;@Ahk2Exe-Set ProductName, WAU Settings GUI
+;@Ahk2Exe-Set FileDescription, WAU Settings GUI
+;@Ahk2Exe-Set FileVersion, 1.7.9.0
+;@Ahk2Exe-Set ProductVersion, 1.7.9
+;@Ahk2Exe-Set InternalName, WAU-Settings-GUI
+;@Ahk2Exe-UpdateManifest 1
+
 SetWorkingDir A_ScriptDir  ; Ensures a consistent starting directory.
 SplitPath(A_ScriptName, , , , &name_no_ext)
 FileEncoding "UTF-8"
@@ -35,8 +43,8 @@ if FileExist(shortcutDesktop) && FileExist(shortcutStartMenu) {
         ExitApp
     }
 
-    ; Check if working dir is under any user's 'AppData\Local\Microsoft\WinGet\Packages'
-    if InStr(A_WorkingDir, "\AppData\Local\Microsoft\WinGet\Packages\", false) > 0 {
+    ; Check if working dir is under 'C:\Program Files\WinGet\Packages'
+    if InStr(A_WorkingDir, "\WinGet\Packages\", false) > 0 {
         FileAppend("This directory was created by 'WAU Settings GUI' WinGet installer.", A_WorkingDir "\installed.txt")
     }
 
