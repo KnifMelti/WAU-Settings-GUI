@@ -22,8 +22,8 @@ A_TrayMenu.Add("Exit", (*) => ExitApp())
 shortcutDesktop := A_Desktop "\WAU Settings (Administrator).lnk"
 shortcutStartMenu := A_ProgramsCommon "\Winget-AutoUpdate\WAU Settings (Administrator).lnk"
 psScriptPath := A_WorkingDir "\" name_no_ext ".ps1"
-runCommand := '*RunAs C:\Windows\System32\conhost.exe --headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' psScriptPath '"'
-portableCommand := '*RunAs C:\Windows\System32\conhost.exe --headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' psScriptPath '" -Portable'
+runCommand := 'C:\Windows\System32\conhost.exe --headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' psScriptPath '"'
+portableCommand := 'C:\Windows\System32\conhost.exe --headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' psScriptPath '" -Portable'
 
 ; Check if both shortcuts exist
 if FileExist(shortcutDesktop) && FileExist(shortcutStartMenu) {
