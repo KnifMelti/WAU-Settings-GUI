@@ -23,7 +23,7 @@ NB: Must be run as **Administrator** (exe and shortcuts have the flag set)
 - Standalone Installer/Portable (i.e. no need to install)
 - Detects if running from USB drive, etc.
 - Run `WAU-Settings-GUI.exe`:
-  - <img src="Sources/assets//WAU-Settings-GUI.png" alt="Installer/Portable">
+  - <img src="../assets//WAU-Settings-GUI.png" alt="Installer/Portable">
   - Select a base directory for the installation or run directly in portable mode
 
 ### Running
@@ -41,6 +41,7 @@ NB: Must be run as **Administrator** (exe and shortcuts have the flag set)
 
 ### Uninstall ([Review required](https://github.com/microsoft/winget-pkgs/pull/273462))
 - Use **WinGet CLI** from **Command Prompt** (Run as **Administrator**!) to uninstall:
+  
   ```bash
   winget uninstall KnifMelti.WAU-Settings-GUI
   ```
