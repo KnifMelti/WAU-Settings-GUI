@@ -2259,19 +2259,27 @@ function Test-WAULists {
                         $dialogResult = $folderDialog.ShowDialog()
                         if ($dialogResult -eq [System.Windows.Forms.DialogResult]::OK) {
                             $selectedPath = $folderDialog.SelectedPath
-                            
-                            # Check if selected path is under user profile
-                            if ($selectedPath.StartsWith($userProfile, [StringComparison]::OrdinalIgnoreCase) -or $isWinGetInstall) {
+                    
+                            # Check if the selected folder is under the user profile or WinGet\Packages
+                            $fullSelectedPath = [System.IO.Path]::GetFullPath($selectedPath)
+                            $fullUserProfile = [System.IO.Path]::GetFullPath($userProfile)
+                            # Is the selected path inside the user profile?
+                            $isUnderUserProfile = ($fullSelectedPath.Length -ge $fullUserProfile.Length) -and
+                                ($fullSelectedPath.Substring(0, $fullUserProfile.Length).TrimEnd('\') -ieq $fullUserProfile.TrimEnd('\'))
+                            # Is the selected path inside WinGet\Packages?
+                            $isWinGetInstall = $fullSelectedPath -match '\\WinGet\\Packages\\'
+                    
+                            if ($isUnderUserProfile -or $isWinGetInstall) {
                                 [System.Windows.MessageBox]::Show("Selected folder is under your user profile/WinGet installation. Please choose a different location.", "Invalid Location", "OK", "Warning")
                                 continue
                             }
-                            
+                    
                             # Check if we have write access to the selected path
                             try {
                                 $testFile = Join-Path $selectedPath "test_write_access.tmp"
                                 Set-Content -Path $testFile -Value "test" -ErrorAction Stop
                                 Remove-Item -Path $testFile -Force -ErrorAction SilentlyContinue
-                                
+                    
                                 # Valid location found
                                 $listsDir = Join-Path $selectedPath "lists"
                                 break
