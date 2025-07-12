@@ -55,3 +55,4 @@ NB: Must be run as **Administrator** (exe and shortcuts have the flag set)
   winget uninstall KnifMelti.WAU-Settings-GUI
   ```
 - Manually delete the shortcuts from your **Desktop** and/or **Start Menu\Programs\Winget-AutoUpdate** folder.
+- Optional: delete the installation directory
