@@ -2242,15 +2242,16 @@ function Test-WAULists {
             if ($result -eq 'OK') {
                 $listsDir = Join-Path $Script:WorkingDir "lists"
                 
-                # Check if the proposed lists directory would be under user profile
+                # Check if the proposed lists directory would be under user profile/WinGet installation
                 $userProfile = [Environment]::GetFolderPath('UserProfile')
-                if ($listsDir.StartsWith($userProfile, [StringComparison]::OrdinalIgnoreCase)) {
+                $isWinGetInstall = $listsDir -like "*\WinGet\Packages\*"
+                if ($listsDir.StartsWith($userProfile, [StringComparison]::OrdinalIgnoreCase) -or $isWinGetInstall) {
                     # Lists directory would be under user profile, need to choose alternative location
-                    $folderMsg = "The default location would be under your user profile which is not recommended.`n`nPlease select a folder where the 'lists' folder should be created (must be outside your user profile):"
+                    $folderMsg = "The default location would be under your user profile/WinGet installation which is not recommended.`n`nPlease select a folder where the 'lists' folder should be created (must be outside your user profile/WinGet installation):"
                     [System.Windows.MessageBox]::Show($folderMsg, "Select Location", "OK", "Information")
                     
                     $folderDialog = New-Object System.Windows.Forms.FolderBrowserDialog
-                    $folderDialog.Description = "Select folder where 'lists' folder will be created (must be outside user profile)"
+                    $folderDialog.Description = "Select folder where 'lists' folder will be created (must be outside user profile/WinGet installation)"
                     $folderDialog.ShowNewFolderButton = $true
                     $folderDialog.SelectedPath = "C:\"
                     
@@ -2260,8 +2261,8 @@ function Test-WAULists {
                             $selectedPath = $folderDialog.SelectedPath
                             
                             # Check if selected path is under user profile
-                            if ($selectedPath.StartsWith($userProfile, [StringComparison]::OrdinalIgnoreCase)) {
-                                [System.Windows.MessageBox]::Show("Selected folder is under your user profile. Please choose a different location.", "Invalid Location", "OK", "Warning")
+                            if ($selectedPath.StartsWith($userProfile, [StringComparison]::OrdinalIgnoreCase) -or $isWinGetInstall) {
+                                [System.Windows.MessageBox]::Show("Selected folder is under your user profile/WinGet installation. Please choose a different location.", "Invalid Location", "OK", "Warning")
                                 continue
                             }
                             
