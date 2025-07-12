@@ -89,7 +89,7 @@ NB: Must be run as **Administrator** (exe and shortcuts have the flag set)
 ### Updating
 - Dev Tools (F12): Click the button `[ver]`
 - Checks automatically every week as standard (can be managed via `config_user.psm1`)
-- If an update exists, **WAU Settings GUI** will ask if you want to download and manage the update manually; opening the downloaded ***.zip** and the installation folder for you to copy/owerwrite the old files.
+- If an update exists, **WAU Settings GUI** will ask if you want to download and manage the update manually; opening the downloaded ***.zip** and the installation folder for you to copy/owerwrite the old files
 
 ### Uninstallation
 - Use **WinGet CLI** from **Command Prompt** to uninstall:
