@@ -7,7 +7,7 @@ NB: Must be run as **Administrator** (exe and shortcuts have the flag set)
   winget install KnifMelti.WAU-Settings-GUI
   ```
 
-- Already have **WAU** installed? Then you can use the `--scope` parameter to install it for the current user only (because it has set `"scope":  "Machine"` in the preferences):
+- Already have **WAU** installed? Then you can use the `--scope` parameter to install it for the current user only (because **WAU** has set `"scope":  "Machine"` in the preferences):
   
   ```bash
   winget install KnifMelti.WAU-Settings-GUI --scope user
