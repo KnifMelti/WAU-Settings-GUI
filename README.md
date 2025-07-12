@@ -91,7 +91,7 @@ NB: Must be run as **Administrator** (exe and shortcuts have the flag set)
 - Checks automatically every week as standard (can be managed via `config_user.psm1`)
 
 ### Uninstallation
-- Use **WinGet CLI** from **Command Prompt** (Run as **Administrator**!) to uninstall:
+- Use **WinGet CLI** from **Command Prompt** to uninstall:
   
   ```bash
   winget uninstall KnifMelti.WAU-Settings-GUI

@@ -1,22 +1,30 @@
 NB: Must be run as **Administrator** (exe and shortcuts have the flag set)
 
-### Automatic Installation ([Review required](https://github.com/microsoft/winget-pkgs/pull/273462))
+### Automatic Installation
 - Use **WinGet CLI** from **Command Prompt** to install the latest version:
-  ```bash
-  winget install KnifMelti.WAU-Settings-GUI --scope user
-  ```
-  This will install to:
-  
-   `%USERPROFILE%\AppData\Local\Microsoft\WinGet\Packages\KnifMelti.WAU-Settings-GUI__DefaultSource`.
-
-- Alternatively, you can install for **All Users (64-Bit)** from **Command Prompt** (Run as **administrator**):
   
   ```bash
   winget install KnifMelti.WAU-Settings-GUI
   ```
+
+  Already have **WAU** installed? Then you can use the `--scope` parameter to install it for the current user only (because it has set `"scope":  "Machine"` in the preferences):
+  
+  ```bash
+  winget install KnifMelti.WAU-Settings-GUI --scope user
+  ```
+
   This will install to:
   
-  `%ProgramFiles%\WinGet\Packages\KnifMelti.WAU-Settings-GUI__DefaultSource`.
+   `%USERPROFILE%\AppData\Local\Microsoft\WinGet\Packages\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe`.
+
+- Alternatively, you can install for **All Users (64-Bit)** from **Command Prompt** (Run as **administrator**):
+  
+  ```bash
+  winget install KnifMelti.WAU-Settings-GUI --scope machine
+  ```
+  This will install to:
+  
+  `%ProgramFiles%\WinGet\Packages\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe`.
 
 ### Manual Installation
 - Download and extract `Sources\WAU Settings GUI`
@@ -35,13 +43,14 @@ NB: Must be run as **Administrator** (exe and shortcuts have the flag set)
 - In `config_user.psm1` you can set the `AUTOUPDATE_CHECK` variable to `$true/$false` to enable/disable version autoupdate check once every `AUTOUPDATE_DAYS` and other user-specific settings (i.e. colors)
 - Move `config_user.psm1` to the `modules` folder to enable it
 
-### Update
+### Updating
 - Dev Tools (F12): Click the button `[ver]`
 - Checks automatically every week as standard (can be managed via `config_user.psm1`)
 
-### Uninstall ([Review required](https://github.com/microsoft/winget-pkgs/pull/273462))
-- Use **WinGet CLI** from **Command Prompt** (Run as **Administrator**!) to uninstall:
+### Uninstallation
+- Use **WinGet CLI** from **Command Prompt** to uninstall:
   
   ```bash
   winget uninstall KnifMelti.WAU-Settings-GUI
   ```
+Then manually delete the shortcuts from your **Desktop** and/or **Start Menu\Programs\Winget-AutoUpdate** folder.
