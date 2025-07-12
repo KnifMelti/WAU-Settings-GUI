@@ -3,8 +3,8 @@
 ;@Ahk2Exe-Set CompanyName, KnifMelti
 ;@Ahk2Exe-Set ProductName, WAU Settings GUI
 ;@Ahk2Exe-Set FileDescription, WAU Settings GUI
-;@Ahk2Exe-Set FileVersion, 1.7.9.5
-;@Ahk2Exe-Set ProductVersion, 1.7.9.5
+;@Ahk2Exe-Set FileVersion, 1.7.9.6
+;@Ahk2Exe-Set ProductVersion, 1.7.9.6
 ;@Ahk2Exe-Set InternalName, WAU-Settings-GUI
 ;@Ahk2Exe-SetMainIcon ..\assets\WAU Settings GUI.ico
 ;@Ahk2Exe-UpdateManifest 1
@@ -24,6 +24,40 @@ shortcutStartMenu := A_ProgramsCommon "\Winget-AutoUpdate\WAU Settings (Administ
 psScriptPath := A_WorkingDir "\" name_no_ext ".ps1"
 runCommand := 'C:\Windows\System32\conhost.exe --headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' psScriptPath '"'
 portableCommand := 'C:\Windows\System32\conhost.exe --headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' psScriptPath '" -Portable'
+
+; Check if the script was called with -Uninstall parameter
+if A_Args.Length && (A_Args[1] = "-Uninstall") {
+    ; Close all instances of WAU Settings GUI using PowerShell
+    try {
+        RunWait('C:\Windows\System32\conhost.exe --headless powershell.exe -NoProfile -Command "Get-Process | Where-Object { $_.MainWindowTitle -like \"WAU Settings*\" } | Stop-Process -Force"', , "Hide")
+    } catch {
+        ; Ignore errors if no matching processes found
+    }
+    ; Remove shortcuts if they exist
+    if FileExist(shortcutDesktop) || FileExist(shortcutStartMenu) {
+        try {
+            if FileExist(shortcutDesktop)
+                FileDelete(shortcutDesktop)
+            if FileExist(shortcutStartMenu)
+                FileDelete(shortcutStartMenu)
+        } catch {
+            ; Ignore errors if shortcuts can't be deleted
+        }
+    }
+    ; Check if working dir is under '\WinGet\Packages\'
+    if InStr(A_WorkingDir, "\WinGet\Packages\", false) > 0 {
+        ; Remove registry key for WinGet uninstall entry
+        try {
+            RegDeleteKey("HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe")
+        } catch {
+            ; Ignore errors if registry key can't be deleted
+        }
+    }
+    ; Runs a command to delete the entire script folder after a short delay
+    Run('cmd.exe /C ping 127.0.0.1 -n 3 > nul & rmdir /S /Q "' A_WorkingDir '"', , "Hide")
+    ExitApp
+}
+
 
 ; Check if both shortcuts exist
 if FileExist(shortcutDesktop) && FileExist(shortcutStartMenu) {
