@@ -27,6 +27,15 @@ portableCommand := 'C:\Windows\System32\conhost.exe --headless powershell.exe -N
 
 ; Check if the script was called with -Uninstall parameter
 if A_Args.Length && (A_Args[1] = "-Uninstall") {
+    ; Ask the user to confirm uninstallation
+    choice := MsgBox(
+        "Do you want to uninstall WAU Settings GUI?" . "`n`nChoose Yes to uninstall, No to cancel.",
+        name_no_ext,
+        0x4  ; Yes/No
+    )
+    if (choice != "Yes") {
+        ExitApp
+    }
     ; Close all instances of WAU Settings GUI using PowerShell
     try {
         RunWait('C:\Windows\System32\conhost.exe --headless powershell.exe -NoProfile -Command "Get-Process | Where-Object { $_.MainWindowTitle -like \"WAU Settings*\" } | Stop-Process -Force"', , "Hide")
@@ -52,6 +61,12 @@ if A_Args.Length && (A_Args[1] = "-Uninstall") {
         } catch {
             ; Ignore errors if registry key can't be deleted
         }
+    }
+    ; Remove registry key for WAU Settings GUI uninstall entry
+    try {
+        RegDeleteKey("HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\WAU-Settings-GUI")
+    } catch {
+        ; Ignore errors if registry key can't be deleted
     }
     ; Runs a command to delete the entire script folder after a short delay
     Run('cmd.exe /C ping 127.0.0.1 -n 3 > nul & rmdir /S /Q "' A_WorkingDir '"', , "Hide")
@@ -85,6 +100,8 @@ if FileExist(shortcutDesktop) && FileExist(shortcutStartMenu) {
 
     ; Check if "installed.txt" exists in working directory
     if FileExist(A_WorkingDir "\installed.txt") {
+        ; Call the function to create uninstall entries in the registry
+        CreateUninstall(name_no_ext, A_WorkingDir)
         Run runCommand
     } else {
         ; Ask the user if they want to install or run portable
@@ -115,10 +132,13 @@ if FileExist(shortcutDesktop) && FileExist(shortcutStartMenu) {
             ; Create installed.txt file in the target directory
             FileAppend("This directory was created by 'WAU Settings GUI' local installer.", targetDir "\installed.txt")
 
+            ; Call the function to create uninstall entries in the registry
+            CreateUninstall(name_no_ext, targetDir)
+
             ; Open install directory in Explorer
             Run targetDir
             MsgBox(
-                "Installation complete! Please start the program by running 'WAU-Settings-GUI.exe' from the installation folder.",
+                "Installation complete! Please start the program by running '" name_no_ext ".exe' from the installation folder.",
                 name_no_ext,
                 0x40000  ; Information icon
             )
@@ -174,4 +194,20 @@ CopyFilesAndFolders(src, dst) {
             }
         }
     }
+}
+
+; Helper function to create uninstall entries in the registry
+CreateUninstall(name_no_ext, targetDir) {
+    regPath := "HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\" name_no_ext
+    RegWrite("KnifMelti WAU Settings GUI", "REG_SZ", regPath, "DisplayName")
+    RegWrite(FileGetVersion(A_ScriptFullPath), "REG_SZ", regPath, "DisplayVersion")
+    RegWrite(A_ScriptFullPath, "REG_SZ", regPath, "DisplayIcon")
+    RegWrite("KnifMelti", "REG_SZ", regPath, "Publisher")
+    RegWrite("https://github.com/KnifMelti/" name_no_ext, "REG_SZ", regPath, "URLInfoAbout")
+    RegWrite(A_ScriptFullPath " -Uninstall", "REG_SZ", regPath, "UninstallString")
+
+    ; Create README link in installation directory
+    readmeUrl := "https://github.com/KnifMelti/" name_no_ext
+    urlContent := "[InternetShortcut]`nURL=" readmeUrl "`n"
+    FileAppend(urlContent, targetDir "\README.url")
 }
