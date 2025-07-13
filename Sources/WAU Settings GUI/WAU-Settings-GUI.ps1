@@ -32,7 +32,8 @@ Provides a user-friendly interface to modify every aspect of WAU settings includ
 Must be run as Administrator
 #>
 param(
-    [switch]$Portable
+    [switch]$Portable,
+    [switch]$FromAHK
 )
 
 # Set portable mode flag
@@ -232,7 +233,11 @@ function Test-WAUGUIUpdate {
         $latestVer = [Version]$latestVersion
         
         # Check if we already have the latest version downloaded
-        $downloadDir = Join-Path $Script:WorkingDir "updates"
+        # If obsolete 'updates' folder exists, remove it
+        if (Test-Path -Path (Join-Path $Script:WorkingDir "updates")) {
+            Remove-Item -Path (Join-Path $Script:WorkingDir "updates") -Recurse -Force
+        }
+        $downloadDir = Join-Path $Script:WorkingDir "ver"
         $alreadyDownloaded = $false
         $existingFilePath = $null
         
@@ -306,7 +311,7 @@ function Start-WAUGUIUpdate {
             throw "No download URL found in release"
         }
         
-        $downloadDir = Join-Path $Script:WorkingDir "updates"
+        $downloadDir = Join-Path $Script:WorkingDir "ver"
         if (-not (Test-Path $downloadDir)) {
             New-Item -ItemType Directory -Path $downloadDir -Force | Out-Null
         }
@@ -340,18 +345,164 @@ function Start-WAUGUIUpdate {
         # Ask user if they want to install now
         $statusText = if ($updateInfo.AlreadyDownloaded) { "existing" } else { "downloaded successfully" }
         $result = [System.Windows.MessageBox]::Show(
-            "Update $statusText!`n`nFile: $fileName`nLocation: $downloadPath`n`nDo you want to extract and manage the update now?",
+            "Update $statusText!`n`nFile: $fileName`nLocation: $downloadPath`n`nDo you want to extract and install the update now?",
             "Update Ready",
             "OkCancel",
             "Question"
         )
         
         if ($result -eq 'Ok') {
-            Start-Process "explorer.exe" "$Script:WorkingDir"
-            Start-Process "explorer.exe" "$downloadPath"
-            Close-WindowGracefully -controls $controls -window $window
+            Start-PopUp "Installing update..."
+            
+            try {
+                # Extract the ZIP file
+                $extractPath = Join-Path $downloadDir "extract_temp"
+                if (Test-Path $extractPath) {
+                    Remove-Item -Path $extractPath -Recurse -Force
+                }
+                
+                Add-Type -AssemblyName System.IO.Compression.FileSystem
+                [System.IO.Compression.ZipFile]::ExtractToDirectory($downloadPath, $extractPath)
+                
+                # Find the source directory (handle both manual uploads and GitHub source archives)
+                $sourceDir = $null
+                
+                # Look for a subdirectory that contains the main files
+                $subDirs = Get-ChildItem -Path $extractPath -Directory
+                foreach ($dir in $subDirs) {
+                    if ((Test-Path (Join-Path $dir.FullName "WAU-Settings-GUI.ps1")) -or 
+                        (Test-Path (Join-Path $dir.FullName "Sources"))) {
+                        $sourceDir = $dir.FullName
+                        break
+                    }
+                }
+                
+                # If no subdirectory found, check if files are in root
+                if (-not $sourceDir) {
+                    if ((Test-Path (Join-Path $extractPath "WAU-Settings-GUI.ps1")) -or 
+                        (Test-Path (Join-Path $extractPath "Sources"))) {
+                        $sourceDir = $extractPath
+                    }
+                }
+                
+                # Handle GitHub source archive structure
+                if (-not $sourceDir) {
+                    $sourcesPath = Get-ChildItem -Path $extractPath -Recurse -Directory -Name "Sources" | Select-Object -First 1
+                    if ($sourcesPath) {
+                        $sourceDir = Split-Path (Join-Path $extractPath $sourcesPath) -Parent
+                    }
+                }
+                
+                if (-not $sourceDir) {
+                    throw "Could not find source files in extracted archive"
+                }
+                
+                # Find the actual files to copy
+                $filesToCopy = $null
+                
+                # Check for Sources\WAU Settings GUI structure
+                $wauSettingsPath = Join-Path $sourceDir "Sources\WAU Settings GUI"
+                if (Test-Path $wauSettingsPath) {
+                    $filesToCopy = $wauSettingsPath
+                } elseif (Test-Path (Join-Path $sourceDir "WAU-Settings-GUI.ps1")) {
+                    $filesToCopy = $sourceDir
+                }
+                
+                if (-not $filesToCopy) {
+                    throw "Could not find WAU Settings GUI files in the archive"
+                }
+                
+                # Create backup of current version
+                $backupDir = Join-Path $Script:WorkingDir "backup_$(Get-Date -Format 'yyyy-MM-dd_HH-mm-ss')"
+                if (-not (Test-Path $backupDir)) {
+                    New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
+                }
+                
+                # Backup current files (exclude ver and backup folders)
+                Get-ChildItem -Path $Script:WorkingDir -Exclude "ver", "backup_*", "msi", "cfg", "lists" | ForEach-Object {
+                    Copy-Item -Path $_.FullName -Destination $backupDir -Recurse -Force
+                }
+                
+                # Copy new files, preserving existing config and user data
+                $excludePatterns = @("ver", "backup_*", "msi", "cfg", "lists")
+                Get-ChildItem -Path $filesToCopy | ForEach-Object {
+                    $relativePath = $_.Name
+                    $destinationPath = Join-Path $Script:WorkingDir $relativePath
+                    
+                    if ($relativePath -notin $excludePatterns) {
+                        if ($_.PSIsContainer) {
+                            # For directories, copy recursively but preserve user data
+                            if ($relativePath -eq "config") {
+                                # For config directory, only copy new files, don't overwrite existing user configs
+                                if (-not (Test-Path $destinationPath)) {
+                                    New-Item -ItemType Directory -Path $destinationPath -Force | Out-Null
+                                }
+                                Get-ChildItem -Path $_.FullName | ForEach-Object {
+                                    $configFile = Join-Path $destinationPath $_.Name
+                                    if (-not (Test-Path $configFile) -or $_.Name -eq "version.txt") {
+                                        Copy-Item -Path $_.FullName -Destination $configFile -Force
+                                    }
+                                }
+                            } else {
+                                Copy-Item -Path $_.FullName -Destination $destinationPath -Recurse -Force
+                            }
+                        } else {
+                            # For files, copy directly
+                            Copy-Item -Path $_.FullName -Destination $destinationPath -Force
+                        }
+                    }
+                }
+                
+                # Clean up extraction directory
+                Remove-Item -Path $extractPath -Recurse -Force -ErrorAction SilentlyContinue
+                
+                # Always create/update the desktop shortcut for WAU Settings
+                if (-not $Script:PORTABLE_MODE) {
+                    $shortcutPath = $Script:DESKTOP_WAU_SETTINGS
+                    $targetPath = Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'
+                    
+                    # Only create shortcut if the target file exists
+                    if (Test-Path $targetPath) {
+                        Add-Shortcut -Shortcut $shortcutPath `
+                                   -Target $Script:CONHOST_EXE `
+                                   -StartIn $Script:WorkingDir `
+                                   -Arguments "$Script:POWERSHELL_ARGS `"$targetPath`"" `
+                                   -Icon $Script:GUI_ICON `
+                                   -Description "Configure Winget-AutoUpdate settings after installation" `
+                                   -WindowStyle "Normal" `
+                                   -RunAsAdmin $true
+                    }
+                }
+                
+                Close-PopUp
+                
+                [System.Windows.MessageBox]::Show(
+                    "Update installed successfully!`n`nThe application will now restart with the new version.",
+                    "Update Complete",
+                    "OK",
+                    "Information"
+                )
+                
+                # Restart the application with the new version
+                if (-not $Script:PORTABLE_MODE) {
+                    Start-Process -FilePath $Script:DESKTOP_WAU_SETTINGS
+                } else {
+                    Start-Process -FilePath "powershell.exe" -ArgumentList "-File `"$(Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1')`" -Portable"
+                }
+                
+                # Close current instance
+                Close-WindowGracefully -controls $controls -window $window
+                
+            } catch {
+                Close-PopUp
+                [System.Windows.MessageBox]::Show("Failed to install update: $($_.Exception.Message)", "Installation Error", "OK", "Error")
+                
+                # Fallback to manual installation
+                Start-Process "explorer.exe" "$Script:WorkingDir"
+                Start-Process "explorer.exe" "$downloadPath"
+                Close-WindowGracefully -controls $controls -window $window
+            }
         }
-        
         return $true
     }
     catch {
@@ -391,8 +542,20 @@ function Get-WAUCurrentConfig {
         if (!$config -or [string]::IsNullOrEmpty($config.ProductVersion)) {
             throw "WAU not found in registry or ProductVersion missing"
         }
+        $uninstPath = Join-Path $Script:WorkingDir "UnInst.exe"
+        $wauGuiPath = Join-Path $Script:WorkingDir "$Script:WAU_GUI_NAME.exe"
+        if (-not $Script:PORTABLE_MODE -and -not $Script:MainWindowStarted -and -not $FromAHK) {
+            if (-not (Test-Path $uninstPath) -and (Test-Path $wauGuiPath)) {
+                $currentProcess = Get-Process -Id $PID
+                $isRunningAsPowerShell = $currentProcess.ProcessName -eq "powershell" -or $currentProcess.ProcessName -eq "pwsh"
+                if ($isRunningAsPowerShell) {
+                    Start-Process -FilePath $wauGuiPath -ArgumentList "/FROMPS"
+                    exit
+                }
+            }
+        }
         return $config
-    }    
+    }
     catch {
         if (!$Script:MainWindowStarted) {
             Close-PopUp
