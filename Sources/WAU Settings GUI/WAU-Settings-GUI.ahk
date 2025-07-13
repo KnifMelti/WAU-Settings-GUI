@@ -23,6 +23,11 @@ A_TrayMenu.Add("Exit", (*) => ExitApp())
 fromPS := (A_Args.Length && A_Args[1] = "/FROMPS")
 shortcutDesktop := A_Desktop "\WAU Settings (Administrator).lnk"
 shortcutStartMenu := A_ProgramsCommon "\Winget-AutoUpdate\WAU Settings (Administrator).lnk"
+shortcutAppInstaller := A_ProgramsCommon "\Winget-AutoUpdate\WAU App Installer.lnk"
+shortcutOpenLogs := A_ProgramsCommon "\Winget-AutoUpdate\Open Logs.lnk"
+; Original: 2 shortcuts for Run WAU and updates.log
+shortcutRunWau := A_ProgramsCommon "\Winget-AutoUpdate\Run WAU.lnk"
+shortcutLog := A_ProgramsCommon "\Winget-AutoUpdate\updates.log"
 psScriptPath := A_WorkingDir "\" name_no_ext ".ps1"
 uninstPath := A_WorkingDir "\UnInst.exe"
 runCommand := 'C:\Windows\System32\conhost.exe --headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' psScriptPath '" -FromAHK'
@@ -57,6 +62,24 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
         } catch {
             ; Ignore errors if shortcuts can't be deleted
         }
+    }
+    ; Add original shortcuts for Run WAU and updates.log if registry value is set
+    try {
+        shortcutFlag := 0
+        RegRead("HKLM\SOFTWARE\Romanitho\Winget-AutoUpdate", "WAU_StartMenuShortcut", &shortcutFlag)
+        if shortcutFlag = 1 {
+            RegRead("HKLM\SOFTWARE\Romanitho\Winget-AutoUpdate", "InstallLocation", &installLocation)
+            ; Create shortcut for Run WAU if it doesn't exist
+            if !FileExist(shortcutRunWau) {
+                FileCreateShortcut(installLocation "WAU.exe", shortcutRunWau)
+            }
+            ; Create updates.log file shortcut if it doesn't exist
+            if !FileExist(shortcutLog) {
+                FileCreateShortcut(installLocation "logs\updates.log", shortcutLog)
+            }
+        }
+    } catch {
+        ; Ignore errors if shortcuts or log link can't be created
     }
     ; Check if working dir is under '\WinGet\Packages\'
     if InStr(A_WorkingDir, "\WinGet\Packages\", false) > 0 {

@@ -428,7 +428,7 @@ function Start-WAUGUIUpdate {
                 Get-ChildItem -Path $filesToCopy | ForEach-Object {
                     $relativePath = $_.Name
                     $destinationPath = Join-Path $Script:WorkingDir $relativePath
-                    
+
                     if ($relativePath -notin $excludePatterns) {
                         if ($_.PSIsContainer) {
                             # For directories, copy recursively but preserve user data
@@ -442,6 +442,16 @@ function Start-WAUGUIUpdate {
                                     if (-not (Test-Path $configFile) -or $_.Name -eq "version.txt") {
                                         Copy-Item -Path $_.FullName -Destination $configFile -Force
                                     }
+                                }
+                            } elseif ($relativePath -eq "modules") {
+                                # Only copy files from source modules folder to destination modules folder, do not create modules\modules
+                                $modulesDest = Join-Path $Script:WorkingDir "modules"
+                                if (-not (Test-Path $modulesDest)) {
+                                    New-Item -ItemType Directory -Path $modulesDest -Force | Out-Null
+                                }
+                                Get-ChildItem -Path $_.FullName | ForEach-Object {
+                                    $moduleFile = Join-Path $modulesDest $_.Name
+                                    Copy-Item -Path $_.FullName -Destination $moduleFile -Force
                                 }
                             } else {
                                 Copy-Item -Path $_.FullName -Destination $destinationPath -Recurse -Force
