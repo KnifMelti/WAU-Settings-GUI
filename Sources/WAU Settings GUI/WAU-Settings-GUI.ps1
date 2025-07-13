@@ -425,8 +425,11 @@ function Get-WAUCurrentConfig {
                 # Create desktop shortcut for settings
                 if (-not $Script:PORTABLE_MODE) {
                     Add-Shortcut $Script:DESKTOP_WAU_SETTINGS $Script:CONHOST_EXE $Script:WorkingDir "$Script:POWERSHELL_ARGS `"$((Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'))`"" $Script:GUI_ICON "Configure Winget-AutoUpdate settings after installation" "Normal" $true
-                    Start-Process -FilePath $Script:DESKTOP_WAU_SETTINGS
-                    exit
+                    if ($installResult) {
+                        Start-Process -FilePath $Script:DESKTOP_WAU_SETTINGS
+                        exit
+                    }
+                    exit 1
                 }
                 
                 if ($installResult) {
