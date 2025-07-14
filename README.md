@@ -47,27 +47,12 @@ NB: Must be run as **Administrator** (exe and shortcuts have the flag set)
 - Use **WinGet CLI** from **Command Prompt** to install the latest version:
   
   ```bash
-  winget install KnifMelti.WAU-Settings-GUI
-  ```
-
-- Already have **WAU** installed?<br>Then you can use the `--scope` parameter to install it for the current user only (because **WAU** has set `"scope":  "Machine"` in the preferences):
-  
-  ```bash
   winget install KnifMelti.WAU-Settings-GUI --scope user
   ```
 
-  Both of these commands will install to:
+This will install to:
   
    `%USERPROFILE%\AppData\Local\Microsoft\WinGet\Packages\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe`.
-
-- Alternatively, you can install for **All Users (64-Bit)** from **Command Prompt** (Run as **administrator**):
-  
-  ```bash
-  winget install KnifMelti.WAU-Settings-GUI --scope machine
-  ```
-  This will install to:
-  
-  `%ProgramFiles%\WinGet\Packages\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe`.
 
 ### Manual Installation
 - Download and extract `Sources\WAU Settings GUI`
