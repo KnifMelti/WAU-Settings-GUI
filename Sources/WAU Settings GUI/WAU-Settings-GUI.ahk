@@ -23,11 +23,15 @@ A_TrayMenu.Add("Exit", (*) => ExitApp())
 fromPS := (A_Args.Length && A_Args[1] = "/FROMPS")
 shortcutDesktop := A_Desktop "\WAU Settings (Administrator).lnk"
 shortcutStartMenu := A_ProgramsCommon "\Winget-AutoUpdate\WAU Settings (Administrator).lnk"
-shortcutAppInstaller := A_ProgramsCommon "\Winget-AutoUpdate\WAU App Installer.lnk"
 shortcutOpenLogs := A_ProgramsCommon "\Winget-AutoUpdate\Open Logs.lnk"
-; Original: 2 shortcuts for Run WAU and updates.log
-shortcutRunWau := A_ProgramsCommon "\Winget-AutoUpdate\Run WAU.lnk"
-shortcutLog := A_ProgramsCommon "\Winget-AutoUpdate\updates.log"
+shortcutAppInstaller := A_ProgramsCommon "\Winget-AutoUpdate\WAU App Installer.lnk"
+
+; Original: 3 shortcuts for Run WAU and updates.log
+wauRunWau := A_ProgramsCommon "\Winget-AutoUpdate\Run WAU.lnk" ; C:\Windows\System32\conhost.exe --headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\Winget-AutoUpdate\User-Run.ps1"
+wauOpenLog := A_ProgramsCommon "\Winget-AutoUpdate\Open log.lnk" ; ""C:\Program Files\Winget-AutoUpdate\logs\updates.log""
+wauDesktop := A_DesktopCommon "\Run WAU.lnk" ; C:\Windows\System32\conhost.exe --headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\Winget-AutoUpdate\User-Run.ps1"
+wauAppInstaller := A_DesktopCommon "\WAU App Installer.lnk" ; C:\Windows\System32\conhost.exe --headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\Winget-AutoUpdate\WAU-Installer-GUI.ps1"
+
 psScriptPath := A_WorkingDir "\" name_no_ext ".ps1"
 uninstPath := A_WorkingDir "\UnInst.exe"
 runCommand := 'C:\Windows\System32\conhost.exe --headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' psScriptPath '" -FromAHK'
@@ -46,41 +50,75 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
             ExitApp
         }
     }
+
     ; Close all instances of WAU Settings GUI using PowerShell
     try {
         RunWait('C:\Windows\System32\conhost.exe --headless powershell.exe -NoProfile -Command "Get-Process | Where-Object { $_.MainWindowTitle -like \"WAU Settings*\" } | Stop-Process -Force"', , "Hide")
     } catch {
         ; Ignore errors if no matching processes found
     }
-    ; Remove shortcuts if they exist
-    if FileExist(shortcutDesktop) || FileExist(shortcutStartMenu) {
-        try {
+
+    ; Remove WAU Settings (Administrator) shortcuts if they exist
+    if FileExist(shortcutDesktop) || FileExist(shortcutStartMenu) || FileExist(shortcutOpenLogs) || FileExist(shortcutAppInstaller) {
             if FileExist(shortcutDesktop)
                 FileDelete(shortcutDesktop)
             if FileExist(shortcutStartMenu)
                 FileDelete(shortcutStartMenu)
-        } catch {
-            ; Ignore errors if shortcuts can't be deleted
-        }
+            if FileExist(shortcutOpenLogs)
+                FileDelete(shortcutOpenLogs)
+            if FileExist(shortcutAppInstaller)
+                FileDelete(shortcutAppInstaller)
     }
-    ; Add original shortcuts for Run WAU and updates.log if registry value is set
-    try {
+
+    ; Add Start menu shortcuts for Run WAU and updates.log if registry value is set
         shortcutFlag := 0
         RegRead("HKLM\SOFTWARE\Romanitho\Winget-AutoUpdate", "WAU_StartMenuShortcut", &shortcutFlag)
         if shortcutFlag = 1 {
             RegRead("HKLM\SOFTWARE\Romanitho\Winget-AutoUpdate", "InstallLocation", &installLocation)
             ; Create shortcut for Run WAU if it doesn't exist
-            if !FileExist(shortcutRunWau) {
-                FileCreateShortcut(installLocation "WAU.exe", shortcutRunWau)
+            if !FileExist(wauRunWau) {
+                FileCreateShortcut("C:\Windows\System32\conhost.exe --headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File " installLocation "User-Run.ps1", wauRunWau)
             }
             ; Create updates.log file shortcut if it doesn't exist
-            if !FileExist(shortcutLog) {
-                FileCreateShortcut(installLocation "logs\updates.log", shortcutLog)
+            if !FileExist(wauOpenLog) {
+                logFile := installLocation "logs\updates.log"
+                ; Create log directory if it doesn't exist
+                if !DirExist(installLocation "logs") {
+                    DirCreate(installLocation "logs")
+                }
+                ; Create empty log file if it doesn't exist
+                if !FileExist(logFile) {
+                    FileAppend("", logFile)
+                }
+                FileCreateShortcut(logFile, wauOpenLog)
+            }            
+        }
+        else {
+            ; If the registry value is not set, delete the Start menu
+            if FileExist(A_ProgramsCommon "\Winget-AutoUpdate")
+                FileDelete(A_ProgramsCommon "\Winget-AutoUpdate")
+        }
+
+    ; Add Desktop shortcuts for Run WAU and WAU App Installer if registry value is set
+        shortcutFlag := 0
+        RegRead("HKLM\SOFTWARE\Romanitho\Winget-AutoUpdate", "WAU_DesktopShortcut", &shortcutFlag)
+        if shortcutFlag = 1 {
+            RegRead("HKLM\SOFTWARE\Romanitho\Winget-AutoUpdate", "InstallLocation", &installLocation)
+            ; Create shortcut for Run WAU if it doesn't exist
+            if !FileExist(wauDesktop) {
+                FileCreateShortcut("C:\Windows\System32\conhost.exe --headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File " installLocation "User-Run.ps1", wauDesktop)
             }
         }
-    } catch {
-        ; Ignore errors if shortcuts or log link can't be created
-    }
+        shortcutFlag := 0
+        RegRead("HKLM\SOFTWARE\Romanitho\Winget-AutoUpdate", "WAU_AppInstallerShortcut", &shortcutFlag)
+        if shortcutFlag = 1 {
+            RegRead("HKLM\SOFTWARE\Romanitho\Winget-AutoUpdate", "InstallLocation", &installLocation)
+            ; Create shortcut for WAU App Installer if it doesn't exist
+            if !FileExist(wauAppInstaller) {
+                FileCreateShortcut("C:\Windows\System32\conhost.exe --headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File " installLocation "WAU-Installer-GUI.ps1", wauAppInstaller)
+            }
+        }
+
     ; Check if working dir is under '\WinGet\Packages\'
     if InStr(A_WorkingDir, "\WinGet\Packages\", false) > 0 {
          ; Remove registry key for WinGet uninstall local manifest entry (SandboxTest.ps1)
@@ -96,6 +134,7 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
             ; Ignore errors if registry key can't be deleted
         }
    }
+
     ; Remove registry key for WAU Settings GUI uninstall entry
     try {
         RegDeleteKey("HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\WAU-Settings-GUI")
@@ -106,7 +145,6 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
     Run('cmd.exe /C ping 127.0.0.1 -n 3 > nul & rmdir /S /Q "' A_WorkingDir '"', , "Hide")
     ExitApp
 }
-
 
 ; Check if we are started from PowerShell for UnInst.exe creation
 if fromPS {
