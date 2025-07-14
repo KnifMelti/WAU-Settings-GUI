@@ -44,7 +44,7 @@ Configure **WAU** settings after installation, including:
 NB: Must be run as **Administrator** (exe and shortcuts have the flag set)
 
 ### Automatic Installation
-- Use **WinGet CLI** from **Command Prompt** to install the latest version:
+- Use **WinGet CLI** from **Command Prompt** to install the latest released **WinGet** version:
   
   ```bash
   winget install KnifMelti.WAU-Settings-GUI --scope user
