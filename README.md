@@ -50,7 +50,7 @@ NB: Must be run as **Administrator** (exe and shortcuts have the flag set)
   winget install KnifMelti.WAU-Settings-GUI --scope user
   ```
 
-This will install to:
+This will install a Portable WinGet Package (with Alias: **WAU-Settings-GUI**) to:
   
    `%USERPROFILE%\AppData\Local\Microsoft\WinGet\Packages\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe`.
 
