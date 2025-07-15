@@ -130,7 +130,7 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
 
 ; Check if we are started from PowerShell for UnInst.exe creation
 if fromPS {
-    ; Only create UnInst.exe and registry, no shortcut launch!
+    ; Create UnInst.exe and registry, relaunch after info!
     if FileExist(A_WorkingDir "\installed.txt") {
         if !FileExist(uninstPath) {
             FileCopy(A_ScriptFullPath, uninstPath, 1)
@@ -138,10 +138,11 @@ if fromPS {
         }
     }
     MsgBox(
-        "UnInst.exe and registry uninstall entry`nhave been created successfully.`n`nPlease restart the program to apply changes.",
+        "UnInst.exe and registry uninstall entry`nhave been created successfully.`n`nRestarting the program to apply changes.",
         name_no_ext,
         0x40  ; Information icon
     )
+    Run runCommand
     ExitApp
 }
 
@@ -273,8 +274,11 @@ CreateUninstall(uninstPath, name_no_ext, targetDir) {
     RegWrite("1", "REG_DWORD", regPath, "NoModify")
     RegWrite("1", "REG_DWORD", regPath, "NoRepair")
 
-    ; Create README link in installation directory
+    ; Create README link in installation directory and delete README.md if it exists
     readmeUrl := "https://github.com/KnifMelti/" name_no_ext
     urlContent := "[InternetShortcut]`nURL=" readmeUrl "`n"
     FileAppend(urlContent, targetDir "\README.url")
+    if FileExist(targetDir "\README.md") {
+        FileDelete(targetDir "\README.md")
+    }
 }
