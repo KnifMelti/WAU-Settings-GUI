@@ -411,12 +411,12 @@ function Start-WAUGUIUpdate {
                 }
                 
                 # Backup current files (exclude ver and backup folders)
-                Get-ChildItem -Path $Script:WorkingDir -Exclude "ver", "ver_*", "msi", "cfg", "lists" | ForEach-Object {
+                Get-ChildItem -Path $Script:WorkingDir -Exclude "ver", "ver_*", "msi", "cfg" | ForEach-Object {
                     Copy-Item -Path $_.FullName -Destination $backupDir -Recurse -Force
                 }
                 
                 # Copy new files, preserving existing config and user data
-                $excludePatterns = @("ver", "ver_*", "msi", "cfg", "lists")
+                $excludePatterns = @("ver", "ver_*", "msi", "cfg")
                 Get-ChildItem -Path $filesToCopy | ForEach-Object {
                     $relativePath = $_.Name
                     $destinationPath = Join-Path $Script:WorkingDir $relativePath
