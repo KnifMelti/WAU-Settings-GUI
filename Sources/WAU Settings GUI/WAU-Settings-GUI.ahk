@@ -98,28 +98,67 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
     }
 
     ; MSI repair (from latest install) will restore all original WAU components including shortcuts
-    try {
-        ; Use PowerShell to find the product code (GUID) for Winget-AutoUpdate
-        psCommand := 'powershell.exe -NoProfile -Command "$pkg = Get-Package -Name \"Winget-AutoUpdate\" -ProviderName msi -ErrorAction SilentlyContinue; if ($pkg) { return $pkg.Metadata[\"ProductCode\"] }"'
-        tempFile := A_Temp "\wau_guid.tmp"
-        
-        ; Run the command, redirecting output to a temporary file
-        RunWait(A_ComSpec ' /c "' psCommand ' > "' tempFile '"', , "Hide")
-        
-        wauGUID := ""
-        if FileExist(tempFile) {
-            wauGUID := Trim(FileRead(tempFile))
-            FileDelete(tempFile)
-        }
+    if !silent {
+        try {
+            ; Use PowerShell to find the product code (GUID) for Winget-AutoUpdate
+            psCommand := 'powershell.exe -NoProfile -Command "$pkg = Get-Package -Name \"Winget-AutoUpdate\" -ProviderName msi -ErrorAction SilentlyContinue; if ($pkg) { $productCode = $pkg.Metadata[\"ProductCode\"]; $installSource = (Get-ItemProperty -Path \"HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$productCode\" -Name \"InstallSource\" -ErrorAction SilentlyContinue).InstallSource; Write-Host \"ProductCode: $productCode\"; Write-Host \"InstallSource: $installSource\" }"'
+            tempFile := A_Temp "\wau_guid.tmp"
+            
+            ; Run the command, redirecting output to a temporary file
+            RunWait(A_ComSpec ' /c "' psCommand ' > "' tempFile '"', , "Hide")
+            
+            wauGUID := ""
+            wauSource := ""
+            if FileExist(tempFile) {
+                fileContent := Trim(FileRead(tempFile))
+                FileDelete(tempFile)
+                
+                ; Parse the two lines to extract ProductCode and InstallSource
+                lines := StrSplit(fileContent, "`n")
+                for line in lines {
+                    line := Trim(line)
+                    if InStr(line, "ProductCode: ") = 1 {
+                        wauGUID := SubStr(line, 14)  ; Extract after "ProductCode: "
+                    } else if InStr(line, "InstallSource: ") = 1 {
+                        wauSource := SubStr(line, 16)  ; Extract after "InstallSource: "
+                    }
+                }
+            }
 
-        if (wauGUID != "") {
-            ; Trigger MSI repair using the found GUID to restore shortcuts and files
-            RunWait(A_ComSpec ' /c msiexec /fvomus ' wauGUID ' /qn', , "Hide")
-        } else {
-            throw Error("WAU GUID not found via PowerShell")
+            if (wauGUID != "") {
+                ; Check if WAU.msi exists in the install source before attempting repair
+                if (wauSource != "" && FileExist(wauSource "WAU.msi")) {
+                    ; Trigger MSI repair using the found GUID to restore shortcuts and files
+                    RunWait(A_ComSpec ' /c msiexec /fvomus ' wauGUID ' /qn', , "Hide")
+                } else if (FileExist(A_WorkingDir "\msi\WAU.msi")) {
+                    ; WAU.msi not found in original source, but found in working directory msi folder
+                    wauSource := A_WorkingDir "\msi\"
+
+                    ; Copy WAU.msi to temp folder for MSI repair (msi folder will be deleted later)
+                    tempMsiPath := A_Temp "\WAU.msi"
+                    FileCopy(wauSource "WAU.msi", tempMsiPath, 1)
+
+                    wauSource := A_Temp "\"
+
+                    ; Update registry InstallSource to point to temp folder
+                    try {
+                        RegWrite(wauSource, "REG_SZ", "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\" wauGUID, "InstallSource")
+                    } catch {
+                        ; Ignore registry write errors
+                    }
+
+                    ; Trigger MSI repair using the found GUID to restore shortcuts and files
+                    RunWait(A_ComSpec ' /c msiexec /fvomus ' wauGUID ' /qn', , "Hide")
+                } else {
+                    throw Error("WAU.msi not found in install source: " (wauSource != "" ? wauSource : "Unknown") " or in working directory 'msi' folder")
+                }
+            } else {
+                throw Error("WAU GUID not found via PowerShell")
+            }
+                
+        } catch as e {
+            MsgBox("Failed to trigger MSI repair. Please repair WAU manually from Apps & Features.`n`nError: " e.Message, name_no_ext, 0x10)
         }
-    } catch as e {
-        MsgBox("Failed to trigger MSI repair. Please repair WAU manually from Apps & Features.`n`nError: " e.Message, name_no_ext, 0x10)
     }
 
     ; Runs a command to delete the entire script folder after a short delay
