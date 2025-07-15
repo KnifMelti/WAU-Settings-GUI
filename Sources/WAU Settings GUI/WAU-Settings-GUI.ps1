@@ -384,15 +384,7 @@ function Start-WAUGUIUpdate {
                         $sourceDir = $extractPath
                     }
                 }
-                
-                # Handle GitHub source archive structure
-                if (-not $sourceDir) {
-                    $sourcesPath = Get-ChildItem -Path $extractPath -Recurse -Directory -Name "Sources" | Select-Object -First 1
-                    if ($sourcesPath) {
-                        $sourceDir = Split-Path (Join-Path $extractPath $sourcesPath) -Parent
-                    }
-                }
-                
+
                 if (-not $sourceDir) {
                     throw "Could not find source files in extracted archive"
                 }
@@ -413,18 +405,18 @@ function Start-WAUGUIUpdate {
                 }
                 
                 # Create backup of current version
-                $backupDir = Join-Path $Script:WorkingDir "backup_$(Get-Date -Format 'yyyy-MM-dd_HH-mm-ss')"
+                $backupDir = Join-Path $Script:WorkingDir "ver_$(Get-Date -Format 'yyyy-MM-dd_HH-mm-ss')"
                 if (-not (Test-Path $backupDir)) {
                     New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
                 }
                 
                 # Backup current files (exclude ver and backup folders)
-                Get-ChildItem -Path $Script:WorkingDir -Exclude "ver", "backup_*", "msi", "cfg", "lists" | ForEach-Object {
+                Get-ChildItem -Path $Script:WorkingDir -Exclude "ver", "ver_*", "msi", "cfg", "lists" | ForEach-Object {
                     Copy-Item -Path $_.FullName -Destination $backupDir -Recurse -Force
                 }
                 
                 # Copy new files, preserving existing config and user data
-                $excludePatterns = @("ver", "backup_*", "msi", "cfg", "lists")
+                $excludePatterns = @("ver", "ver_*", "msi", "cfg", "lists")
                 Get-ChildItem -Path $filesToCopy | ForEach-Object {
                     $relativePath = $_.Name
                     $destinationPath = Join-Path $Script:WorkingDir $relativePath
@@ -462,6 +454,35 @@ function Start-WAUGUIUpdate {
                         }
                     }
                 }
+                
+                # Create zip backup of the backup directory
+                try {
+                    $backupZipDir = Join-Path $downloadDir "backup"
+                    if (-not (Test-Path $backupZipDir)) {
+                        New-Item -ItemType Directory -Path $backupZipDir -Force | Out-Null
+                    }
+                    
+                    $backupDirName = Split-Path $backupDir -Leaf
+                    $zipFileName = "$backupDirName.zip"
+                    $zipFilePath = Join-Path $backupZipDir $zipFileName
+                    
+                    # Create zip file from backup directory
+                    Add-Type -AssemblyName System.IO.Compression.FileSystem
+                    [System.IO.Compression.ZipFile]::CreateFromDirectory($backupDir, $zipFilePath)
+                    
+                    # Verify zip was created successfully
+                    if (Test-Path $zipFilePath) {
+                        Write-Host "Backup zip created: $zipFilePath"
+                        
+                        # Remove the original backup directory to save space
+                        Remove-Item -Path $backupDir -Recurse -Force -ErrorAction SilentlyContinue
+                        Write-Host "Original backup directory removed: $backupDir"
+                    }
+                }
+                catch {
+                    Write-Warning "Failed to create backup zip: $($_.Exception.Message)"
+                    # Continue with installation even if zip creation fails
+                }                
                 
                 # Clean up extraction directory
                 Remove-Item -Path $extractPath -Recurse -Force -ErrorAction SilentlyContinue
