@@ -37,9 +37,9 @@ uninstPath := A_WorkingDir "\UnInst.exe"
 runCommand := 'C:\Windows\System32\conhost.exe --headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' psScriptPath '" -FromAHK'
 portableCommand := 'C:\Windows\System32\conhost.exe --headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' psScriptPath '" -Portable'
 
-; Check if the script was called with '/UNINSTALL' or '/UNINSTALL /SILENT' parameter
+; Check if the script was called with '/UNINSTALL' or '/UNINSTALL /S' parameter
 if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
-    silent := (A_Args.Length > 1 && (A_Args[2] = "/SILENT"))
+    silent := (A_Args.Length > 1 && (A_Args[2] = "/S"))
     if !silent {
         choice := MsgBox(
             "Do you want to uninstall WAU Settings GUI?" . "`n`nChoose Yes to uninstall, No to cancel.",
