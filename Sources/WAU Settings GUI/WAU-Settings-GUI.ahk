@@ -98,65 +98,103 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
     }
 
     ; MSI repair (from latest install) will restore all original WAU components including shortcuts
-    if !silent {
-        try {
-            ; Use PowerShell to find the product code (GUID) for Winget-AutoUpdate
-            psCommand := 'powershell.exe -NoProfile -Command "$pkg = Get-Package -Name \"Winget-AutoUpdate\" -ProviderName msi -ErrorAction SilentlyContinue; if ($pkg) { $productCode = $pkg.Metadata[\"ProductCode\"]; $installSource = (Get-ItemProperty -Path \"HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$productCode\" -Name \"InstallSource\" -ErrorAction SilentlyContinue).InstallSource; Write-Host \"ProductCode: $productCode\"; Write-Host \"InstallSource: $installSource\" }"'
-            tempFile := A_Temp "\wau_guid.tmp"
+    try {
+        ; Use PowerShell to find the product code (GUID) for Winget-AutoUpdate
+        psCommand := 'powershell.exe -NoProfile -Command "$pkg = Get-Package -Name \"Winget-AutoUpdate\" -ProviderName msi -ErrorAction SilentlyContinue; if ($pkg) { $productCode = $pkg.Metadata[\"ProductCode\"]; $installSource = (Get-ItemProperty -Path \"HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$productCode\" -Name \"InstallSource\" -ErrorAction SilentlyContinue).InstallSource; Write-Host \"ProductCode: $productCode\"; Write-Host \"InstallSource: $installSource\"; Write-Host \"Version: $($pkg.Version)\" }"'
+        tempFile := A_Temp "\wau_guid.tmp"
+        
+        ; Run the command, redirecting output to a temporary file
+        RunWait(A_ComSpec ' /c "' psCommand ' > "' tempFile '"', , "Hide")
+        
+        wauGUID := ""
+        wauSource := ""
+        wauVersion := ""
+        if FileExist(tempFile) {
+            fileContent := Trim(FileRead(tempFile))
+            FileDelete(tempFile)
             
-            ; Run the command, redirecting output to a temporary file
-            RunWait(A_ComSpec ' /c "' psCommand ' > "' tempFile '"', , "Hide")
-            
-            wauGUID := ""
-            wauSource := ""
-            if FileExist(tempFile) {
-                fileContent := Trim(FileRead(tempFile))
-                FileDelete(tempFile)
-                
-                ; Parse the two lines to extract ProductCode and InstallSource
-                lines := StrSplit(fileContent, "`n")
-                for line in lines {
-                    line := Trim(line)
-                    if InStr(line, "ProductCode: ") = 1 {
-                        wauGUID := SubStr(line, 14)  ; Extract after "ProductCode: "
-                    } else if InStr(line, "InstallSource: ") = 1 {
-                        wauSource := SubStr(line, 16)  ; Extract after "InstallSource: "
-                    }
+            ; Parse the three lines to extract ProductCode, InstallSource and Version
+            lines := StrSplit(fileContent, "`n")
+            for line in lines {
+                line := Trim(line)
+                if InStr(line, "ProductCode: ") = 1 {
+                    wauGUID := SubStr(line, 14)  ; Extract after "ProductCode: "
+                } else if InStr(line, "InstallSource: ") = 1 {
+                    wauSource := RTrim(SubStr(line, 16), "\")  ; Extract after "InstallSource: " and remove trailing backslash
+                } else if InStr(line, "Version: ") = 1 {
+                    wauLongVersion := "v" . SubStr(line, 10)  ; Extract after "Version: " (keep full version, including last dot and numbers)
+                    wauVersion := "v" . RegExReplace(SubStr(line, 10), "\.\d+$", "")  ; Extract after "Version: ", add "v" prefix, remove last dot and numbers
                 }
             }
-
-            if (wauGUID != "") {
-                ; Check if WAU.msi exists in the install source before attempting repair
-                if (wauSource != "" && FileExist(wauSource "WAU.msi")) {
-                    ; Trigger MSI repair using the found GUID to restore shortcuts and files
-                    RunWait(A_ComSpec ' /c msiexec /fvomus ' wauGUID ' /qn', , "Hide")
-                } else if (FileExist(A_WorkingDir "\msi\WAU.msi")) {
-                    ; WAU.msi not found in original source, but found in working directory msi folder
-                    wauSource := A_WorkingDir "\msi\"
-
-                    ; Copy WAU.msi to temp folder for MSI repair (msi folder will be deleted later)
-                    tempMsiPath := A_Temp "\WAU.msi"
-                    FileCopy(wauSource "WAU.msi", tempMsiPath, 1)
-
-                    wauSource := A_Temp "\"
-
-                    ; Update registry InstallSource to point to temp folder
+        }
+        
+        if (wauGUID != "") {
+            ; Check if WAU.msi exists in the install source before attempting repair
+            if (wauSource != "" && FileExist(wauSource "\WAU.msi")) {
+                ; Trigger MSI repair using the found GUID to restore shortcuts and files
+                if !silent {
+                    RunWait('msiexec /fvomus ' wauGUID ' /qb INSTALLSOURCE="' wauSource '\"', , "Hide")
+                }
+                else {
+                    RunWait('msiexec /fvomus ' wauGUID ' /qn INSTALLSOURCE="' wauSource '\"', , "Hide")
+                }
+            } else if (IsInternetAvailable()) {
+                ; WAU.msi not found in original source, download the original version and trigger MSI reinstall
+                downloadUrl := "https://github.com/Romanitho/Winget-AutoUpdate/releases/download/" wauVersion "/WAU.msi"
+                wauMsiPath := A_WorkingDir "\WAU.msi"
+                try {
+                    Download(downloadUrl, wauMsiPath)
+                    ; Check MSI file signature (first 8 bytes should be MSI signature)
                     try {
-                        RegWrite(wauSource, "REG_SZ", "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\" wauGUID, "InstallSource")
-                    } catch {
-                        ; Ignore registry write errors
+                        f := FileOpen(wauMsiPath, "r")
+                        if !f {
+                            throw Error("Could not open downloaded file for validation.")
+                        }
+                        ; Read first 8 bytes as hex values
+                        signature := ""
+                        Loop 8 {
+                            signature .= Format("{:02X}", f.ReadUChar())
+                        }
+                        f.Close()
+                        if (signature != "D0CF11E0A1B11AE1") { ; OLE/COM compound document signature
+                            throw Error("Downloaded file is not a valid MSI file (invalid signature).")
+                        }
+                    } catch as e {
+                        throw Error("Failed to validate MSI file signature: " e.Message)
                     }
-
-                    ; Trigger MSI repair using the found GUID to restore shortcuts and files
-                    RunWait(A_ComSpec ' /c msiexec /fvomus ' wauGUID ' /qn', , "Hide")
-                } else {
-                    throw Error("WAU.msi not found in install source: " (wauSource != "" ? wauSource : "Unknown") " or in working directory 'msi' folder")
+                } catch as e {
+                    throw Error("Failed to download WAU.msi from GitHub: " downloadUrl "`nError: " e.Message)
                 }
+
+                wauSource := A_WorkingDir
+                ; Copy WAU.msi to %ProgramData%\Package Cache folder for MSI repair (msi folder will be deleted later)
+                cacheDir := A_AppDataCommon "\Package Cache\" wauGUID wauLongVersion "\Installers"
+                if !DirExist(cacheDir) {
+                    DirCreate(cacheDir)
+                }
+                cacheMsiPath := cacheDir "\WAU.msi"
+                FileCopy(wauSource "\WAU.msi", cacheMsiPath, 1)
+
+                wauSource := cacheDir
+
+                sleep 1000  ; Wait for a second to ensure the file is copied
+
+                ; Trigger MSI reinstall using the MSI file directly
+                if !silent {
+                    RunWait('msiexec /i "' wauSource '\WAU.msi" /qb REINSTALL=ALL REINSTALLMODE=vomus', , "Hide")
+                }
+                else {
+                    RunWait('msiexec /i "' wauSource '\WAU.msi" /qn REINSTALL=ALL REINSTALLMODE=vomus', , "Hide")
+                }           
             } else {
-                throw Error("WAU GUID not found via PowerShell")
+                throw Error("WAU.msi not found in install source: " (wauSource != "" ? wauSource : "Unknown") " and couldn't be downloaded.`nPlease check your internet connection or download WAU.msi manually from GitHub.")
             }
-                
-        } catch as e {
+        } else {
+            throw Error("WAU GUID not found via PowerShell")
+        }
+            
+    } catch as e {
+        if !silent {
             MsgBox("Failed to trigger MSI repair. Please repair WAU manually from Apps & Features.`n`nError: " e.Message, name_no_ext, 0x10)
         }
     }
@@ -320,4 +358,9 @@ CreateUninstall(uninstPath, name_no_ext, targetDir) {
     if FileExist(targetDir "\README.md") {
         FileDelete(targetDir "\README.md")
     }
+}
+
+; Helper function to check internet connectivity using Windows API
+IsInternetAvailable() {
+    return DllCall("wininet.dll\InternetGetConnectedState", "UInt*", 0, "UInt", 0)
 }
