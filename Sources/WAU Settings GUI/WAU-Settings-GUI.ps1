@@ -405,7 +405,7 @@ function Start-WAUGUIUpdate {
                 }
                 
                 # Create backup of current version
-                $backupDir = Join-Path $Script:WorkingDir "ver_$(Get-Date -Format 'yyyy-MM-dd_HH-mm-ss')"
+                $backupDir = Join-Path $Script:WorkingDir "ver_$($Script:WAU_GUI_VERSION)_$(Get-Date -Format 'yyyy-MM-dd_HH-mm-ss')"
                 if (-not (Test-Path $backupDir)) {
                     New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
                 }
