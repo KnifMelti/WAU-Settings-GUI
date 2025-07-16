@@ -26,11 +26,11 @@ shortcutStartMenu := A_ProgramsCommon "\Winget-AutoUpdate\WAU Settings (Administ
 shortcutOpenLogs := A_ProgramsCommon "\Winget-AutoUpdate\Open Logs.lnk"
 shortcutAppInstaller := A_ProgramsCommon "\Winget-AutoUpdate\WAU App Installer.lnk"
 
-; Original: 3 shortcuts for Run WAU and updates.log
-wauRunWau := A_ProgramsCommon "\Winget-AutoUpdate\Run WAU.lnk" ; C:\Windows\System32\conhost.exe --headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\Winget-AutoUpdate\User-Run.ps1"
-wauOpenLog := A_ProgramsCommon "\Winget-AutoUpdate\Open log.lnk" ; ""C:\Program Files\Winget-AutoUpdate\logs\updates.log""
-wauDesktop := A_DesktopCommon "\Run WAU.lnk" ; C:\Windows\System32\conhost.exe --headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\Winget-AutoUpdate\User-Run.ps1"
-wauAppInstaller := A_DesktopCommon "\WAU App Installer.lnk" ; C:\Windows\System32\conhost.exe --headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\Winget-AutoUpdate\WAU-Installer-GUI.ps1"
+; Original: 4 shortcuts for Run WAU and updates.log
+; wauRunWau := A_ProgramsCommon "\Winget-AutoUpdate\Run WAU.lnk" ; C:\Windows\System32\conhost.exe --headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\Winget-AutoUpdate\User-Run.ps1"
+; wauOpenLog := A_ProgramsCommon "\Winget-AutoUpdate\Open log.lnk" ; ""C:\Program Files\Winget-AutoUpdate\logs\updates.log""
+; wauDesktop := A_DesktopCommon "\Run WAU.lnk" ; C:\Windows\System32\conhost.exe --headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\Winget-AutoUpdate\User-Run.ps1"
+; wauAppInstaller := A_DesktopCommon "\WAU App Installer.lnk" ; C:\Windows\System32\conhost.exe --headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\Winget-AutoUpdate\WAU-Installer-GUI.ps1"
 
 psScriptPath := A_WorkingDir "\" name_no_ext ".ps1"
 uninstPath := A_WorkingDir "\UnInst.exe"
@@ -74,6 +74,7 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
             }
     }
 
+
     ; Check if working dir is under '\WinGet\Packages\'
     if InStr(A_WorkingDir, "\WinGet\Packages\", false) > 0 {
          ; Remove registry key for WinGet uninstall local manifest entry (SandboxTest.ps1)
@@ -97,7 +98,7 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
         ; Ignore errors if registry key can't be deleted
     }
 
-    ; MSI repair (from latest install) will restore all original WAU components including shortcuts
+    ; MSI uninstall/install to restore WAU from current showing shortcut settings in the GUI
     try {
         ; Use PowerShell to find the product code (GUID) for Winget-AutoUpdate
         psCommand := 'powershell.exe -NoProfile -Command "$pkg = Get-Package -Name \"Winget-AutoUpdate\" -ProviderName msi -ErrorAction SilentlyContinue; if ($pkg) { $productCode = $pkg.Metadata[\"ProductCode\"]; $installSource = (Get-ItemProperty -Path \"HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$productCode\" -Name \"InstallSource\" -ErrorAction SilentlyContinue).InstallSource; Write-Host \"ProductCode: $productCode\"; Write-Host \"InstallSource: $installSource\"; Write-Host \"Version: $($pkg.Version)\" }"'
@@ -129,14 +130,37 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
         }
         
         if (wauGUID != "") {
-            ; Check if WAU.msi exists in the install source before attempting repair
+            ; Delete existing Startmenu
+            try {
+                if FileExist(A_ProgramsCommon "\Winget-AutoUpdate")
+                    FileDelete(A_ProgramsCommon "\Winget-AutoUpdate")
+            } catch {
+                ; Ignore errors from MSI subsystem
+            }
+
+            ; Check if WAU.msi exists in the install source before attempting uninstall/install
             if (wauSource != "" && FileExist(wauSource "\WAU.msi")) {
-                ; Trigger MSI repair using the found GUID to restore shortcuts and files
-                if !silent {
-                    RunWait('msiexec /fvomus ' wauGUID ' /qb INSTALLSOURCE="' wauSource '\"', , "Hide")
+                ; Copy WAU.msi to %ProgramData%\Package Cache folder for MSI uninstall/install
+                cacheDir := A_AppDataCommon "\Package Cache\" wauGUID wauLongVersion "\Installers"
+                if !DirExist(cacheDir) {
+                    DirCreate(cacheDir)
                 }
+                cacheMsiPath := cacheDir "\WAU.msi"
+                ; Only copy if wauSource is NOT under Package Cache
+                if InStr(wauSource, "\Package Cache\" wauGUID wauLongVersion "\Installers", false) = 0 {
+                    FileCopy(wauSource "\WAU.msi", cacheMsiPath, 1)
+                }
+
+                msiParams := GetMSIParams()
+
+                ; Uninstall using the found GUID and install from the copied WAU.msi in the Package Cache folder
+                if !silent {
+                    RunWait('msiexec /x' wauGUID ' /qn', , "Hide")
+                    RunWait('msiexec /i "' cacheMsiPath '" /qb' msiParams, , "Hide")
+                }                
                 else {
-                    RunWait('msiexec /fvomus ' wauGUID ' /qn INSTALLSOURCE="' wauSource '\"', , "Hide")
+                    RunWait('msiexec /x' wauGUID ' /qn', , "Hide")
+                    RunWait('msiexec /i "' cacheMsiPath '" /qn' msiParams, , "Hide")
                 }
             } else if (IsInternetAvailable()) {
                 ; WAU.msi not found in original source, download the original version and trigger MSI reinstall
@@ -177,15 +201,17 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
 
                 wauSource := cacheDir
 
-                sleep 1000  ; Wait for a second to ensure the file is copied
+                msiParams := GetMSIParams()
 
-                ; Trigger MSI reinstall using the MSI file directly
+                ; Uninstall using the found GUID and install from the copied WAU.msi in the Package Cache folder
                 if !silent {
-                    RunWait('msiexec /i "' wauSource '\WAU.msi" /qb REINSTALL=ALL REINSTALLMODE=vomus', , "Hide")
-                }
+                    RunWait('msiexec /x' wauGUID ' /qn', , "Hide")
+                    RunWait('msiexec /i "' cacheMsiPath '" /qb' msiParams, , "Hide")
+                }                
                 else {
-                    RunWait('msiexec /i "' wauSource '\WAU.msi" /qn REINSTALL=ALL REINSTALLMODE=vomus', , "Hide")
-                }           
+                    RunWait('msiexec /x' wauGUID ' /qn', , "Hide")
+                    RunWait('msiexec /i "' cacheMsiPath '" /qn' msiParams, , "Hide")
+                }
             } else {
                 throw Error("WAU.msi not found in install source: " (wauSource != "" ? wauSource : "Unknown") " and couldn't be downloaded.`nPlease check your internet connection or download WAU.msi manually from GitHub.")
             }
@@ -219,11 +245,22 @@ if fromPS {
         name_no_ext,
         0x40  ; Information icon
     )
-    Run runCommand
+
+    if FileExist(shortcutDesktop) && FileExist(shortcutStartMenu) {
+        Run shortcutDesktop
+    } else if FileExist(shortcutDesktop) {
+        Run shortcutDesktop
+    } else if FileExist(shortcutStartMenu) {
+        Run shortcutStartMenu
+    }
+    else {
+        ; If no shortcuts exist, run the script directly
+        Run runCommand
+    }
+
     ExitApp
 }
 
-; Normal logic if we are NOT started from PowerShell
 if FileExist(shortcutDesktop) && FileExist(shortcutStartMenu) {
     Run shortcutDesktop
 } else if FileExist(shortcutDesktop) {
@@ -252,7 +289,17 @@ if FileExist(shortcutDesktop) && FileExist(shortcutStartMenu) {
         }
         ; Start PowerShell-GUI if UnInst.exe now exists
         if FileExist(uninstPath) {
-            Run runCommand
+            if FileExist(shortcutDesktop) && FileExist(shortcutStartMenu) {
+                Run shortcutDesktop
+            } else if FileExist(shortcutDesktop) {
+                Run shortcutDesktop
+            } else if FileExist(shortcutStartMenu) {
+                Run shortcutStartMenu
+            }
+            else {
+                ; If no shortcuts exist, run the script directly
+                Run runCommand
+            }
         }
         ExitApp
     } else {
@@ -277,12 +324,12 @@ if FileExist(shortcutDesktop) && FileExist(shortcutStartMenu) {
             uninstPath := targetDir "\UnInst.exe"
             FileCopy(targetDir "\" name_no_ext ".exe", uninstPath, 1)
             CreateUninstall(uninstPath, name_no_ext, targetDir)
-            Run targetDir
             MsgBox(
-                "Installation complete!`n`nPlease start the program by running '" name_no_ext ".exe'`nfrom the installation folder.",
+                "Installation complete!`n`nRunning '" name_no_ext ".exe'`nfrom the installation folder.",
                 name_no_ext,
                 0x40  ; Information icon
             )
+            Run targetDir "\" name_no_ext ".exe"
             ExitApp
         } else {
             Run portableCommand
@@ -363,4 +410,47 @@ CreateUninstall(uninstPath, name_no_ext, targetDir) {
 ; Helper function to check internet connectivity using Windows API
 IsInternetAvailable() {
     return DllCall("wininet.dll\InternetGetConnectedState", "UInt*", 0, "UInt", 0)
+}
+
+GetMSIParams() {
+    startMenu := ""
+    desktopWAU := ""
+    desktopAppInstaller := ""
+
+    try {
+        shortcutFlag := RegRead("HKLM\SOFTWARE\Romanitho\Winget-AutoUpdate", "WAU_StartMenuShortcut")
+    } catch {
+        shortcutFlag := 0
+    }
+    if shortcutFlag = 1 {
+        startMenu := "STARTMENUSHORTCUT=1"
+    }
+
+    try {
+        shortcutFlag := RegRead("HKLM\SOFTWARE\Romanitho\Winget-AutoUpdate", "WAU_DesktopShortcut")
+    } catch {
+        shortcutFlag := 0
+    }
+    if shortcutFlag = 1 {
+        desktopWAU := "DESKTOPSHORTCUT=1"
+    }
+
+    try {
+        shortcutFlag := RegRead("HKLM\SOFTWARE\Romanitho\Winget-AutoUpdate", "WAU_AppInstallerShortcut")
+    } catch {
+        shortcutFlag := 0
+    }
+    if shortcutFlag = 1 {
+        desktopAppInstaller := "APPINSTALLERSHORTCUT=1"
+    }
+
+    msiParams := ""
+    if (startMenu != "")
+        msiParams .= " " startMenu
+    if (desktopWAU != "")
+        msiParams .= " " desktopWAU
+    if (desktopAppInstaller != "")
+        msiParams .= " " desktopAppInstaller
+
+    return msiParams
 }
