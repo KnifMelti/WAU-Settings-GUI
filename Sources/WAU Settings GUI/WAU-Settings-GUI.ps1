@@ -505,6 +505,22 @@ function Start-WAUGUIUpdate {
                     }
                 }
                 
+                # If current version is less than or equal to 1.7.9.5, rename config_user.psm1 to .old
+                $currentVer = [Version]$updateInfo.CurrentVersion
+                $thresholdVer = [Version]"1.7.9.5"
+                $configUserModulePath = Join-Path $Script:WorkingDir "modules\config_user.psm1"
+                if ($currentVer -le $thresholdVer) {
+                    if (Test-Path $configUserModulePath) {
+                        Rename-Item -Path $configUserModulePath -NewName "config_user.psm1.old" -Force
+                    }
+                } else {
+                    # Otherwise, delete UnInst.exe
+                    $uninstPath = Join-Path $Script:WorkingDir "UnInst.exe"
+                    if (Test-Path $uninstPath) {
+                        Remove-Item -Path $uninstPath -Force
+                    }
+                }
+
                 Close-PopUp
                 
                 [System.Windows.MessageBox]::Show(
@@ -574,25 +590,24 @@ function Get-WAUCurrentConfig {
             throw "WAU not found in registry or ProductVersion missing"
         }
 
-        # Check if first start and no shortcut exist
+        # Check if UnInst.exe exists or installed/first run file exists
+        $installedFile = Join-Path $Script:WorkingDir "installed.txt"
         $firstRunFile = Join-Path $Script:WorkingDir "firstrun.txt"
-        if (-not $Script:PORTABLE_MODE -and -not (Test-Path $Script:DESKTOP_WAU_SETTINGS) -and -not (Test-Path $firstRunFile)) {
-            Add-Shortcut $Script:DESKTOP_WAU_SETTINGS $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$((Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'))`"" "$Script:GUI_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
-            Set-Content -Path $firstRunFile -Value "WAU Settings GUI first run completed" -Force
-            Start-Process -FilePath $Script:DESKTOP_WAU_SETTINGS
-            exit
-        }
-
-        # Check if UnInst.exe exists
         $uninstPath = Join-Path $Script:WorkingDir "UnInst.exe"
         $wauGuiPath = Join-Path $Script:WorkingDir "$Script:WAU_GUI_NAME.exe"
         if (-not $Script:PORTABLE_MODE -and -not $Script:MainWindowStarted -and -not $FromAHK) {
-            if (-not (Test-Path $uninstPath) -and (Test-Path $wauGuiPath)) {
+            if (-not (Test-Path $firstRunFile) -or -not (Test-Path $installedFile) -or -not (Test-Path $uninstPath) -and (Test-Path $wauGuiPath)) {
                 $currentProcess = Get-Process -Id $PID
                 $isRunningAsPowerShell = $currentProcess.ProcessName -eq "powershell" -or $currentProcess.ProcessName -eq "pwsh"
                 if ($isRunningAsPowerShell) {
-                    Start-Process -FilePath $wauGuiPath -ArgumentList "/FROMPS"
-                    exit
+                Add-Shortcut $Script:DESKTOP_WAU_SETTINGS $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$((Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'))`"" "$Script:GUI_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
+                Set-Content -Path $firstRunFile -Value "WAU Settings GUI first run completed" -Force
+                Set-Content -Path $installedFile -Value "WAU Settings GUI installed" -Force
+                # Set file attributes to Hidden and System
+                $fileInfo = Get-Item -Path $installedFile
+                $fileInfo.Attributes = 'Hidden','System'
+                Start-Process -FilePath $wauGuiPath -ArgumentList "/FROMPS"
+                exit
                 }
             }
         }

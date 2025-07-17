@@ -279,6 +279,8 @@ if FileExist(shortcutDesktop) && FileExist(shortcutStartMenu) {
     ; Create installed.txt if missing
     if InStr(A_WorkingDir, "\WinGet\Packages\", false) > 0 && !FileExist(A_WorkingDir "\installed.txt") {
         FileAppend("This directory was created by 'WAU Settings GUI' WinGet installer.", A_WorkingDir "\installed.txt")
+        ; Set installed.txt as hidden and system file
+        FileSetAttrib("+HS", A_WorkingDir "\installed.txt")
     }
 
     ; If installed.txt exists, create UnInst.exe and registry if missing
@@ -321,6 +323,7 @@ if FileExist(shortcutDesktop) && FileExist(shortcutStartMenu) {
             DirCreate(targetDir)
             CopyFilesAndFolders(A_WorkingDir, targetDir)
             FileAppend("This directory was created by 'WAU Settings GUI' local installer.", targetDir "\installed.txt")
+            FileSetAttrib("+HS", targetDir "\installed.txt")
             uninstPath := targetDir "\UnInst.exe"
             FileCopy(targetDir "\" name_no_ext ".exe", uninstPath, 1)
             CreateUninstall(uninstPath, name_no_ext, targetDir)
