@@ -573,6 +573,17 @@ function Get-WAUCurrentConfig {
         if (!$config -or [string]::IsNullOrEmpty($config.ProductVersion)) {
             throw "WAU not found in registry or ProductVersion missing"
         }
+
+        # Check if first start and no shortcut exist
+        $firstRunFile = Join-Path $Script:WorkingDir "firstrun.txt"
+        if (-not $Script:PORTABLE_MODE -and -not (Test-Path $Script:DESKTOP_WAU_SETTINGS) -and -not (Test-Path $firstRunFile)) {
+            Add-Shortcut $Script:DESKTOP_WAU_SETTINGS $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$((Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'))`"" "$Script:GUI_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
+            Set-Content -Path $firstRunFile -Value "WAU Settings GUI first run completed" -Force
+            Start-Process -FilePath $Script:DESKTOP_WAU_SETTINGS
+            exit
+        }
+
+        # Check if UnInst.exe exists
         $uninstPath = Join-Path $Script:WorkingDir "UnInst.exe"
         $wauGuiPath = Join-Path $Script:WorkingDir "$Script:WAU_GUI_NAME.exe"
         if (-not $Script:PORTABLE_MODE -and -not $Script:MainWindowStarted -and -not $FromAHK) {
@@ -1049,10 +1060,13 @@ function Set-WAUConfig {
             }
         }
 
-        # Remove WAU Settings desktop shortcut if Start Menu shortcuts are created
+        # Remove WAU Settings desktop shortcut if Start Menu is created (only if WAU Settings Start menu shortcut exists)
         if ($Settings.ContainsKey('WAU_StartMenuShortcut') -and $Settings['WAU_StartMenuShortcut'] -eq 1) {
-            if (Test-Path $Script:DESKTOP_WAU_SETTINGS) {
-                Remove-Item -Path $Script:DESKTOP_WAU_SETTINGS -Force
+            $startMenuShortcutPath = "$Script:STARTMENU_WAU_DIR\$Script:GUI_TITLE.lnk"
+            if (Test-Path $startMenuShortcutPath) {
+                if (Test-Path $Script:DESKTOP_WAU_SETTINGS) {
+                    Remove-Item -Path $Script:DESKTOP_WAU_SETTINGS -Force
+                }
             }
             
             # Also remove Run WAU desktop shortcut if Start Menu is created and Desktop shortcuts are disabled
@@ -2428,8 +2442,6 @@ function Test-WAULists {
         $excludedFile = Join-Path $installLocation "excluded_apps.txt"
         $includedFile = Join-Path $installLocation "included_apps.txt"
         $defaultExcluded = Join-Path $installLocation "config\default_excluded_apps.txt"
-        $listsDir = Join-Path $Script:WorkingDir "lists"
-        $appsExcluded = Join-Path $listsDir "excluded_apps.txt"
 
         $hasListPath = -not [string]::IsNullOrWhiteSpace($currentListPath)
         $hasAnyListFile = (Test-Path $excludedFile) -or (Test-Path $includedFile)
@@ -2439,62 +2451,59 @@ function Test-WAULists {
             $msg = "No 'External List Path' is set and no list file exists under $installLocation.`n`nDo you want to create a local 'lists' folder with an editable 'excluded_apps.txt' to use?`n`n'default_excluded_apps.txt' will always be overwritten when 'WAU' updates itself!"
             $result = [System.Windows.MessageBox]::Show($msg, "Create lists folder?", "OKCancel", "Question")
             if ($result -eq 'OK') {
-                $listsDir = Join-Path $Script:WorkingDir "lists"
-                
-                # Check if the proposed lists directory would be under user profile/WinGet installation
+                # Ask user for location of 'lists' folder
                 $userProfile = [Environment]::GetFolderPath('UserProfile')
-                $isWinGetInstall = $listsDir -like "*\WinGet\Packages\*"
-                if ($listsDir.StartsWith($userProfile, [StringComparison]::OrdinalIgnoreCase) -or $isWinGetInstall) {
-                    # Lists directory would be under user profile, need to choose alternative location
-                    $folderMsg = "The default location would be under your user profile/WinGet installation which is not recommended.`n`nPlease select a folder where the 'lists' folder should be created (must be outside your user profile/WinGet installation):"
-                    [System.Windows.MessageBox]::Show($folderMsg, "Select Location", "OK", "Information")
-                    
-                    $folderDialog = New-Object System.Windows.Forms.FolderBrowserDialog
-                    $folderDialog.Description = "Select folder where 'lists' folder will be created (must be outside user profile/WinGet installation)"
-                    $folderDialog.ShowNewFolderButton = $true
-                    $folderDialog.SelectedPath = "C:\"
-                    
-                    do {
-                        $dialogResult = $folderDialog.ShowDialog()
-                        if ($dialogResult -eq [System.Windows.Forms.DialogResult]::OK) {
-                            $selectedPath = $folderDialog.SelectedPath
-                    
-                            # Check if the selected folder is under the user profile or WinGet\Packages
-                            $fullSelectedPath = [System.IO.Path]::GetFullPath($selectedPath)
-                            $fullUserProfile = [System.IO.Path]::GetFullPath($userProfile)
-                            # Is the selected path inside the user profile?
-                            $isUnderUserProfile = ($fullSelectedPath.Length -ge $fullUserProfile.Length) -and
-                                ($fullSelectedPath.Substring(0, $fullUserProfile.Length).TrimEnd('\') -ieq $fullUserProfile.TrimEnd('\'))
-                            # Is the selected path inside WinGet\Packages?
-                            $isWinGetInstall = $fullSelectedPath -match '\\WinGet\\Packages\\'
-                    
-                            if ($isUnderUserProfile -or $isWinGetInstall) {
-                                [System.Windows.MessageBox]::Show("Selected folder is under your user profile/WinGet installation. Please choose a different location.", "Invalid Location", "OK", "Warning")
-                                continue
-                            }
-                    
-                            # Check if we have write access to the selected path
-                            try {
-                                $testFile = Join-Path $selectedPath "test_write_access.tmp"
-                                Set-Content -Path $testFile -Value "test" -ErrorAction Stop
-                                Remove-Item -Path $testFile -Force -ErrorAction SilentlyContinue
-                    
-                                # Valid location found
-                                $listsDir = Join-Path $selectedPath "lists"
-                                break
-                            }
-                            catch {
-                                [System.Windows.MessageBox]::Show("No write access to selected folder. Please choose a different location.", "Access Denied", "OK", "Warning")
-                                continue
-                            }
+                $workingDir = $Script:WorkingDir
+
+                $folderMsg = "Please select a folder where the 'lists' folder should be created (must be outside your user profile and WAU installation directory):"
+                [System.Windows.MessageBox]::Show($folderMsg, "Select Location", "OK", "Information")
+
+                $folderDialog = New-Object System.Windows.Forms.FolderBrowserDialog
+                $folderDialog.Description = "Select folder where 'lists' folder will be created (must be outside user profile and WAU installation directory)"
+                $folderDialog.ShowNewFolderButton = $true
+                $folderDialog.SelectedPath = "C:\"
+
+                do {
+                    $dialogResult = $folderDialog.ShowDialog()
+                    if ($dialogResult -eq [System.Windows.Forms.DialogResult]::OK) {
+                        $selectedPath = $folderDialog.SelectedPath
+
+                        # Check if selected folder is under UserProfile or WorkingDir
+                        $fullSelectedPath = [System.IO.Path]::GetFullPath($selectedPath)
+                        $fullUserProfile = [System.IO.Path]::GetFullPath($userProfile)
+                        $fullWorkingDir = [System.IO.Path]::GetFullPath($workingDir)
+
+                        # Is selected path inside user profile?
+                        $isUnderUserProfile = $fullSelectedPath.StartsWith($fullUserProfile, [StringComparison]::OrdinalIgnoreCase)
+                        # Is selected path inside WAU installation directory?
+                        $isUnderWorkingDir = $fullSelectedPath.StartsWith($fullWorkingDir, [StringComparison]::OrdinalIgnoreCase)
+
+                        if ($isUnderUserProfile -or $isUnderWorkingDir) {
+                            [System.Windows.MessageBox]::Show("Selected folder is under your user profile or WAU installation directory. Please choose a different location.", "Invalid Location", "OK", "Warning")
+                            continue
                         }
-                        else {
-                            # User cancelled folder selection
-                            return
+
+                        # Test write access to selected folder
+                        try {
+                            $testFile = Join-Path $selectedPath "test_write_access.tmp"
+                            Set-Content -Path $testFile -Value "test" -ErrorAction Stop
+                            Remove-Item -Path $testFile -Force -ErrorAction SilentlyContinue
+
+                            # Valid location found
+                            $listsDir = Join-Path $selectedPath "lists"
+                            break
                         }
-                    } while ($true)
-                }
-                
+                        catch {
+                            [System.Windows.MessageBox]::Show("No write access to selected folder. Please choose a different location.", "Access Denied", "OK", "Warning")
+                            continue
+                        }
+                    }
+                    else {
+                        # User cancelled folder selection
+                        return
+                    }
+                } while ($true)
+
                 if (-not (Test-Path $listsDir)) {
                     New-Item -Path $listsDir -ItemType Directory | Out-Null
                 }
@@ -2507,7 +2516,7 @@ function Test-WAULists {
                         Set-Content $appsExcluded "# Add apps to exclude, one per line."
                     }
                 }
-        
+
                 # Set WAU_ListPath to the new lists folder
                 Set-ItemProperty -Path $Script:WAU_REGISTRY_PATH -Name "WAU_ListPath" -Value $listsDir -Force
                 # Update the controls to reflect the new path

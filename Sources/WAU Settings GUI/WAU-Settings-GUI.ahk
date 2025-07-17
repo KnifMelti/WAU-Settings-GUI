@@ -42,11 +42,11 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
     silent := (A_Args.Length > 1 && (A_Args[2] = "/S"))
     if !silent {
         choice := MsgBox(
-            "Do you want to uninstall WAU Settings GUI?" . "`n`nChoose Yes to uninstall, No to cancel.",
+            "Do you want to uninstall WAU Settings GUI?`n`nWAU will be automatically reinstalled afterward`nrestoring the original current showing shortcuts.",
             name_no_ext,
-            0x24  ; Yes/No with Question icon
+            0x21  ; OK/Cancel with Question icon
         )
-        if (choice != "Yes") {
+        if (choice != "OK") {
             ExitApp
         }
     }
@@ -155,7 +155,7 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
 
                 ; Uninstall using the found GUID and install from the copied WAU.msi in the Package Cache folder
                 if !silent {
-                    RunWait('msiexec /x' wauGUID ' /qn', , "Hide")
+                    RunWait('msiexec /x' wauGUID ' /qb', , "Hide")
                     RunWait('msiexec /i "' cacheMsiPath '" /qb' msiParams, , "Hide")
                 }                
                 else {
