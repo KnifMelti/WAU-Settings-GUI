@@ -574,11 +574,6 @@ function Get-DisplayValue {
 }
 function Get-WAUCurrentConfig {
     try {
-        $config = Get-ItemProperty -Path $Script:WAU_REGISTRY_PATH -ErrorAction SilentlyContinue
-        if (!$config -or [string]::IsNullOrEmpty($config.ProductVersion)) {
-            throw "WAU not found in registry or ProductVersion missing"
-        }
-
         # Check if UnInst.exe exists or installed/first run file exists
         $installedFile = Join-Path $Script:WorkingDir "installed.txt"
         $firstRunFile = Join-Path $Script:WorkingDir "firstrun.txt"
@@ -593,13 +588,22 @@ function Get-WAUCurrentConfig {
                 Set-Content -Path $firstRunFile -Value "WAU Settings GUI first run completed" -Force
                 Set-Content -Path $installedFile -Value "WAU Settings GUI installed" -Force
                 # Set file attributes to Hidden and System
-                $fileInfo = Get-Item -Path $installedFile
-                $fileInfo.Attributes = 'Hidden','System'
+                try {
+                    $fileInfo = Get-Item -Path $installedFile
+                    $fileInfo.Attributes = 'Hidden,System'
+                } catch {
+                    # Ignore attribute setting errors
+                }
                 Start-Process -FilePath $wauGuiPath -ArgumentList "/FROMPS"
                 exit
                 }
             }
         }
+        $config = Get-ItemProperty -Path $Script:WAU_REGISTRY_PATH -ErrorAction SilentlyContinue
+        if (!$config -or [string]::IsNullOrEmpty($config.ProductVersion)) {
+            throw "WAU not found in registry or ProductVersion missing"
+        }
+
         return $config
     }
     catch {
