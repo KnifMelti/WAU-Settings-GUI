@@ -63,20 +63,23 @@ This will install a **Portable WinGet Package** (with alias: **WAU-Settings-GUI*
   - Select a base directory for the installation or run directly in portable mode
 
 ### Running
-- After installation, you can start **WAU Settings GUI** by running `WAU-Settings-GUI.exe` from the installation directory (or via an ordinary **Command Prompt** using the `PortableCommandAlias` from `WinGet`: **WAU-Settings-GUI**)
-- If **WAU** is not installed, it will prompt to download and install with standard settings (creating a **WAU Settings (Administrator)** shortcut on your own **Desktop**)
-- Toggle the **☐|☑ Start Menu shortcuts** option in the GUI and `Save Settings`
-- Retoggle **☑|☐** and `Save Settings` again (depending on your choice)
-- The **WAU Settings (Administrator)** shortcut has now been created under **Start Menu\Programs\Winget-AutoUpdate** folder (along with the other **WAU** shortcuts) or on your own **Desktop** (pin to taskbar when running maybe?)
+- After installation, **WAU Settings GUI** starts (if installed by `WinGet` you must start it via an ordinary **Command Prompt** using the `PortableCommandAlias` from `WinGet`: **WAU-Settings-GUI**)
+- If **WAU** is not installed, it will prompt to download and install with standard settings
+- If a local list is not found, it will prompt to create a new one
+- In the GUI you now have **☐|☑ Start Menu shortcuts** / **☐|☑ WAU Desktop shortcut** / **☐|☑ App Installer shortcut** options showing the current installed **WAU** configuration
+- Configure every setting to your preferences and `Save Settings`
+- The **WAU Settings (Administrator)** shortcut has now been created under **Start Menu\Programs\Winget-AutoUpdate** folder (along with the other **WAU** shortcuts) or on your own **Desktop** (pin to taskbar when running maybe?) depending on your choice
 - In `config_user.psm1` you can set the `AUTOUPDATE_CHECK` variable to `$true/$false` to enable/disable version autoupdate check once every `AUTOUPDATE_DAYS` and other user-specific settings (i.e. colors)
-- Move `config_user.psm1` to the `modules` folder to enable it
+- Copy/move `config_user.psm1` to the `modules` folder to enable it
 
 ### Updating
 - Dev Tools (F12): Click the button `[ver]`
 - Checks automatically every week as standard (can be managed via `config_user.psm1`)
-- If an update exists, **WAU Settings GUI** will ask if you want to download and manage the update manually; opening the downloaded ***.zip** and the installation folder for you to copy/owerwrite the old files
+- If an update exists, **WAU Settings GUI** will ask if you want to download and install the new version
+- Before installing a backup of the current version will be created in the `ver\backup` folder
+
 - **WAU** will also update in user scope with every new released **WinGet** version of **WAU Settings GUI** 
-  - If you want to play it safe, you can create a **KnifMelti.WAU-Settings-GUI-preinstall.ps1** script in the **WAU** `mods` folder to shut down **WAU Settings GUI** before updating:
+  - If you want to play it safe (not really necessary) you can create a **KnifMelti.WAU-Settings-GUI-preinstall.ps1** script in the **WAU** `mods` folder to shut down **WAU Settings GUI** before updating:
   ```powershell
   Get-Process powershell | Where-Object {$_.MainWindowTitle -like "WAU Settings*"} | Stop-Process -Force
   ```
@@ -89,13 +92,14 @@ This will install a **Portable WinGet Package** (with alias: **WAU-Settings-GUI*
 
 
 ### Uninstallation
-- Use **WinGet CLI** from **Command Prompt** to uninstall:
+- Use **Programs and Features** in **Control Panel** to uninstall **WAU Settings GUI**
+- Uninstall can be done from `CMD` too (`/UNINSTALL` or `/UNINSTALL /S` parameter) using `UnInst.exe` in the **WAU Settings GUI** install folder, e.g.:
   
   ```bash
-  winget uninstall KnifMelti.WAU-Settings-GUI
+  "C:\WAU Settings GUI\UnInst.exe" /UNINSTALL /S
   ```
-- Manually delete the shortcuts from your **Desktop** and/or **Start Menu\Programs\Winget-AutoUpdate** folder
-- Optional: delete the installation directory
+- This will remove even the `WinGet` Portable package from the source, so it will not show up in the `WinGet` list anymore
+- **WAU** will be automatically reinstalled afterward restoring the original current showing shortcuts.
 
 ### Screenshots
 Managed by Registry (local):  
