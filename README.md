@@ -92,7 +92,7 @@ This will install a **Portable WinGet Package** (with alias: **WAU-Settings-GUI*
 
 
 ### Uninstallation
-- Use **Programs and Features** in **Control Panel** to uninstall **WAU Settings GUI**
+- Use **Programs and Features** in **Control Panel** to uninstall **KnifMelti WAU Settings GUI**
 - Uninstall can be done from `CMD` too (`/UNINSTALL` or `/UNINSTALL /S` parameter) using `UnInst.exe` in the **WAU Settings GUI** install folder, e.g.:
   
   ```bash
