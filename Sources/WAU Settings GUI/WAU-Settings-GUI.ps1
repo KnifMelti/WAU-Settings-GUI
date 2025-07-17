@@ -32,9 +32,8 @@ Provides a user-friendly interface to modify every aspect of WAU settings includ
 Must be run as Administrator
 #>
 param(
-    [switch]$Portable,
-    [switch]$FromAHK
-)
+    [switch]$Portable
+ )
 
 # Set portable mode flag
 $Script:PORTABLE_MODE = $Portable.IsPresent
@@ -415,6 +414,12 @@ function Start-WAUGUIUpdate {
                     Copy-Item -Path $_.FullName -Destination $backupDir -Recurse -Force
                 }
                 
+                # Delete UnInst.exe (to be recreated by the new version)
+                $uninstPath = Join-Path $Script:WorkingDir "UnInst.exe"
+                if (Test-Path $uninstPath) {
+                    Remove-Item -Path $uninstPath -Force
+                }
+
                 # Copy new files, preserving existing config and user data
                 $excludePatterns = @("ver", "ver_*", "msi", "cfg")
                 Get-ChildItem -Path $filesToCopy | ForEach-Object {
@@ -505,22 +510,6 @@ function Start-WAUGUIUpdate {
                     }
                 }
                 
-                # If current version is less than or equal to 1.7.9.5, rename config_user.psm1 to .old
-                $currentVer = [Version]$updateInfo.CurrentVersion
-                $thresholdVer = [Version]"1.7.9.5"
-                $configUserModulePath = Join-Path $Script:WorkingDir "modules\config_user.psm1"
-                if ($currentVer -le $thresholdVer) {
-                    if (Test-Path $configUserModulePath) {
-                        Rename-Item -Path $configUserModulePath -NewName "config_user.psm1.old" -Force
-                    }
-                } else {
-                    # Otherwise, delete UnInst.exe
-                    $uninstPath = Join-Path $Script:WorkingDir "UnInst.exe"
-                    if (Test-Path $uninstPath) {
-                        Remove-Item -Path $uninstPath -Force
-                    }
-                }
-
                 Close-PopUp
                 
                 [System.Windows.MessageBox]::Show(
@@ -595,7 +584,7 @@ function Get-WAUCurrentConfig {
         $firstRunFile = Join-Path $Script:WorkingDir "firstrun.txt"
         $uninstPath = Join-Path $Script:WorkingDir "UnInst.exe"
         $wauGuiPath = Join-Path $Script:WorkingDir "$Script:WAU_GUI_NAME.exe"
-        if (-not $Script:PORTABLE_MODE -and -not $Script:MainWindowStarted -and -not $FromAHK) {
+        if (-not $Script:PORTABLE_MODE -and -not $Script:MainWindowStarted) {
             if (-not (Test-Path $firstRunFile) -or -not (Test-Path $installedFile) -or -not (Test-Path $uninstPath) -and (Test-Path $wauGuiPath)) {
                 $currentProcess = Get-Process -Id $PID
                 $isRunningAsPowerShell = $currentProcess.ProcessName -eq "powershell" -or $currentProcess.ProcessName -eq "pwsh"

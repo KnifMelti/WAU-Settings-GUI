@@ -3,8 +3,8 @@
 ;@Ahk2Exe-Set CompanyName, KnifMelti
 ;@Ahk2Exe-Set ProductName, WAU Settings GUI
 ;@Ahk2Exe-Set FileDescription, WAU Settings GUI
-;@Ahk2Exe-Set FileVersion, 1.7.10.0
-;@Ahk2Exe-Set ProductVersion, 1.7.10.0
+;@Ahk2Exe-Set FileVersion, 1.8.0.0
+;@Ahk2Exe-Set ProductVersion, 1.8.0.0
 ;@Ahk2Exe-Set InternalName, WAU-Settings-GUI
 ;@Ahk2Exe-SetMainIcon ..\assets\WAU Settings GUI.ico
 ;@Ahk2Exe-UpdateManifest 1
@@ -34,7 +34,7 @@ shortcutAppInstaller := A_ProgramsCommon "\Winget-AutoUpdate\WAU App Installer.l
 
 psScriptPath := A_WorkingDir "\" name_no_ext ".ps1"
 uninstPath := A_WorkingDir "\UnInst.exe"
-runCommand := 'C:\Windows\System32\conhost.exe --headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' psScriptPath '" -FromAHK'
+runCommand := 'C:\Windows\System32\conhost.exe --headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' psScriptPath '"'
 portableCommand := 'C:\Windows\System32\conhost.exe --headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' psScriptPath '" -Portable'
 
 ; Check if the script was called with '/UNINSTALL' or '/UNINSTALL /S' parameter
