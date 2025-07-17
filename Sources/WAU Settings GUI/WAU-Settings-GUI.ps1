@@ -1564,6 +1564,14 @@ function Uninstall-WAU {
         if ($remainingWAU.Count -ne 0) {
             throw "WAU is still detected as installed after uninstallation."
         }
+        # Remove WAU Start Menu
+        if (Test-Path $Script:STARTMENU_WAU_DIR) {
+            Remove-Item -Path $Script:STARTMENU_WAU_DIR -Recurse -Force
+        }
+        # Create desktop shortcut for WAU Settings GUI if not already present
+        if (-not $Script:PORTABLE_MODE -and -not (Test-Path $Script:DESKTOP_WAU_SETTINGS)) {
+            Add-Shortcut $Script:DESKTOP_WAU_SETTINGS $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$((Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'))`"" "$Script:GUI_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
+        }
         Close-PopUp
         
         [System.Windows.MessageBox]::Show("WAU uninstalled successfully.", "Uninstall Complete", "OK", "Information")
