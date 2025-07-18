@@ -76,7 +76,7 @@ This will install a **Portable WinGet Package** (with alias: **WAU-Settings-GUI*
 - Dev Tools (F12): Click the button `[ver]`
 - Checks automatically every week as standard (can be managed via `config_user.psm1`)
 - If an update exists, **WAU Settings GUI** will ask if you want to download and install the new version
-- Before installing a backup of the current version will be created in the `ver\backup` folder
+- Before installing a backup of the current version will be created in `ver\backup` folder
 
 - **WAU** will also update in user scope with every new released **WinGet** version of **WAU Settings GUI** 
   - If you want to play it safe (not really necessary) you can create a **KnifMelti.WAU-Settings-GUI-preinstall.ps1** script in the **WAU** `mods` folder to shut down **WAU Settings GUI** before updating:
