@@ -1966,8 +1966,8 @@ function Set-ControlsState {
 
     $alwaysEnabledControls = @(
         'ScreenshotButton', 'SaveButton', 'CancelButton', 'RunNowButton', 'OpenLogsButton', 'GUIPng',
-        'DevTaskButton', 'DevRegButton', 'DevGUIDButton', 'DevSysButton', 'DevListButton',
-        'DevMSIButton', 'DevVerButton', 'DevSrcButton', 'VersionLinksTextBlock'
+        'DevGPOButton', 'DevTaskButton', 'DevRegButton', 'DevGUIDButton', 'DevSysButton', 'DevListButton',
+        'DevUsrButton', 'DevMSIButton', 'DevVerButton', 'DevSrcButton', 'VersionLinksTextBlock'
     )
 
     function Get-Children($control) {
@@ -2914,12 +2914,14 @@ function Invoke-SettingsLoad {
 }
 function Set-DevToolsVisibility {
     param($controls, $window)
-    if ($controls.DevTaskButton.Visibility -eq 'Collapsed') {
+    if ($controls.DevGPOButton.Visibility -eq 'Collapsed') {
+        $controls.DevGPOButton.Visibility = 'Visible'
         $controls.DevTaskButton.Visibility = 'Visible'
         $controls.DevRegButton.Visibility = 'Visible'
         $controls.DevGUIDButton.Visibility = 'Visible'
         $controls.DevSysButton.Visibility = 'Visible'
         $controls.DevListButton.Visibility = 'Visible'
+        $controls.DevUsrButton.Visibility = 'Visible'
         $controls.DevMSIButton.Visibility = 'Visible'
         $controls.DevCfgButton.Visibility = 'Visible'
         $controls.DevWAUButton.Visibility = 'Visible'
@@ -2932,11 +2934,13 @@ function Set-DevToolsVisibility {
             $window.Title = "$Script:GUI_TITLE - Dev Tools"
         }
     } else {
+        $controls.DevGPOButton.Visibility = 'Collapsed'
         $controls.DevTaskButton.Visibility = 'Collapsed'
         $controls.DevRegButton.Visibility = 'Collapsed'
         $controls.DevGUIDButton.Visibility = 'Collapsed'
         $controls.DevSysButton.Visibility = 'Collapsed'
         $controls.DevListButton.Visibility = 'Collapsed'
+        $controls.DevUsrButton.Visibility = 'Collapsed'
         $controls.DevMSIButton.Visibility = 'Collapsed'
         $controls.DevCfgButton.Visibility = 'Collapsed'
         $controls.DevWAUButton.Visibility = 'Collapsed'

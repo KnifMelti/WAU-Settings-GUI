@@ -51,6 +51,8 @@
                     
                     <!-- First row of buttons -->
                     <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,1">
+                        <Button x:Name="DevGPOButton" Content="[gpo]" Width="34" Height="20" FontSize="9" Visibility="Collapsed" Margin="0,0,2,0"
+                            ToolTip="open the 'WAU' policies path in registry"/>
                         <Button x:Name="DevTaskButton" Content="[task]" Width="34" Height="20" FontSize="9" Visibility="Collapsed" Margin="0,0,2,0"
                             ToolTip="open the task scheduler"/>
                         <Button x:Name="DevRegButton" Content="[reg]" Width="34" Height="20" FontSize="9" Visibility="Collapsed" Margin="0,0,2,0"
@@ -65,6 +67,8 @@
                     
                     <!-- Second row of buttons -->
                     <StackPanel Grid.Row="1" Orientation="Horizontal">
+                        <Button x:Name="DevUsrButton" Content="[usr]" Width="34" Height="20" FontSize="9" Visibility="Collapsed" Margin="0,0,2,0"
+                            ToolTip="change colors/update schedule for 'WAU Settings GUI'"/>
                         <Button x:Name="DevMSIButton" Content="[msi]" Width="34" Height="20" FontSize="9" Visibility="Collapsed" Margin="0,0,2,0"
                             ToolTip="create a transform file for 'WAU.msi' using current showing configuration"/>
                         <Button x:Name="DevCfgButton" Content="[cfg]" Width="34" Height="20" FontSize="9" Visibility="Collapsed" Margin="0,0,2,0"
