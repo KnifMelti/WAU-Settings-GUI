@@ -111,4 +111,7 @@ Dev Tools (F12):
 Managed by GPO (central/local):  
 ![image](Sources/assets/Screenshot_GPO.png)
 
+Running Portable:  
+![image](Sources/assets/Screenshot_Portable.png)
+
 
