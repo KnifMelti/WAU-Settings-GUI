@@ -557,7 +557,7 @@ function Get-DisplayValue {
     )
     
     # Check if GPO management is active
-    $isGPOManaged = ($Policies.WAU_ActivateGPOManagement -eq 1 -and $Config.WAU_RunGPOManagement -eq 1)
+    $isGPOManaged = ($null -ne $Policies)
     
     # These properties are always editable and taken from local config, even in GPO mode
     $alwaysFromConfig = @('WAU_AppInstallerShortcut', 'WAU_DesktopShortcut', 'WAU_StartMenuShortcut')
@@ -2054,8 +2054,7 @@ function Update-PreReleaseCheckBoxState {
 function Update-GPOManagementState {
     param($controls, $skipPopup = $false)
     
-    # Get updated config and policies
-    $updatedConfig = Get-WAUCurrentConfig
+    # Get updated policies
     $updatedPolicies = $null
     try {
         $updatedPolicies = Get-ItemProperty -Path $Script:WAU_POLICIES_PATH -ErrorAction SilentlyContinue
@@ -2064,11 +2063,8 @@ function Update-GPOManagementState {
         # GPO registry key doesn't exist or can't be read
     }
 
-    $wauActivateGPOManagementEnabled = ($updatedPolicies.WAU_ActivateGPOManagement -eq 1)
-    $wauRunGPOManagementEnabled = ($updatedConfig.WAU_RunGPOManagement -eq 1)
-    
-    # Check if both GPO settings are enabled
-    $gpoControlsActive = $wauActivateGPOManagementEnabled -and $wauRunGPOManagementEnabled
+    #  Check if GPO management is active
+    $gpoControlsActive = ($null -ne $updatedPolicies)
     
     if ($gpoControlsActive) {
          # Show popup only if not skipped (i.e., when window first opens)
@@ -2132,9 +2128,8 @@ function Update-WAUGUIFromConfig {
         # GPO registry key doesn't exist or can't be read
     }
 
-    $wauActivateGPOManagementEnabled = ($updatedPolicies.WAU_ActivateGPOManagement -eq 1)
     $wauGPOListPathEnabled = ($updatedPolicies.WAU_ListPath -eq "GPO")
-    $wauRunGPOManagementEnabled = ($updatedConfig.WAU_RunGPOManagement -eq 1)
+    $gpoControlsActive = ($null -ne $updatedPolicies)
 
     # Update Notification Level
     $notifLevel = Get-DisplayValue -PropertyName "WAU_NotificationLevel" -Config $updatedConfig -Policies $updatedPolicies
@@ -2271,7 +2266,7 @@ function Update-WAUGUIFromConfig {
     }
 
     $Controls.InstallLocationText.Text = "WAU Install Location: $($updatedConfig.InstallLocation) | "
-    if ($wauGPOListPathEnabled -and $wauActivateGPOManagementEnabled) {
+    if ($wauGPOListPathEnabled -and ($null -ne $updatedPolicies)) {
         $Controls.LocalListText.Inlines.Clear()
         $Controls.LocalListText.Inlines.Add("Current Local List: ")
         if ($updatedPolicies.WAU_UseWhiteList -eq 1) {
@@ -2281,11 +2276,11 @@ function Update-WAUGUIFromConfig {
         }   
         $run.Foreground = $Script:COLOR_ENABLED
         $Controls.LocalListText.Inlines.Add($run)
-    }
+    }    
     else {
         try {
             $installdir = $updatedConfig.InstallLocation
-            if ($updatedConfig.WAU_UseWhiteList -eq 1 -or ($updatedPolicies.WAU_UseWhiteList -eq 1 -and $wauActivateGPOManagementEnabled)) {
+            if ($updatedConfig.WAU_UseWhiteList -eq 1 -or ($updatedPolicies.WAU_UseWhiteList -eq 1 -and ($null -ne $updatedPolicies))) {
                 $whiteListFile = Join-Path $installdir 'included_apps.txt'
                 if (Test-Path $whiteListFile) {
                     $Controls.LocalListText.Inlines.Clear()
@@ -2336,15 +2331,13 @@ function Update-WAUGUIFromConfig {
     # Update WAU AutoUpdate status
     $wauAutoUpdateDisabled = [bool](Get-DisplayValue -PropertyName "WAU_DisableAutoUpdate" -Config $updatedConfig -Policies $updatedPolicies)
     $wauPreReleaseEnabled = [bool](Get-DisplayValue -PropertyName "WAU_UpdatePrerelease" -Config $updatedConfig -Policies $updatedPolicies)
-    $wauActivateGPOManagementEnabled = ($updatedPolicies.WAU_ActivateGPOManagement -eq 1)
-    $wauRunGPOManagementEnabled = ($updatedConfig.WAU_RunGPOManagement -eq 1)
+    $gpoManagementEnabled = ($null -ne $updatedPolicies)
 
     # Compose colored status text using Inlines (for TextBlock with Inlines)
     $statusText = @(
-        Get-ColoredStatusText "WAU AutoUpdate" (-not $wauAutoUpdateDisabled)
-        Get-ColoredStatusText "WAU PreRelease" $wauPreReleaseEnabled
-        Get-ColoredStatusText "GPO Management" $wauActivateGPOManagementEnabled
-        Get-ColoredStatusText "Daily GPO Task Status" $wauRunGPOManagementEnabled
+    Get-ColoredStatusText "WAU AutoUpdate" (-not $wauAutoUpdateDisabled)
+    Get-ColoredStatusText "WAU PreRelease" $wauPreReleaseEnabled
+    Get-ColoredStatusText "GPO Management" $gpoManagementEnabled
     ) -join " | "
 
     # Set the Inlines property for colorized text
@@ -2357,10 +2350,8 @@ function Update-WAUGUIFromConfig {
     Update-PreReleaseCheckBoxState -Controls $controls
 
     # Check if we're being called from a save operation by checking if we're in GPO mode
-    $wauActivateGPOManagementEnabled = ($updatedPolicies.WAU_ActivateGPOManagement -eq 1)
-    $wauRunGPOManagementEnabled = ($updatedConfig.WAU_RunGPOManagement -eq 1)
-    $gpoControlsActive = $wauActivateGPOManagementEnabled -and $wauRunGPOManagementEnabled
-    
+    $gpoControlsActive = ($null -ne $updatedPolicies)
+
     # Only show popup when window first opens, not when updating after save
     $skipPopupForInitialLoad = $false
     
@@ -2448,9 +2439,7 @@ function Test-WAULists {
         $updatedPolicies = Get-ItemProperty -Path $Script:WAU_POLICIES_PATH -ErrorAction SilentlyContinue
     } catch {}
 
-    $wauActivateGPOManagementEnabled = ($updatedPolicies.WAU_ActivateGPOManagement -eq 1)
-    $wauRunGPOManagementEnabled = ($updatedConfig.WAU_RunGPOManagement -eq 1)
-    $gpoControlsActive = $wauActivateGPOManagementEnabled -and $wauRunGPOManagementEnabled
+    $gpoControlsActive = ($null -ne $updatedPolicies)
 
     if (-not $gpoControlsActive -and $Script:MainWindowStarted) {
         $currentListPath = (Get-DisplayValue -PropertyName "WAU_ListPath" -Config $updatedConfig)
@@ -2611,7 +2600,7 @@ function Test-SettingsChanged {
         } catch { }
         
         # Check if GPO management is active
-        $isGPOManaged = ($policies.WAU_ActivateGPOManagement -eq 1 -and $currentConfig.WAU_RunGPOManagement -eq 1)
+        $isGPOManaged = ($null -ne $policies)
         
         $changes = @()
         
@@ -2767,7 +2756,6 @@ function Save-WAUSettings {
         }
 
         # Check if settings are controlled by GPO
-        $updatedConfig = Get-WAUCurrentConfig
         $updatedPolicies = $null
         try {
             $updatedPolicies = Get-ItemProperty -Path $Script:WAU_POLICIES_PATH -ErrorAction SilentlyContinue
@@ -2776,10 +2764,7 @@ function Save-WAUSettings {
             # GPO registry key doesn't exist or can't be read
         }
 
-        $wauActivateGPOManagementEnabled = ($updatedPolicies.WAU_ActivateGPOManagement -eq 1)
-        $wauRunGPOManagementEnabled = ($updatedConfig.WAU_RunGPOManagement -eq 1)
-        
-        if ($wauActivateGPOManagementEnabled -and $wauRunGPOManagementEnabled) {
+        if ($null -ne $updatedPolicies) {
             # For GPO mode - show popup immediately without delay
             Start-PopUp "Saving WAU Settings..."
             # Update status to "Saving..."
