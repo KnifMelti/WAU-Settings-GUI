@@ -30,15 +30,17 @@ Configure **WAU** settings after installation, including:
 - GPO management integration
 - Real-time status information display showing version details, last run times, and current configuration state
 - Developer tools for advanced troubleshooting:
+  - Open **WAU** policies path in registry (if GPO Managed)
   - Task scheduler access
   - Registry editor access
   - GUID path exploration
   - WinGet system wide installed application list
   - List file management
+  - Change colors/update schedule for **WAU Settings GUI**
   - MSI transform creation (using current showing configuration)
   - Configuration backup/import (i.e. for sharing settings)
   - Uninstall/install **WAU** (with current showing configuration)
-  - Manual/automatic check for updates (checks automatically every week as standard, can be managed via `config_user.psm1`)
+  - Manual/automatic check for updates (checks automatically every week as standard)
   - Direct access to the **WAU Settings GUI** install folder
 
 NB: Must be run as **Administrator** (exe and shortcuts have the flag set)
@@ -69,12 +71,10 @@ This will install a **Portable WinGet Package** (with alias: **WAU-Settings-GUI*
 - In the GUI you now have **☐|☑ Start Menu shortcuts** / **☐|☑ WAU Desktop shortcut** / **☐|☑ App Installer shortcut** options showing the current installed **WAU** configuration
 - Configure every setting to your preferences and `Save Settings`
 - The **WAU Settings (Administrator)** shortcut has now been created under **Start Menu\Programs\Winget-AutoUpdate** folder (along with the other **WAU** shortcuts) or on your own **Desktop** (pin to taskbar when running maybe?) depending on your choice
-- In `config_user.psm1` you can set the `AUTOUPDATE_CHECK` variable to `$true/$false` to enable/disable version autoupdate check once every `AUTOUPDATE_DAYS` and other user-specific settings (i.e. colors)
-- Copy/move `config_user.psm1` to the `modules` folder to enable it
 
 ### Updating
 - Dev Tools (F12): Click the button `[ver]`
-- Checks automatically every week as standard (can be managed via `config_user.psm1`)
+- Checks automatically every week as standard
 - If an update exists, **WAU Settings GUI** will ask if you want to download and install the new version
 - Before installing a backup of the current version will be created in `ver\backup` folder
 
@@ -110,8 +110,3 @@ Dev Tools (F12):
 
 Managed by GPO (central/local):  
 ![image](Sources/assets/Screenshot_GPO.png)
-
-Portable Mode:  
-![image](Sources/assets/Screenshot_Portable.png)
-
-

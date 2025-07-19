@@ -436,7 +436,7 @@ function Start-WAUGUIUpdate {
                                 }
                                 Get-ChildItem -Path $_.FullName | ForEach-Object {
                                     $configFile = Join-Path $destinationPath $_.Name
-                                    if (-not (Test-Path $configFile) -or $_.Name -eq "version.txt") {
+                                    if (-not (Test-Path $configFile)) {
                                         Copy-Item -Path $_.FullName -Destination $configFile -Force
                                     }
                                 }
@@ -589,6 +589,8 @@ function Get-WAUCurrentConfig {
                 Set-Content -Path $installedFile -Value "WAU Settings GUI installed" -Force
                 # Set file attributes to Hidden and System
                 try {
+                    $fileInfo = Get-Item -Path $firstRunFile
+                    $fileInfo.Attributes = 'Hidden,System'
                     $fileInfo = Get-Item -Path $installedFile
                     $fileInfo.Attributes = 'Hidden,System'
                 } catch {
@@ -1011,7 +1013,12 @@ function Set-WAUConfig {
                         New-Item -Path $Script:STARTMENU_WAU_DIR -ItemType Directory | Out-Null
                     }
                     Add-Shortcut "$Script:STARTMENU_WAU_DIR\Run WAU.lnk" $Script:CONHOST_EXE "$($currentConfig.InstallLocation)" "$Script:POWERSHELL_ARGS `"$($currentConfig.InstallLocation)$Script:USER_RUN_SCRIPT`"" "$Script:WAU_ICON" "Run Winget AutoUpdate" "Normal"
-                    Add-Shortcut "$Script:STARTMENU_WAU_DIR\Open Logs.lnk" "$($currentConfig.InstallLocation)logs" "" "" "" "Open WAU Logs" "Normal"
+                    # Ensure logs directory exists before creating shortcut
+                    $logsDir = Join-Path $currentConfig.InstallLocation "logs"
+                    if (-not (Test-Path $logsDir)) {
+                        New-Item -Path $logsDir -ItemType Directory -Force | Out-Null
+                    }
+                    Add-Shortcut "$Script:STARTMENU_WAU_DIR\Open Logs.lnk" $logsDir "" "" "" "Open WAU Logs" "Normal"
                     Add-Shortcut "$Script:STARTMENU_WAU_DIR\WAU App Installer.lnk" $Script:CONHOST_EXE "$($currentConfig.InstallLocation)" "$Script:POWERSHELL_ARGS `"$($currentConfig.InstallLocation)WAU-Installer-GUI.ps1`"" "$Script:WAU_ICON" "Search for and Install WinGet Apps, etc..." "Normal"
                     if (-not $Script:PORTABLE_MODE) {
                         Add-Shortcut "$Script:STARTMENU_WAU_DIR\$Script:GUI_TITLE.lnk" $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$((Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'))`"" "$Script:GUI_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
@@ -1966,8 +1973,8 @@ function Set-ControlsState {
 
     $alwaysEnabledControls = @(
         'ScreenshotButton', 'SaveButton', 'CancelButton', 'RunNowButton', 'OpenLogsButton', 'GUIPng',
-        'DevTaskButton', 'DevRegButton', 'DevGUIDButton', 'DevSysButton', 'DevListButton',
-        'DevMSIButton', 'DevVerButton', 'DevSrcButton', 'VersionLinksTextBlock'
+        'DevGPOButton', 'DevTaskButton', 'DevRegButton', 'DevGUIDButton', 'DevSysButton', 'DevListButton',
+        'DevUsrButton', 'DevMSIButton', 'DevVerButton', 'DevSrcButton', 'VersionLinksTextBlock'
     )
 
     function Get-Children($control) {
@@ -2087,10 +2094,16 @@ function Update-GPOManagementState {
         # Disable all except Shortcut controls
         Set-ControlsState -parentControl $window -enabled $false -excludePattern "*Shortcut*"
 
+        # Enable DevGPOButton when GPO is active
+        $controls.DevGPOButton.IsEnabled = $true
+
     } else {
         # Enable all controls
         Set-ControlsState -parentControl $window -enabled $true
-        
+
+        # Disable DevGPOButton when GPO is not active
+        $controls.DevGPOButton.IsEnabled = $false
+
         # Reset status bar if it was showing GPO message
         if ($controls.StatusBarText.Text -eq "Managed by GPO") {
             $controls.StatusBarText.Text = $Script:STATUS_READY_TEXT
@@ -2115,6 +2128,7 @@ function Update-GPOManagementState {
     
     return $gpoControlsActive
 }
+
 function Update-WAUGUIFromConfig {
     param($controls)
     
@@ -2378,6 +2392,21 @@ function Update-WAUGUIFromConfig {
             if (-not $Script:AUTOUPDATE_CHECK) {
                 return
             }
+
+            # Add a grace period after first run (e.g., 1 hour) before checking for updates
+            $gracePeriodHours = 1
+            if (Test-Path $firstRunFile) {
+                try {
+                    $firstRunInfo = Get-Item $firstRunFile
+                    $timeSinceFirstRun = (Get-Date) - $firstRunInfo.CreationTime
+                    if ($timeSinceFirstRun.TotalHours -lt $gracePeriodHours) {
+                        return
+                    }
+                }
+                catch {
+                    # If we can't read first run time, proceed with normal check
+                }
+            }
             
             # Check if we've already checked for updates within the configured interval
             $timestampFile = Join-Path $Script:WorkingDir "config\last_update_check.txt"
@@ -2406,9 +2435,12 @@ function Update-WAUGUIFromConfig {
             if ($shouldCheck) {
                 $updateInfo = Test-WAUGUIUpdate
                 if ($updateInfo.UpdateAvailable -and -not $updateInfo.Error) {
-                    $controls.StatusBarText.Text = "GUI update available!"
-                    $controls.StatusBarText.Foreground = $Script:COLOR_ACTIVE
-                    Start-WAUGUIUpdate -updateInfo $updateInfo
+                    # Only show update notification if no other popups are currently active
+                    if ($null -eq $Script:PopUpWindow) {
+                        $controls.StatusBarText.Text = "GUI update available!"
+                        $controls.StatusBarText.Foreground = $Script:COLOR_ACTIVE
+                        Start-WAUGUIUpdate -updateInfo $updateInfo
+                    }
                 }
                 
                 # Save today's date to timestamp file
@@ -2914,12 +2946,14 @@ function Invoke-SettingsLoad {
 }
 function Set-DevToolsVisibility {
     param($controls, $window)
-    if ($controls.DevTaskButton.Visibility -eq 'Collapsed') {
+    if ($controls.DevGPOButton.Visibility -eq 'Collapsed') {
+        $controls.DevGPOButton.Visibility = 'Visible'
         $controls.DevTaskButton.Visibility = 'Visible'
         $controls.DevRegButton.Visibility = 'Visible'
         $controls.DevGUIDButton.Visibility = 'Visible'
         $controls.DevSysButton.Visibility = 'Visible'
         $controls.DevListButton.Visibility = 'Visible'
+        $controls.DevUsrButton.Visibility = 'Visible'
         $controls.DevMSIButton.Visibility = 'Visible'
         $controls.DevCfgButton.Visibility = 'Visible'
         $controls.DevWAUButton.Visibility = 'Visible'
@@ -2932,11 +2966,13 @@ function Set-DevToolsVisibility {
             $window.Title = "$Script:GUI_TITLE - Dev Tools"
         }
     } else {
+        $controls.DevGPOButton.Visibility = 'Collapsed'
         $controls.DevTaskButton.Visibility = 'Collapsed'
         $controls.DevRegButton.Visibility = 'Collapsed'
         $controls.DevGUIDButton.Visibility = 'Collapsed'
         $controls.DevSysButton.Visibility = 'Collapsed'
         $controls.DevListButton.Visibility = 'Collapsed'
+        $controls.DevUsrButton.Visibility = 'Collapsed'
         $controls.DevMSIButton.Visibility = 'Collapsed'
         $controls.DevCfgButton.Visibility = 'Collapsed'
         $controls.DevWAUButton.Visibility = 'Collapsed'
@@ -3183,6 +3219,36 @@ function Show-WAUSettingsGUI {
         Set-DevToolsVisibility -controls $controls -window $window
     })
 
+    $controls.DevGPOButton.Add_Click({
+        try {
+            Start-PopUp "WAU Policies registry opening..."
+            # Open Registry Editor and navigate to WAU Policies registry key
+            $regPath = $Script:WAU_POLICIES_PATH.Replace('HKLM:', 'HKEY_LOCAL_MACHINE')
+            
+            # Set the LastKey registry value to navigate to the desired location
+            Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Applets\Regedit" -Name "LastKey" -Value $regPath -Force
+            
+            # Open Registry Editor (it will open at the last key location)
+            Start-Process "regedit.exe"
+
+            # Update status to "Done"
+            $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
+            $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED
+            
+            # Create timer to reset status back to ready after standard wait time
+            $window.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Background, [Action]{
+                Start-Sleep -Milliseconds $Script:WAIT_TIME
+                $controls.StatusBarText.Text = "$Script:STATUS_READY_TEXT"
+                $controls.StatusBarText.Foreground = "$Script:COLOR_INACTIVE"
+                Close-PopUp
+            }) | Out-Null
+        }
+        catch {
+            Close-PopUp
+            [System.Windows.MessageBox]::Show("Failed to open Task Scheduler: $($_.Exception.Message)", "Error", "OK", "Error")
+        }
+    })
+
     $controls.DevTaskButton.Add_Click({
         try {
             Start-PopUp "Task scheduler opening, look in WAU folder..."
@@ -3212,7 +3278,7 @@ function Show-WAUSettingsGUI {
         try {
             Start-PopUp "WAU registry opening..."
             # Open Registry Editor and navigate to WAU registry key
-            $regPath = "HKEY_LOCAL_MACHINE\SOFTWARE\Romanitho\Winget-AutoUpdate"
+            $regPath = $Script:WAU_REGISTRY_PATH.Replace('HKLM:', 'HKEY_LOCAL_MACHINE')
             
             # Set the LastKey registry value to navigate to the desired location
             Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Applets\Regedit" -Name "LastKey" -Value $regPath -Force
@@ -3394,6 +3460,56 @@ function Show-WAUSettingsGUI {
         catch {
             Close-PopUp
             [System.Windows.MessageBox]::Show("Failed to open List: $($_.Exception.Message)", "Error", "OK", "Error")
+        }
+    })
+
+    $controls.DevUsrButton.Add_Click({
+        try {
+            $modulesPath = Join-Path $Script:WorkingDir "modules"
+            $configUserModulePath = Join-Path $modulesPath "config_user.psm1"
+            $workingDirConfigUserPath = Join-Path $Script:WorkingDir "config_user.psm1"
+            
+            # Check if config_user.psm1 exists in modules folder
+            if (Test-Path $configUserModulePath) {
+                Start-PopUp "'config_user.psm1' opening from modules folder..."
+                Start-Process "explorer.exe" -ArgumentList $configUserModulePath
+            }
+            # If not in modules, check if it exists in working directory
+            elseif (Test-Path $workingDirConfigUserPath) {
+                Start-PopUp "Copying 'config_user.psm1' to modules folder and opening..."
+                
+                # Ensure modules directory exists
+                if (-not (Test-Path $modulesPath)) {
+                    New-Item -ItemType Directory -Path $modulesPath -Force | Out-Null
+                }
+                
+                # Copy from working directory to modules
+                Copy-Item -Path $workingDirConfigUserPath -Destination $configUserModulePath -Force
+                
+                # Open the copied file
+                Start-Process "explorer.exe" -ArgumentList $configUserModulePath
+            }
+            else {
+                Close-PopUp
+                [System.Windows.MessageBox]::Show("'config_user.psm1' not found in either working directory or modules folder.", "File Not Found", "OK", "Warning")
+                return
+            }
+    
+            # Update status to "Done"
+            $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
+            $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED
+            
+            # Create timer to reset status back to ready after standard wait time
+            $window.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Background, [Action]{
+                Start-Sleep -Milliseconds $Script:WAIT_TIME
+                $controls.StatusBarText.Text = "$Script:STATUS_READY_TEXT"
+                $controls.StatusBarText.Foreground = "$Script:COLOR_INACTIVE"
+                Close-PopUp
+            }) | Out-Null
+        }
+        catch {
+            Close-PopUp
+            [System.Windows.MessageBox]::Show("Failed to handle 'config_user.psm1': $($_.Exception.Message)", "Error", "OK", "Error")
         }
     })
 
@@ -3782,10 +3898,16 @@ if (Test-Path $xamlConfigPath) {
 #Pop "Starting..."
 Start-PopUp "Gathering WAU Data..."
 
-# Version information
-$versionFile = Join-Path $Script:WorkingDir "\config\version.txt"
-if (Test-Path $versionFile) {
-    $Script:WAU_GUI_VERSION = (Get-Content $versionFile -Raw).Trim()
+# Version information (remove old config\version.txt if it exists)
+$oldVersionFile = Join-Path $Script:WorkingDir "config\version.txt"
+if (Test-Path $oldVersionFile) {
+    Remove-Item $oldVersionFile -Force -ErrorAction SilentlyContinue
+}
+
+$exePath = Join-Path $Script:WorkingDir "$Script:WAU_GUI_NAME.exe"
+if (Test-Path $exePath) {
+    $fileVersionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($exePath)
+    $Script:WAU_GUI_VERSION = $fileVersionInfo.ProductVersion
 } else {
     $Script:WAU_GUI_VERSION = "Unknown"
 }
