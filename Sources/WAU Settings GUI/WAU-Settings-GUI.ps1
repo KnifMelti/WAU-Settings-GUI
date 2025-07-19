@@ -436,7 +436,7 @@ function Start-WAUGUIUpdate {
                                 }
                                 Get-ChildItem -Path $_.FullName | ForEach-Object {
                                     $configFile = Join-Path $destinationPath $_.Name
-                                    if (-not (Test-Path $configFile) -or $_.Name -eq "version.txt") {
+                                    if (-not (Test-Path $configFile)) {
                                         Copy-Item -Path $_.FullName -Destination $configFile -Force
                                     }
                                 }
@@ -2392,16 +2392,9 @@ function Update-WAUGUIFromConfig {
             if (-not $Script:AUTOUPDATE_CHECK) {
                 return
             }
-            
-            # Skip update check on first run to avoid interference with initial setup dialogs
-            $firstRunFile = Join-Path $Script:WorkingDir "firstrun.txt"
-            $installedFile = Join-Path $Script:WorkingDir "installed.txt"
-            if (-not (Test-Path $firstRunFile) -or -not (Test-Path $installedFile)) {
-                return
-            }
-            
-            # Add a grace period after first run (e.g., 24 hours) before checking for updates
-            $gracePeriodHours = 24
+
+            # Add a grace period after first run (e.g., 1 hour) before checking for updates
+            $gracePeriodHours = 1
             if (Test-Path $firstRunFile) {
                 try {
                     $firstRunInfo = Get-Item $firstRunFile
@@ -2440,9 +2433,6 @@ function Update-WAUGUIFromConfig {
             }
             
             if ($shouldCheck) {
-                # Add additional delay to ensure main window is fully loaded and stable
-                Start-Sleep -Milliseconds ($Script:WAIT_TIME * 2)
-                
                 $updateInfo = Test-WAUGUIUpdate
                 if ($updateInfo.UpdateAvailable -and -not $updateInfo.Error) {
                     # Only show update notification if no other popups are currently active
@@ -3908,10 +3898,16 @@ if (Test-Path $xamlConfigPath) {
 #Pop "Starting..."
 Start-PopUp "Gathering WAU Data..."
 
-# Version information
-$versionFile = Join-Path $Script:WorkingDir "\config\version.txt"
-if (Test-Path $versionFile) {
-    $Script:WAU_GUI_VERSION = (Get-Content $versionFile -Raw).Trim()
+# Version information (remove old config\version.txt if it exists)
+$oldVersionFile = Join-Path $Script:WorkingDir "config\version.txt"
+if (Test-Path $oldVersionFile) {
+    Remove-Item $oldVersionFile -Force -ErrorAction SilentlyContinue
+}
+
+$exePath = Join-Path $Script:WorkingDir "$Script:WAU_GUI_NAME.exe"
+if (Test-Path $exePath) {
+    $fileVersionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($exePath)
+    $Script:WAU_GUI_VERSION = $fileVersionInfo.ProductVersion
 } else {
     $Script:WAU_GUI_VERSION = "Unknown"
 }
