@@ -589,6 +589,8 @@ function Get-WAUCurrentConfig {
                 Set-Content -Path $installedFile -Value "WAU Settings GUI installed" -Force
                 # Set file attributes to Hidden and System
                 try {
+                    $fileInfo = Get-Item -Path $firstRunFile
+                    $fileInfo.Attributes = 'Hidden,System'
                     $fileInfo = Get-Item -Path $installedFile
                     $fileInfo.Attributes = 'Hidden,System'
                 } catch {
@@ -2087,10 +2089,16 @@ function Update-GPOManagementState {
         # Disable all except Shortcut controls
         Set-ControlsState -parentControl $window -enabled $false -excludePattern "*Shortcut*"
 
+        # Enable DevGPOButton when GPO is active
+        $controls.DevGPOButton.IsEnabled = $true
+
     } else {
         # Enable all controls
         Set-ControlsState -parentControl $window -enabled $true
-        
+
+        # Disable DevGPOButton when GPO is not active
+        $controls.DevGPOButton.IsEnabled = $false
+
         # Reset status bar if it was showing GPO message
         if ($controls.StatusBarText.Text -eq "Managed by GPO") {
             $controls.StatusBarText.Text = $Script:STATUS_READY_TEXT
@@ -2115,6 +2123,7 @@ function Update-GPOManagementState {
     
     return $gpoControlsActive
 }
+
 function Update-WAUGUIFromConfig {
     param($controls)
     
@@ -3187,6 +3196,36 @@ function Show-WAUSettingsGUI {
         Set-DevToolsVisibility -controls $controls -window $window
     })
 
+    $controls.DevGPOButton.Add_Click({
+        try {
+            Start-PopUp "WAU Policies registry opening..."
+            # Open Registry Editor and navigate to WAU Policies registry key
+            $regPath = $Script:WAU_POLICIES_PATH.Replace('HKLM:', 'HKEY_LOCAL_MACHINE')
+            
+            # Set the LastKey registry value to navigate to the desired location
+            Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Applets\Regedit" -Name "LastKey" -Value $regPath -Force
+            
+            # Open Registry Editor (it will open at the last key location)
+            Start-Process "regedit.exe"
+
+            # Update status to "Done"
+            $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
+            $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED
+            
+            # Create timer to reset status back to ready after standard wait time
+            $window.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Background, [Action]{
+                Start-Sleep -Milliseconds $Script:WAIT_TIME
+                $controls.StatusBarText.Text = "$Script:STATUS_READY_TEXT"
+                $controls.StatusBarText.Foreground = "$Script:COLOR_INACTIVE"
+                Close-PopUp
+            }) | Out-Null
+        }
+        catch {
+            Close-PopUp
+            [System.Windows.MessageBox]::Show("Failed to open Task Scheduler: $($_.Exception.Message)", "Error", "OK", "Error")
+        }
+    })
+
     $controls.DevTaskButton.Add_Click({
         try {
             Start-PopUp "Task scheduler opening, look in WAU folder..."
@@ -3216,7 +3255,7 @@ function Show-WAUSettingsGUI {
         try {
             Start-PopUp "WAU registry opening..."
             # Open Registry Editor and navigate to WAU registry key
-            $regPath = "HKEY_LOCAL_MACHINE\SOFTWARE\Romanitho\Winget-AutoUpdate"
+            $regPath = $Script:WAU_REGISTRY_PATH.Replace('HKLM:', 'HKEY_LOCAL_MACHINE')
             
             # Set the LastKey registry value to navigate to the desired location
             Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Applets\Regedit" -Name "LastKey" -Value $regPath -Force
