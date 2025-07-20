@@ -434,12 +434,6 @@ function Start-WAUGUIUpdate {
                     }
                 }
                 
-                # Remove old config\version.txt if it exists
-                $oldVersionFile = Join-Path $Script:WorkingDir "config\version.txt"
-                if (Test-Path $oldVersionFile) {
-                    Remove-Item $oldVersionFile -Force -ErrorAction SilentlyContinue
-                }
-
                 # Create zip backup of the backup directory
                 try {
                     $backupZipDir = Join-Path $downloadDir "backup"
@@ -3874,6 +3868,12 @@ if (Test-Path $xamlConfigPath) {
 
 #Pop "Starting..."
 Start-PopUp "Gathering WAU Data..."
+
+# Remove old config\version.txt if it exists
+$oldVersionFile = Join-Path $Script:WorkingDir "config\version.txt"
+if (Test-Path $oldVersionFile) {
+    Remove-Item $oldVersionFile -Force -ErrorAction SilentlyContinue
+}
 
 # Version information
 $exePath = Join-Path $Script:WorkingDir "$Script:WAU_GUI_NAME.exe"
