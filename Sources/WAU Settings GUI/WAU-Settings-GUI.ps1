@@ -3894,48 +3894,6 @@ if (Test-Path $exePath) {
     $Script:WAU_GUI_VERSION = "Unknown"
 }
 
-# Old upgrade fix: if the version is 1.8.1.0, extract the settings-window.xaml from the ZIP file
-if ($Script:WAU_GUI_VERSION -eq "1.8.1.0") {
-    try {
-        $zipFilePath = Join-Path $Script:WorkingDir "ver\WAU-Settings-GUI-v1.8.1.0.zip"
-        $targetXamlPath = Join-Path $Script:WorkingDir "config\settings-window.xaml"
-        
-        if (Test-Path $zipFilePath) {
-            # Load compression assembly
-            Add-Type -AssemblyName System.IO.Compression.FileSystem
-            
-            # Open ZIP file
-            $zip = [System.IO.Compression.ZipFile]::OpenRead($zipFilePath)
-            
-            # Find the settings-window.xaml entry in the ZIP
-            $xamlEntry = $zip.Entries | Where-Object { 
-                $_.FullName -like "*config/settings-window.xaml" -or 
-                $_.FullName -like "*config\settings-window.xaml" 
-            } | Select-Object -First 1
-            
-            if ($xamlEntry) {
-                # Ensure config directory exists
-                $configDir = Join-Path $Script:WorkingDir "config"
-                if (-not (Test-Path $configDir)) {
-                    New-Item -ItemType Directory -Path $configDir -Force | Out-Null
-                }
-                
-                # Extract the file
-                [System.IO.Compression.ZipFileExtensions]::ExtractToFile($xamlEntry, $targetXamlPath, $true)
-                Write-Host "Extracted settings-window.xaml from ZIP for version 1.8.1.0"
-            }
-            
-            # Close ZIP file
-            $zip.Dispose()
-        } else {
-            Write-Warning "ZIP file not found: $zipFilePath"
-        }
-    }
-    catch {
-        Write-Warning "Failed to extract settings-window.xaml: $($_.Exception.Message)"
-    }
-}
-
 # Load Window XAML from config file and store as constant
 $xamlConfigPath = Join-Path $Script:WorkingDir "config\settings-window.xaml"
 $guiPngPath = Join-Path $Script:WorkingDir "config\WAU Settings GUI.png"
