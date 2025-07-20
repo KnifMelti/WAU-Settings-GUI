@@ -409,7 +409,7 @@ function Start-WAUGUIUpdate {
                     New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
                 }
                 
-                # Backup current files (exclude ver and backup folders)
+                # Backup current files (exclude created directories)
                 Get-ChildItem -Path $Script:WorkingDir -Exclude "ver", "ver_*", "msi", "cfg" | ForEach-Object {
                     Copy-Item -Path $_.FullName -Destination $backupDir -Recurse -Force
                 }
@@ -420,46 +420,26 @@ function Start-WAUGUIUpdate {
                     Remove-Item -Path $uninstPath -Force
                 }
 
-                # Copy new files, preserving existing config and user data
-                $excludePatterns = @("ver", "ver_*", "msi", "cfg")
+                # Copy new files, overwriting all existing files without exceptions
                 Get-ChildItem -Path $filesToCopy | ForEach-Object {
                     $relativePath = $_.Name
                     $destinationPath = Join-Path $Script:WorkingDir $relativePath
-
-                    if ($relativePath -notin $excludePatterns) {
-                        if ($_.PSIsContainer) {
-                            # For directories, copy recursively but preserve user data
-                            if ($relativePath -eq "config") {
-                                # For config directory, only copy new files, don't overwrite existing user configs
-                                if (-not (Test-Path $destinationPath)) {
-                                    New-Item -ItemType Directory -Path $destinationPath -Force | Out-Null
-                                }
-                                Get-ChildItem -Path $_.FullName | ForEach-Object {
-                                    $configFile = Join-Path $destinationPath $_.Name
-                                    if (-not (Test-Path $configFile)) {
-                                        Copy-Item -Path $_.FullName -Destination $configFile -Force
-                                    }
-                                }
-                            } elseif ($relativePath -eq "modules") {
-                                # Only copy files from source modules folder to destination modules folder, do not create modules\modules
-                                $modulesDest = Join-Path $Script:WorkingDir "modules"
-                                if (-not (Test-Path $modulesDest)) {
-                                    New-Item -ItemType Directory -Path $modulesDest -Force | Out-Null
-                                }
-                                Get-ChildItem -Path $_.FullName | ForEach-Object {
-                                    $moduleFile = Join-Path $modulesDest $_.Name
-                                    Copy-Item -Path $_.FullName -Destination $moduleFile -Force
-                                }
-                            } else {
-                                Copy-Item -Path $_.FullName -Destination $destinationPath -Recurse -Force
-                            }
-                        } else {
-                            # For files, copy directly
-                            Copy-Item -Path $_.FullName -Destination $destinationPath -Force
-                        }
+                
+                    if ($_.PSIsContainer) {
+                        # For directories, copy recursively and overwrite everything
+                        Copy-Item -Path $_.FullName -Destination $destinationPath -Recurse -Force
+                    } else {
+                        # For files, copy directly and overwrite
+                        Copy-Item -Path $_.FullName -Destination $destinationPath -Force
                     }
                 }
                 
+                # Remove old config\version.txt if it exists
+                $oldVersionFile = Join-Path $Script:WorkingDir "config\version.txt"
+                if (Test-Path $oldVersionFile) {
+                    Remove-Item $oldVersionFile -Force -ErrorAction SilentlyContinue
+                }
+
                 # Create zip backup of the backup directory
                 try {
                     $backupZipDir = Join-Path $downloadDir "backup"
@@ -525,9 +505,7 @@ function Start-WAUGUIUpdate {
                 } else {
                     Start-Process -FilePath "powershell.exe" -ArgumentList "-File `"$(Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1')`" -Portable"
                 }
-                
-                # Close current instance
-                Close-WindowGracefully -controls $controls -window $window
+                exit
                 
             } catch {
                 Close-PopUp
@@ -2435,10 +2413,9 @@ function Update-WAUGUIFromConfig {
             if ($shouldCheck) {
                 $updateInfo = Test-WAUGUIUpdate
                 if ($updateInfo.UpdateAvailable -and -not $updateInfo.Error) {
-                    # Only show update notification if no other popups are currently active
-                    if ($null -eq $Script:PopUpWindow) {
-                        $controls.StatusBarText.Text = "GUI update available!"
-                        $controls.StatusBarText.Foreground = $Script:COLOR_ACTIVE
+                    $message = "Update available!`n`nCurrent version: $($updateInfo.CurrentVersion)`nLatest version: $($updateInfo.LatestVersion)`nRelease notes:`n$($updateInfo.ReleaseNotes -split "`n" | Where-Object { $_ -match '^(?:\*|-)[^*-]' })`n`nDo you want to download the update?"
+                    $result = [System.Windows.MessageBox]::Show($message, "Update Available", "OkCancel", "Question")
+                    if ($result -eq 'Ok') {
                         Start-WAUGUIUpdate -updateInfo $updateInfo
                     }
                 }
@@ -3898,18 +3875,55 @@ if (Test-Path $xamlConfigPath) {
 #Pop "Starting..."
 Start-PopUp "Gathering WAU Data..."
 
-# Version information (remove old config\version.txt if it exists)
-$oldVersionFile = Join-Path $Script:WorkingDir "config\version.txt"
-if (Test-Path $oldVersionFile) {
-    Remove-Item $oldVersionFile -Force -ErrorAction SilentlyContinue
-}
-
+# Version information
 $exePath = Join-Path $Script:WorkingDir "$Script:WAU_GUI_NAME.exe"
 if (Test-Path $exePath) {
     $fileVersionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($exePath)
     $Script:WAU_GUI_VERSION = $fileVersionInfo.ProductVersion
 } else {
     $Script:WAU_GUI_VERSION = "Unknown"
+}
+
+# Old upgrade fix: if the version is 1.8.1.0, extract the settings-window.xaml from the ZIP file
+if ($Script:WAU_GUI_VERSION -eq "1.8.1.0") {
+    try {
+        $zipFilePath = Join-Path $Script:WorkingDir "ver\WAU-Settings-GUI-v1.8.1.0.zip"
+        $targetXamlPath = Join-Path $Script:WorkingDir "config\settings-window.xaml"
+        
+        if (Test-Path $zipFilePath) {
+            # Load compression assembly
+            Add-Type -AssemblyName System.IO.Compression.FileSystem
+            
+            # Open ZIP file
+            $zip = [System.IO.Compression.ZipFile]::OpenRead($zipFilePath)
+            
+            # Find the settings-window.xaml entry in the ZIP
+            $xamlEntry = $zip.Entries | Where-Object { 
+                $_.FullName -like "*config/settings-window.xaml" -or 
+                $_.FullName -like "*config\settings-window.xaml" 
+            } | Select-Object -First 1
+            
+            if ($xamlEntry) {
+                # Ensure config directory exists
+                $configDir = Join-Path $Script:WorkingDir "config"
+                if (-not (Test-Path $configDir)) {
+                    New-Item -ItemType Directory -Path $configDir -Force | Out-Null
+                }
+                
+                # Extract the file
+                [System.IO.Compression.ZipFileExtensions]::ExtractToFile($xamlEntry, $targetXamlPath, $true)
+                Write-Host "Extracted settings-window.xaml from ZIP for version 1.8.1.0"
+            }
+            
+            # Close ZIP file
+            $zip.Dispose()
+        } else {
+            Write-Warning "ZIP file not found: $zipFilePath"
+        }
+    }
+    catch {
+        Write-Warning "Failed to extract settings-window.xaml: $($_.Exception.Message)"
+    }
 }
 
 # Load Window XAML from config file and store as constant
