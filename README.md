@@ -29,7 +29,7 @@ Configure **WAU** settings after installation, including:
 - Screenshot with masking functionality for documentation
 - GPO management integration
 - Real-time status information display showing version details, last run times, and current configuration state
-- Developer tools for advanced troubleshooting:
+- Dev Tools for advanced troubleshooting:
   - Open **WAU** policies path in registry (if GPO Managed)
   - Task scheduler access
   - Registry editor access
@@ -74,7 +74,7 @@ This will install a **Portable WinGet Package** (with alias: **WAU-Settings-GUI*
 
 ### Updating
 - Dev Tools (F12): Click the button `[ver]`
-- Checks automatically every week as standard
+- Checks automatically every week as standard (click the button `[usr]` under Dev Tools to change the update schedule)
 - If an update exists, **WAU Settings GUI** will ask if you want to download and install the new version
 - Before installing a backup of the current version will be created in `ver\backup` folder
 
