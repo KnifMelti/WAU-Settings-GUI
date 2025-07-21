@@ -3885,13 +3885,55 @@ if (Test-Path $oldVersionFile) {
     Remove-Item $oldVersionFile -Force -ErrorAction SilentlyContinue
 }
 
-# Version information
+# Version information, takes care of if upgraded from external (WinGet/WAU)
 $exePath = Join-Path $Script:WorkingDir "$Script:WAU_GUI_NAME.exe"
+$uninstPath = Join-Path $Script:WorkingDir "UnInst.exe"
+
 if (Test-Path $exePath) {
-    $fileVersionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($exePath)
-    $Script:WAU_GUI_VERSION = $fileVersionInfo.ProductVersion
+    try {
+        $fileVersionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($exePath)
+        $Script:WAU_GUI_VERSION = $fileVersionInfo.ProductVersion
+        
+        # Check if UnInst.exe exists and if versions differ
+        if (Test-Path $uninstPath) {
+            try {
+                $uninstVersionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($uninstPath)
+                $uninstVersion = $uninstVersionInfo.ProductVersion
+                
+                # If versions differ, delete UnInst.exe
+                if ($Script:WAU_GUI_VERSION -ne $uninstVersion) {
+                    Remove-Item -Path $uninstPath -Force -ErrorAction SilentlyContinue
+                }
+            }
+            catch {
+                # If we can't read UnInst.exe version, delete it to be safe
+                Remove-Item -Path $uninstPath -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+    catch {
+        # If we can't read main exe version, set to Unknown
+        $Script:WAU_GUI_VERSION = "Unknown"
+        
+        # Also remove UnInst.exe if it exists since we can't compare versions
+        if (Test-Path $uninstPath) {
+            Remove-Item -Path $uninstPath -Force -ErrorAction SilentlyContinue
+        }
+    }
 } else {
-    $Script:WAU_GUI_VERSION = "Unknown"
+    # If main exe doesn't exist but UnInst.exe does, get version from UnInst.exe and copy it
+    if (Test-Path $uninstPath) {
+        try {
+            $uninstVersionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($uninstPath)
+            $Script:WAU_GUI_VERSION = $uninstVersionInfo.ProductVersion
+        }
+        catch {
+            $Script:WAU_GUI_VERSION = "Unknown"
+        }
+        Copy-Item -Path $uninstPath -Destination $exePath -Force -ErrorAction SilentlyContinue
+    } else {
+        $Script:WAU_GUI_VERSION = "Unknown"
+    }
 }
 
 # Load Window XAML from config file and store as constant
