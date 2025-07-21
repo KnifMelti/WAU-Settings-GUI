@@ -489,7 +489,7 @@ function Start-WAUGUIUpdate {
                         Copy-Item -Path $_.FullName -Destination $destinationPath -Force
                     }
                 }
-                            
+
                 # Create zip backup of the backup directory
                 try {
                     $backupZipDir = Join-Path $downloadDir "backup"
@@ -2485,11 +2485,7 @@ function Update-WAUGUIFromConfig {
                 if ($shouldCheck) {
                     $updateInfo = Test-WAUGUIUpdate
                     if ($updateInfo.UpdateAvailable -and -not $updateInfo.Error) {
-                        $message = "Update available!`n`nCurrent version: $($updateInfo.CurrentVersion)`nLatest version: $($updateInfo.LatestVersion)`nRelease notes:`n$(
-                            $updateInfo.ReleaseNotes -split "`n" | Where-Object { 
-                                $_ -match '^(?:\*|-)[^*-]' -or $_ -match '^\s+(?:\*|-)[^*-]' 
-                            }
-                        )`n`nDo you want to download the update?"
+                        $message = "Update available!`n`nCurrent version: $($updateInfo.CurrentVersion)`nLatest version: $($updateInfo.LatestVersion)`nRelease notes:`n$($updateInfo.ReleaseNotes -split "`n" | Where-Object { $_ -match '^\s*[\*\-]' -and $_ -notmatch '^\s*\*\*' })`n`nDo you want to download the update?"
                         $result = [System.Windows.MessageBox]::Show($message, "Update Available", "OkCancel", "Question")
                         if ($result -eq 'Ok') {
                             Start-WAUGUIUpdate -updateInfo $updateInfo
