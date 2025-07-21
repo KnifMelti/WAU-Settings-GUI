@@ -2365,66 +2365,76 @@ function Update-WAUGUIFromConfig {
                 return
             }
 
-            # Add a grace period after first run (e.g., 1 hour) before checking for updates
+            # Ensure config directory exists first
+            $configDir = Join-Path $Script:WorkingDir "config"
+            if (-not (Test-Path $configDir)) {
+                New-Item -ItemType Directory -Path $configDir -Force | Out-Null
+            }
+
+            $timestampFile = Join-Path $configDir "last_update_check.txt"
+            
+            # Grace period check
+            $firstRunFile = Join-Path $Script:WorkingDir "firstrun.txt"
             $gracePeriodHours = 1
-            if (Test-Path $firstRunFile) {
-                try {
-                    $firstRunInfo = Get-Item $firstRunFile
-                    $timeSinceFirstRun = (Get-Date) - $firstRunInfo.CreationTime
+            $inGracePeriod = $false
+
+            # Use Get-ChildItem with -Force to handle Hidden/System files
+            try {
+                $firstRunFiles = Get-ChildItem -Path $Script:WorkingDir -Name "firstrun.txt" -Force -ErrorAction SilentlyContinue
+                if ($firstRunFiles) {
+                    $firstRunInfo = Get-Item -Path $firstRunFile -Force
+                    $creationTime = $firstRunInfo.CreationTime
+                    $currentTime = Get-Date
+                    $timeSinceFirstRun = $currentTime - $creationTime
+                    
                     if ($timeSinceFirstRun.TotalHours -lt $gracePeriodHours) {
-                        return
+                        $inGracePeriod = $true
                     }
                 }
-                catch {
-                    # If we can't read first run time, proceed with normal check
-                }
             }
-            
-            # Check if we've already checked for updates within the configured interval
-            $timestampFile = Join-Path $Script:WorkingDir "config\last_update_check.txt"
-            $shouldCheck = $true
-            
-            if (Test-Path $timestampFile) {
-                try {
-                    $lastCheckDate = Get-Content $timestampFile -ErrorAction Stop
-                    $lastCheck = [DateTime]::ParseExact($lastCheckDate, "yyyy-MM-dd", $null)
-                    $today = Get-Date
-                    
-                    # Calculate days since last check
-                    $daysSinceLastCheck = ($today - $lastCheck).Days
-                    
-                    # Only check if it's been the configured number of days or more since last check
-                    if ($daysSinceLastCheck -lt $Script:AUTOUPDATE_DAYS) {
-                        $shouldCheck = $false
+            catch {
+                # If we can't read first run time, proceed with normal check
+            }
+
+            # Always create/update timestamp file regardless of grace period
+            try {
+                $today = Get-Date -Format "yyyy-MM-dd"
+                Set-Content -Path $timestampFile -Value $today -Force
+            }
+            catch {
+                # Silent fail if we can't write timestamp file
+            }
+
+            # Only do actual update check if not in grace period and interval allows
+            if (-not $inGracePeriod) {
+                $shouldCheck = $true
+                
+                if (Test-Path $timestampFile) {
+                    try {
+                        $lastCheckDate = Get-Content $timestampFile -ErrorAction Stop
+                        $lastCheck = [DateTime]::ParseExact($lastCheckDate, "yyyy-MM-dd", $null)
+                        $today = Get-Date
+                        
+                        $daysSinceLastCheck = ($today - $lastCheck).Days
+                        
+                        if ($daysSinceLastCheck -lt $Script:AUTOUPDATE_DAYS) {
+                            $shouldCheck = $false
+                        }
                     }
-                }
-                catch {
-                    # If file is corrupted or invalid, proceed with check
-                    $shouldCheck = $true
-                }
-            }
-            
-            if ($shouldCheck) {
-                $updateInfo = Test-WAUGUIUpdate
-                if ($updateInfo.UpdateAvailable -and -not $updateInfo.Error) {
-                    $message = "Update available!`n`nCurrent version: $($updateInfo.CurrentVersion)`nLatest version: $($updateInfo.LatestVersion)`nRelease notes:`n$($updateInfo.ReleaseNotes -split "`n" | Where-Object { $_ -match '^(?:\*|-)[^*-]' })`n`nDo you want to download the update?"
-                    $result = [System.Windows.MessageBox]::Show($message, "Update Available", "OkCancel", "Question")
-                    if ($result -eq 'Ok') {
-                        Start-WAUGUIUpdate -updateInfo $updateInfo
+                    catch {
+                        # If file is corrupted or invalid, proceed with check
                     }
                 }
                 
-                # Save today's date to timestamp file
-                try {
-                    $configDir = Join-Path $Script:WorkingDir "config"
-                    if (-not (Test-Path $configDir)) {
-                        New-Item -ItemType Directory -Path $configDir -Force | Out-Null
+                if ($shouldCheck) {
+                    $updateInfo = Test-WAUGUIUpdate
+                    if ($updateInfo.UpdateAvailable -and -not $updateInfo.Error) {
+                        $message = "Update available!`n`nCurrent version: $($updateInfo.CurrentVersion)`nLatest version: $($updateInfo.LatestVersion)`nRelease notes:`n$($updateInfo.ReleaseNotes -split "`n" | Where-Object { $_ -match '^(?:\*|-)[^*-]' })`n`nDo you want to download the update?"
+                        $result = [System.Windows.MessageBox]::Show($message, "Update Available", "OkCancel", "Question")
+                        if ($result -eq 'Ok') {
+                            Start-WAUGUIUpdate -updateInfo $updateInfo
+                        }
                     }
-                    $today = Get-Date -Format "yyyy-MM-dd"
-                    Set-Content -Path $timestampFile -Value $today -Force
-                }
-                catch {
-                    # Silent fail if we can't write timestamp file
                 }
             }
         }
@@ -3875,55 +3885,52 @@ if (Test-Path $oldVersionFile) {
     Remove-Item $oldVersionFile -Force -ErrorAction SilentlyContinue
 }
 
-# Version information
+# Version information, takes care of if upgraded from external (WinGet/WAU)
 $exePath = Join-Path $Script:WorkingDir "$Script:WAU_GUI_NAME.exe"
-if (Test-Path $exePath) {
-    $fileVersionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($exePath)
-    $Script:WAU_GUI_VERSION = $fileVersionInfo.ProductVersion
-} else {
-    $Script:WAU_GUI_VERSION = "Unknown"
-}
+$uninstPath = Join-Path $Script:WorkingDir "UnInst.exe"
 
-# Old upgrade fix: if the version is 1.8.1.0, extract the settings-window.xaml from the ZIP file
-if ($Script:WAU_GUI_VERSION -eq "1.8.1.0") {
+# Set default version before attempting to read
+$Script:WAU_GUI_VERSION = "0.0.0.0"
+
+if (Test-Path $exePath) {
     try {
-        $zipFilePath = Join-Path $Script:WorkingDir "ver\WAU-Settings-GUI-v1.8.1.0.zip"
-        $targetXamlPath = Join-Path $Script:WorkingDir "config\settings-window.xaml"
+        $fileVersionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($exePath)
+        $Script:WAU_GUI_VERSION = $fileVersionInfo.ProductVersion
         
-        if (Test-Path $zipFilePath) {
-            # Load compression assembly
-            Add-Type -AssemblyName System.IO.Compression.FileSystem
-            
-            # Open ZIP file
-            $zip = [System.IO.Compression.ZipFile]::OpenRead($zipFilePath)
-            
-            # Find the settings-window.xaml entry in the ZIP
-            $xamlEntry = $zip.Entries | Where-Object { 
-                $_.FullName -like "*config/settings-window.xaml" -or 
-                $_.FullName -like "*config\settings-window.xaml" 
-            } | Select-Object -First 1
-            
-            if ($xamlEntry) {
-                # Ensure config directory exists
-                $configDir = Join-Path $Script:WorkingDir "config"
-                if (-not (Test-Path $configDir)) {
-                    New-Item -ItemType Directory -Path $configDir -Force | Out-Null
-                }
+        # Check if UnInst.exe exists and if versions differ
+        if (Test-Path $uninstPath) {
+            try {
+                $uninstVersionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($uninstPath)
+                $uninstVersion = $uninstVersionInfo.ProductVersion
                 
-                # Extract the file
-                [System.IO.Compression.ZipFileExtensions]::ExtractToFile($xamlEntry, $targetXamlPath, $true)
-                Write-Host "Extracted settings-window.xaml from ZIP for version 1.8.1.0"
+                # If versions differ, delete UnInst.exe
+                if ($Script:WAU_GUI_VERSION -ne $uninstVersion) {
+                    Remove-Item -Path $uninstPath -Force -ErrorAction SilentlyContinue
+                }
             }
-            
-            # Close ZIP file
-            $zip.Dispose()
-        } else {
-            Write-Warning "ZIP file not found: $zipFilePath"
+            catch {
+                # If we can't read UnInst.exe version, delete it to be safe
+                Remove-Item -Path $uninstPath -Force -ErrorAction SilentlyContinue
+            }
         }
     }
     catch {
-        Write-Warning "Failed to extract settings-window.xaml: $($_.Exception.Message)"
+        # If we can't read main exe version, keep default "0.0.0.0"
+        # Don't remove UnInst.exe here to avoid creating a loop
     }
+} else {
+    # If main exe doesn't exist but UnInst.exe does, get version from UnInst.exe and copy it
+    if (Test-Path $uninstPath) {
+        try {
+            $uninstVersionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($uninstPath)
+            $Script:WAU_GUI_VERSION = $uninstVersionInfo.ProductVersion
+        }
+        catch {
+            # Keep default "0.0.0.0" if we can't read UnInst.exe version
+        }
+        Copy-Item -Path $uninstPath -Destination $exePath -Force -ErrorAction SilentlyContinue
+    }
+    # If neither file exists, keep default "0.0.0.0"
 }
 
 # Load Window XAML from config file and store as constant
