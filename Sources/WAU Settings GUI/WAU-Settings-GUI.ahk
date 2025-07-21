@@ -288,6 +288,11 @@ if FileExist(shortcutDesktop) && FileExist(shortcutStartMenu) {
         if !FileExist(uninstPath) {
             FileCopy(A_ScriptFullPath, uninstPath, 1)
             CreateUninstall(uninstPath, name_no_ext, A_WorkingDir)
+            MsgBox(
+                "UnInst.exe and registry uninstall entry`nhave been created successfully.`n`nRestarting the program to apply changes.`n`n(This dialog will close automatically in 5 seconds)",
+                name_no_ext,
+                "0x40 T5"  ; Information icon + 5 second timeout
+            )
         }
         ; Start PowerShell-GUI if UnInst.exe now exists
         if FileExist(uninstPath) {
