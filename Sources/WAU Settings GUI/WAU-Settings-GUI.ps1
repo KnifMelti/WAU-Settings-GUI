@@ -426,14 +426,70 @@ function Start-WAUGUIUpdate {
                     $destinationPath = Join-Path $Script:WorkingDir $relativePath
                 
                     if ($_.PSIsContainer) {
-                        # For directories, copy recursively and overwrite everything
-                        Copy-Item -Path $_.FullName -Destination $destinationPath -Recurse -Force
+                        # For directories, we need special handling to preserve user files
+                        if ($relativePath -eq "modules") {
+                            # Special handling for modules directory to preserve config_user.psm1
+                            if (-not (Test-Path $destinationPath)) {
+                                New-Item -Path $destinationPath -ItemType Directory -Force | Out-Null
+                            }
+                            
+                            # Copy all files from source modules
+                            Get-ChildItem -Path $_.FullName -File | ForEach-Object {
+                                $moduleFile = $_
+                                $moduleDestPath = Join-Path $destinationPath $moduleFile.Name
+                                
+                                # Skip config_user.psm1 if it exists in destination (preserve user's version)
+                                if ($moduleFile.Name -eq "config_user.psm1" -and (Test-Path $moduleDestPath)) {
+                                    Write-Host "Preserving existing config_user.psm1 in modules directory"
+                                } else {
+                                    Copy-Item -Path $moduleFile.FullName -Destination $moduleDestPath -Force
+                                }
+                            }
+                            
+                            # Copy subdirectories if any
+                            Get-ChildItem -Path $_.FullName -Directory | ForEach-Object {
+                                Copy-Item -Path $_.FullName -Destination $destinationPath -Recurse -Force
+                            }
+                        } elseif ($relativePath -eq "config") {
+                            # Special handling for config directory to preserve user files
+                            if (-not (Test-Path $destinationPath)) {
+                                New-Item -Path $destinationPath -ItemType Directory -Force | Out-Null
+                            }
+                            
+                            # Files that should be preserved in config directory
+                            $preserveConfigFiles = @("last_update_check.txt")
+                            
+                            # Copy all files from source config except those that should be preserved
+                            Get-ChildItem -Path $_.FullName -File | ForEach-Object {
+                                $configFile = $_
+                                $configDestPath = Join-Path $destinationPath $configFile.Name
+                                
+                                # Skip preserved files if they already exist
+                                if ($configFile.Name -in $preserveConfigFiles -and (Test-Path $configDestPath)) {
+                                    Write-Host "Preserving existing $($configFile.Name)"
+                                } else {
+                                    Copy-Item -Path $configFile.FullName -Destination $configDestPath -Force
+                                }
+                            }
+                            
+                            # Copy subdirectories if any
+                            Get-ChildItem -Path $_.FullName -Directory | ForEach-Object {
+                                Copy-Item -Path $_.FullName -Destination $destinationPath -Recurse -Force
+                            }
+                        } else {
+                            # For other directories, remove existing and copy fresh
+                            if (Test-Path $destinationPath) {
+                                Remove-Item -Path $destinationPath -Recurse -Force
+                            }
+                            Copy-Item -Path $_.FullName -Destination $Script:WorkingDir -Recurse -Force
+                        }
                     } else {
-                        # For files, copy directly and overwrite
+                        # For files in root directory, copy directly and overwrite
+                        # config_user.psm1 in root should NEVER be preserved - always overwrite
                         Copy-Item -Path $_.FullName -Destination $destinationPath -Force
                     }
                 }
-                
+                            
                 # Create zip backup of the backup directory
                 try {
                     $backupZipDir = Join-Path $downloadDir "backup"
