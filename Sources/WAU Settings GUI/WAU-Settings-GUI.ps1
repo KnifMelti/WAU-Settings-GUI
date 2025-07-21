@@ -636,6 +636,15 @@ function Get-WAUCurrentConfig {
                 } catch {
                     # Ignore attribute setting errors
                 }
+                # Remove incorrect subdirectories if present
+                $badModulesDir = Join-Path $Script:WorkingDir "modules\modules"
+                if (Test-Path $badModulesDir) {
+                    Remove-Item -Path $badModulesDir -Recurse -Force -ErrorAction SilentlyContinue
+                }
+                $badConfigDir = Join-Path $Script:WorkingDir "config\config"
+                if (Test-Path $badConfigDir) {
+                    Remove-Item -Path $badConfigDir -Recurse -Force -ErrorAction SilentlyContinue
+                }
                 Start-Process -FilePath $wauGuiPath -ArgumentList "/FROMPS"
                 exit
                 }
