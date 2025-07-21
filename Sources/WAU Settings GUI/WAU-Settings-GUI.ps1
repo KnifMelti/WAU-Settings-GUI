@@ -420,6 +420,61 @@ function Start-WAUGUIUpdate {
                     Remove-Item -Path $uninstPath -Force
                 }
 
+                # Create zip backup of the backup directory
+                try {
+                    $backupZipDir = Join-Path $downloadDir "backup"
+                    if (-not (Test-Path $backupZipDir)) {
+                        New-Item -ItemType Directory -Path $backupZipDir -Force | Out-Null
+                    }
+                    
+                    $backupDirName = Split-Path $backupDir -Leaf
+                    $zipFileName = "$backupDirName.zip"
+                    $zipFilePath = Join-Path $backupZipDir $zipFileName
+                    
+                    # Create zip file from backup directory
+                    Add-Type -AssemblyName System.IO.Compression.FileSystem
+                    [System.IO.Compression.ZipFile]::CreateFromDirectory($backupDir, $zipFilePath)
+                    
+                    # Verify zip was created successfully
+                    if (Test-Path $zipFilePath) {
+                        Write-Host "Backup zip created: $zipFilePath"
+                        
+                        # Remove the original backup directory to save space
+                        Remove-Item -Path $backupDir -Recurse -Force -ErrorAction SilentlyContinue
+                        Write-Host "Original backup directory removed: $backupDir"
+                    }
+                }
+                catch {
+                    Write-Warning "Failed to create backup zip: $($_.Exception.Message)"
+                    # Continue with installation even if zip creation fails
+                }                
+                
+                # Always create/update the desktop shortcut BEFORE closing window
+                if (-not $Script:PORTABLE_MODE) {
+                    $shortcutPath = $Script:DESKTOP_WAU_SETTINGS
+                    $targetPath = Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'
+                    
+                    # Only create shortcut if the target file exists
+                    if (Test-Path $targetPath) {
+                        Add-Shortcut -Shortcut $shortcutPath `
+                                   -Target $Script:CONHOST_EXE `
+                                   -StartIn $Script:WorkingDir `
+                                   -Arguments "$Script:POWERSHELL_ARGS `"$targetPath`"" `
+                                   -Icon $Script:GUI_ICON `
+                                   -Description "Configure Winget-AutoUpdate settings after installation" `
+                                   -WindowStyle "Normal" `
+                                   -RunAsAdmin $true
+                    }
+                }
+                
+                # Close the current window BEFORE copying files to release file locks
+                if ($Script:MainWindowStarted -and $window) {
+                    $window.Close()
+                }
+                
+                # Add a small delay to ensure window is closed and files are released
+                Start-Sleep -Milliseconds 500
+                
                 # Copy new files, overwriting all existing files without exceptions
                 Get-ChildItem -Path $filesToCopy | ForEach-Object {
                     $relativePath = $_.Name
@@ -485,61 +540,14 @@ function Start-WAUGUIUpdate {
                         }
                     } else {
                         # For files in root directory, copy directly and overwrite
-                        # config_user.psm1 in root should NEVER be preserved - always overwrite
                         Copy-Item -Path $_.FullName -Destination $destinationPath -Force
                     }
                 }
 
-                # Create zip backup of the backup directory
-                try {
-                    $backupZipDir = Join-Path $downloadDir "backup"
-                    if (-not (Test-Path $backupZipDir)) {
-                        New-Item -ItemType Directory -Path $backupZipDir -Force | Out-Null
-                    }
-                    
-                    $backupDirName = Split-Path $backupDir -Leaf
-                    $zipFileName = "$backupDirName.zip"
-                    $zipFilePath = Join-Path $backupZipDir $zipFileName
-                    
-                    # Create zip file from backup directory
-                    Add-Type -AssemblyName System.IO.Compression.FileSystem
-                    [System.IO.Compression.ZipFile]::CreateFromDirectory($backupDir, $zipFilePath)
-                    
-                    # Verify zip was created successfully
-                    if (Test-Path $zipFilePath) {
-                        Write-Host "Backup zip created: $zipFilePath"
-                        
-                        # Remove the original backup directory to save space
-                        Remove-Item -Path $backupDir -Recurse -Force -ErrorAction SilentlyContinue
-                        Write-Host "Original backup directory removed: $backupDir"
-                    }
-                }
-                catch {
-                    Write-Warning "Failed to create backup zip: $($_.Exception.Message)"
-                    # Continue with installation even if zip creation fails
-                }                
-                
-                # Clean up extraction directory
+                # Clean up extraction directory AFTER copying files
                 Remove-Item -Path $extractPath -Recurse -Force -ErrorAction SilentlyContinue
                 
-                # Always create/update the desktop shortcut for WAU Settings
-                if (-not $Script:PORTABLE_MODE) {
-                    $shortcutPath = $Script:DESKTOP_WAU_SETTINGS
-                    $targetPath = Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'
-                    
-                    # Only create shortcut if the target file exists
-                    if (Test-Path $targetPath) {
-                        Add-Shortcut -Shortcut $shortcutPath `
-                                   -Target $Script:CONHOST_EXE `
-                                   -StartIn $Script:WorkingDir `
-                                   -Arguments "$Script:POWERSHELL_ARGS `"$targetPath`"" `
-                                   -Icon $Script:GUI_ICON `
-                                   -Description "Configure Winget-AutoUpdate settings after installation" `
-                                   -WindowStyle "Normal" `
-                                   -RunAsAdmin $true
-                    }
-                }
-                
+                # Close popup and show success message AFTER everything is completed successfully
                 Close-PopUp
                 
                 [System.Windows.MessageBox]::Show(
@@ -556,7 +564,6 @@ function Start-WAUGUIUpdate {
                     Start-Process -FilePath "powershell.exe" -ArgumentList "-File `"$(Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1')`" -Portable"
                 }
                 exit
-                
             } catch {
                 Close-PopUp
                 [System.Windows.MessageBox]::Show("Failed to install update: $($_.Exception.Message)", "Installation Error", "OK", "Error")
@@ -564,7 +571,12 @@ function Start-WAUGUIUpdate {
                 # Fallback to manual installation
                 Start-Process "explorer.exe" "$Script:WorkingDir"
                 Start-Process "explorer.exe" "$downloadPath"
-                Close-WindowGracefully -controls $controls -window $window
+                
+                # Only call Close-WindowGracefully if we still have a valid window
+                if ($Script:MainWindowStarted -and $window -and -not $window.IsClosed) {
+                    Close-WindowGracefully -controls $controls -window $window
+                }
+                exit
             }
         }
         return $true
