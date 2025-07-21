@@ -3889,6 +3889,9 @@ if (Test-Path $oldVersionFile) {
 $exePath = Join-Path $Script:WorkingDir "$Script:WAU_GUI_NAME.exe"
 $uninstPath = Join-Path $Script:WorkingDir "UnInst.exe"
 
+# Set default version before attempting to read
+$Script:WAU_GUI_VERSION = "0.0.0.0"
+
 if (Test-Path $exePath) {
     try {
         $fileVersionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($exePath)
@@ -3912,13 +3915,8 @@ if (Test-Path $exePath) {
         }
     }
     catch {
-        # If we can't read main exe version, set to Unknown
-        $Script:WAU_GUI_VERSION = "Unknown"
-        
-        # Also remove UnInst.exe if it exists since we can't compare versions
-        if (Test-Path $uninstPath) {
-            Remove-Item -Path $uninstPath -Force -ErrorAction SilentlyContinue
-        }
+        # If we can't read main exe version, keep default "0.0.0.0"
+        # Don't remove UnInst.exe here to avoid creating a loop
     }
 } else {
     # If main exe doesn't exist but UnInst.exe does, get version from UnInst.exe and copy it
@@ -3928,12 +3926,11 @@ if (Test-Path $exePath) {
             $Script:WAU_GUI_VERSION = $uninstVersionInfo.ProductVersion
         }
         catch {
-            $Script:WAU_GUI_VERSION = "Unknown"
+            # Keep default "0.0.0.0" if we can't read UnInst.exe version
         }
         Copy-Item -Path $uninstPath -Destination $exePath -Force -ErrorAction SilentlyContinue
-    } else {
-        $Script:WAU_GUI_VERSION = "Unknown"
     }
+    # If neither file exists, keep default "0.0.0.0"
 }
 
 # Load Window XAML from config file and store as constant
