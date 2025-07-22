@@ -26,10 +26,10 @@ Configure **WAU** settings after installation, including:
 - Creating/deleting shortcuts
 - Managing log files
 - Starting **WAU** manually
-- Screenshot with masking functionality for documentation (F11)
+- Screenshot with masking functionality for documentation (**F11**)
 - **GPO** management integration
 - Status information display showing version details, last run times, and current configuration state
-- Dev Tools for advanced troubleshooting (F12):
+- Dev Tools for advanced troubleshooting (**F12**):
   - Open **WAU** policies path in registry (if **GPO Managed**)
   - Task scheduler access
   - Registry editor access
