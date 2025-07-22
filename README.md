@@ -25,7 +25,7 @@ Configure **WAU** settings after installation, including:
 - Additional options like running at logon, user context, etc.
 - Creating/deleting shortcuts
 - Managing log files
-- Starting WAU manually
+- Starting **WAU** manually
 - Screenshot with masking functionality for documentation (F11)
 - **GPO** management integration
 - Status information display showing version details, last run times, and current configuration state
