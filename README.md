@@ -110,3 +110,7 @@ Dev Tools (F12):
 
 Managed by GPO (central/local):  
 ![image](Sources/assets/Screenshot_GPO.png)
+
+Uninstall:  
+![image](Sources/assets/Screenshot_Uninstall.png)
+
