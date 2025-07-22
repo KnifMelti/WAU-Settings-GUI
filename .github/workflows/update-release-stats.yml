@@ -30,14 +30,24 @@ jobs:
             
             clean_body=$(echo "$current_body" | sed '/^## 📥 Download Statistics/,/^---$/d')
             
-            stats_header="## 📥 Download Statistics"
-            stats_total="**Total Downloads: ${total_downloads}**"
-            stats_divider="---"
-            
             if [ -n "$clean_body" ]; then
-              new_body="${clean_body}${stats_header}${stats_total}${asset_stats}${stats_divider}"
+              new_body="${clean_body}
+
+## 📥 Download Statistics
+
+**Total Downloads: ${total_downloads}**
+
+${asset_stats}
+
+---"
             else
-              new_body="${stats_header}${stats_total}${asset_stats}${stats_divider}"
+              new_body="## 📥 Download Statistics
+
+**Total Downloads: ${total_downloads}**
+
+${asset_stats}
+
+---"
             fi
             
             escaped_body=$(printf '%s' "$new_body" | jq -Rs .)
