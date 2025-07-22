@@ -561,8 +561,17 @@ function Start-WAUGUIUpdate {
                             Copy-Item -Path $_.FullName -Destination $Script:WorkingDir -Recurse -Force
                         }
                     } else {
-                        # For files in root directory, copy directly and overwrite
-                        Copy-Item -Path $_.FullName -Destination $destinationPath -Force
+                        try {
+                            Copy-Item -Path $_.FullName -Destination $destinationPath -Force -ErrorAction Stop
+                        }
+                        catch {
+                            # If file is locked (like icon file), skip it with warning
+                            if ($_.Exception.Message -like "*being used by another process*") {
+                                Write-Warning "Skipping locked file: $relativePath"
+                                continue
+                            }
+                            throw
+                        }
                     }
                 }
 
