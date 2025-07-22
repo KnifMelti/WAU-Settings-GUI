@@ -2,7 +2,7 @@ name: Update Release Download Stats
 
 on:
   schedule:
-    - cron: '0 4 * * *'  # 06:00 Swedish summer time, 05:00 winter time
+    - cron: '0 4 * * *'
   workflow_dispatch:
 
 jobs:
@@ -26,17 +26,16 @@ jobs:
             
             total_downloads=$(echo "$release" | jq '[.assets[].download_count] | add // 0')
             
-            clean_body=$(echo "$current_body" | sed '/^## 📥 Download Statistics/,/^---$/d')
+            # More robust cleaning - remove everything from statistics marker to end
+            clean_body=$(echo "$current_body" | sed '/## 📥 Download Statistics/,$d')
             
-            # Build the new body with only total downloads
-            stats_section=$(printf "\n\n## 📥 Download Statistics\n\n**Total Downloads: %s**\n\n---" "$total_downloads")
+            # Remove trailing whitespace
+            clean_body=$(echo "$clean_body" | sed 's/[[:space:]]*$//')
             
-            if [ -n "$clean_body" ]; then
-              new_body="${clean_body}${stats_section}"
-            else
-              new_body="${stats_section}"
-            fi
+            # Build the new body
+            stats_section=$(printf "\n\n## 📥 Download Statistics\n\n**Total Downloads: %s**" "$total_downloads")
             
+            new_body="${clean_body}${stats_section}"
             escaped_body=$(printf '%s' "$new_body" | jq -Rs .)
             
             curl -s -X PATCH \
