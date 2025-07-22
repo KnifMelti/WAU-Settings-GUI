@@ -116,6 +116,6 @@ Uninstall:
 
 ---
 
-### GitHub Stats:
+### GitHub Stats
 ![GitHub all releases](https://img.shields.io/github/downloads/KnifMelti/WAU-Settings-GUI/total)
 ![GitHub release (latest by date)](https://img.shields.io/github/downloads/KnifMelti/WAU-Settings-GUI/latest/total)
