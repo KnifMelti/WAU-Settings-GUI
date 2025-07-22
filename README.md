@@ -58,10 +58,10 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
 
 ### Manual Installation
 - Download and extract the latest release: [WAU-Settings-GUI-vX.X.X.X.zip](https://github.com/KnifMelti/WAU-Settings-GUI/releases/latest)
-- Standalone Installer/Portable (i.e. no need to install)
-- Detects if running from USB drive, etc.
+- **Standalone** Portable/Installer (i.e. no need to install)
+- Detects if running from **USB** drive, etc.
 - Run `WAU-Settings-GUI.exe`:
-  - <img src="Sources/assets//WAU-Settings-GUI.png" alt="Installer/Portable">
+  - <img src="Sources/assets//WAU-Settings-GUI.png" alt="Portable/Installer">
   - Select a base directory for the installation or run directly in portable mode
 
 ### Running
