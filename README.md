@@ -8,7 +8,7 @@ Provides a user-friendly portable standalone interface to modify every aspect of
 This project depends on the following repository:
 - [Winget-AutoUpdate](https://github.com/Romanitho/Winget-AutoUpdate): has all the settings this project can handle/modify/save/restore/share and document.
 
-If **WAU** is not installed, the GUI prompts at startup to download and install it with standard settings.
+If **WAU** is not installed, the **GUI** prompts at startup to download and install it with standard settings.
 
 ---
 
@@ -68,12 +68,12 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
 - After installation, **WAU Settings GUI** starts (if installed by **WinGet** you must start it via an ordinary **Command Prompt** using the `PortableCommandAlias`: **WAU-Settings-GUI**)
 - If **WAU** is not installed, it will prompt to download and install with standard settings
 - If a local list is not found, it will prompt to create a new one
-- In the GUI you now have **☐|☑ Start Menu shortcuts** / **☐|☑ WAU Desktop shortcut** / **☐|☑ App Installer shortcut** options showing the current installed **WAU** configuration
+- In the **GUI** you now have **☐|☑ Start Menu shortcuts** / **☐|☑ WAU Desktop shortcut** / **☐|☑ App Installer shortcut** options showing the current installed **WAU** configuration
 - Configure every setting to your preferences and `Save Settings`
 - The **WAU Settings (Administrator)** shortcut has now been created under **Start Menu\Programs\Winget-AutoUpdate** folder (along with the other **WAU** shortcuts) or on your own **Desktop** (pin to taskbar when running maybe?) depending on your choice
 
 ### Updating
-- Dev Tools (F12): Click the button `[ver]`
+- Dev Tools (**F12**): Click the button `[ver]`
 - Checks automatically every week as standard (click the button `[usr]` under Dev Tools to change the update schedule)
 - If an update exists, **WAU Settings GUI** will ask if you want to download and install the new version
 - Before installing a backup of the current version will be created in `ver\backup` folder
