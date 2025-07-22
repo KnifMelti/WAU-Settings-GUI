@@ -30,24 +30,13 @@ jobs:
             
             clean_body=$(echo "$current_body" | sed '/^## 📥 Download Statistics/,/^---$/d')
             
+            # Build the new body using printf to avoid YAML issues
+            stats_section=$(printf "\n## 📥 Download Statistics\n\n**Total Downloads: %s**\n\n%s\n\n---" "$total_downloads" "$asset_stats")
+            
             if [ -n "$clean_body" ]; then
-              new_body="${clean_body}
-
-## 📥 Download Statistics
-
-**Total Downloads: ${total_downloads}**
-
-${asset_stats}
-
----"
+              new_body="${clean_body}${stats_section}"
             else
-              new_body="## 📥 Download Statistics
-
-**Total Downloads: ${total_downloads}**
-
-${asset_stats}
-
----"
+              new_body="${stats_section}"
             fi
             
             escaped_body=$(printf '%s' "$new_body" | jq -Rs .)
