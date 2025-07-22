@@ -1,0 +1,52 @@
+name: Update Release Download Stats
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  update-stats:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Update Release Stats
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          releases=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/releases?per_page=10")
+          
+          echo "$releases" | jq -c '.[]' | while read -r release; do
+            release_id=$(echo "$release" | jq -r '.id')
+            tag_name=$(echo "$release" | jq -r '.tag_name')
+            current_body=$(echo "$release" | jq -r '.body // ""')
+            
+            total_downloads=$(echo "$release" | jq '[.assets[].download_count] | add // 0')
+            
+            asset_stats=$(echo "$release" | jq -r '.assets[] | "- \(.name): **\(.download_count)** downloads"')
+            
+            clean_body=$(echo "$current_body" | sed '/^## 📥 Download Statistics/,/^---$/d')
+            
+            stats_header="## 📥 Download Statistics"
+            stats_total="**Total Downloads: ${total_downloads}**"
+            stats_divider="---"
+            
+            if [ -n "$clean_body" ]; then
+              new_body="${clean_body}${stats_header}${stats_total}${asset_stats}${stats_divider}"
+            else
+              new_body="${stats_header}${stats_total}${asset_stats}${stats_divider}"
+            fi
+            
+            escaped_body=$(printf '%s' "$new_body" | jq -Rs .)
+            
+            curl -s -X PATCH \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Content-Type: application/json" \
+              "https://api.github.com/repos/${{ github.repository }}/releases/$release_id" \
+              -d "{\"body\":$escaped_body}"
+            
+            echo "Updated $tag_name (Downloads: $total_downloads)"
+          done
