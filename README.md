@@ -65,7 +65,7 @@ This will install a **Portable WinGet Package** (with alias: **WAU-Settings-GUI*
   - Select a base directory for the installation or run directly in portable mode
 
 ### Running
-- After installation, **WAU Settings GUI** starts (if installed by `WinGet` you must start it via an ordinary **Command Prompt** using the `PortableCommandAlias` from `WinGet`: **WAU-Settings-GUI**)
+- After installation, **WAU Settings GUI** starts (if installed by **WinGet** you must start it via an ordinary **Command Prompt** using the `PortableCommandAlias`: **WAU-Settings-GUI**)
 - If **WAU** is not installed, it will prompt to download and install with standard settings
 - If a local list is not found, it will prompt to create a new one
 - In the GUI you now have **☐|☑ Start Menu shortcuts** / **☐|☑ WAU Desktop shortcut** / **☐|☑ App Installer shortcut** options showing the current installed **WAU** configuration
@@ -98,7 +98,7 @@ This will install a **Portable WinGet Package** (with alias: **WAU-Settings-GUI*
   ```bash
   "C:\WAU Settings GUI\UnInst.exe" /UNINSTALL /S
   ```
-- This will remove everything, even the `WinGet` Portable package from the source (it will not show up in the `WinGet` list anymore)
+- This will remove everything, even the **WinGet Portable** package from the source (it will not show up in the **WinGet** list anymore)
 - **WAU** will be automatically reinstalled afterward restoring the original current showing shortcuts.
 
 ### Screenshots
