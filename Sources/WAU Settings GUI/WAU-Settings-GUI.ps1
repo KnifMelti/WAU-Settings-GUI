@@ -467,22 +467,19 @@ function Start-WAUGUIUpdate {
                     }
                 }
                 
-                if ($window -and $window.Icon) {
-                    $window.Icon = $null
-                }
+                if ($window -and $window.Icon) { $window.Icon = $null }
                 $Script:GUI_ICON = $null
+                if ($Script:PopUpWindow) { $Script:PopUpWindow.Close(); $Script:PopUpWindow = $null }
 
                 # Close the current window BEFORE copying files to release file locks
-                if ($Script:MainWindowStarted -and $window) {
-                    $window.Close()
-                }
+                if ($Script:MainWindowStarted -and $window) { $window.Close() }
                 
                 # Force garbage collection to release file handles
                 [System.GC]::Collect()
                 [System.GC]::WaitForPendingFinalizers()
 
                 # Add a small delay to ensure window is closed and files are released
-                Start-Sleep -Milliseconds 500
+                Start-Sleep -Milliseconds 1500
                 
                 # Copy new files, overwriting all existing files without exceptions
                 Get-ChildItem -Path $filesToCopy | ForEach-Object {
