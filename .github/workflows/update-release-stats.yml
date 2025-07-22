@@ -2,7 +2,7 @@ name: Update Release Download Stats
 
 on:
   schedule:
-    - cron: '0 6 * * *'
+    - cron: '0 4 * * *'  # 06:00 Swedish summer time, 05:00 winter time
   workflow_dispatch:
 
 jobs:
@@ -26,12 +26,10 @@ jobs:
             
             total_downloads=$(echo "$release" | jq '[.assets[].download_count] | add // 0')
             
-            asset_stats=$(echo "$release" | jq -r '.assets[] | "- \(.name): **\(.download_count)** downloads"')
-            
             clean_body=$(echo "$current_body" | sed '/^## 📥 Download Statistics/,/^---$/d')
             
-            # Build the new body using printf to avoid YAML issues
-            stats_section=$(printf "\n## 📥 Download Statistics\n\n**Total Downloads: %s**\n\n%s\n\n---" "$total_downloads" "$asset_stats")
+            # Build the new body with only total downloads
+            stats_section=$(printf "\n\n## 📥 Download Statistics\n\n**Total Downloads: %s**\n\n---" "$total_downloads")
             
             if [ -n "$clean_body" ]; then
               new_body="${clean_body}${stats_section}"
