@@ -28,7 +28,7 @@ Configure **WAU** settings after installation, including:
 - Starting WAU manually
 - Screenshot with masking functionality for documentation
 - GPO management integration
-- Real-time status information display showing version details, last run times, and current configuration state
+- Status information display showing version details, last run times, and current configuration state
 - Dev Tools for advanced troubleshooting:
   - Open **WAU** policies path in registry (if GPO Managed)
   - Task scheduler access
