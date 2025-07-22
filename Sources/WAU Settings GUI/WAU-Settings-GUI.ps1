@@ -473,7 +473,7 @@ function Start-WAUGUIUpdate {
                 }
                 
                 # Add a small delay to ensure window is closed and files are released
-                Start-Sleep -Milliseconds 500
+                Start-Sleep -Milliseconds 1000
                 
                 # Copy new files, overwriting all existing files without exceptions
                 Get-ChildItem -Path $filesToCopy | ForEach-Object {
