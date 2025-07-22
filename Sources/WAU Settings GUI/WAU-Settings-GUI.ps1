@@ -449,38 +449,36 @@ function Start-WAUGUIUpdate {
                     # Continue with installation even if zip creation fails
                 }                
                 
-                # Always create/update the desktop shortcut BEFORE closing window
-                if (-not $Script:PORTABLE_MODE) {
-                    $shortcutPath = $Script:DESKTOP_WAU_SETTINGS
-                    $targetPath = Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'
-                    
-                    # Only create shortcut if the target file exists
-                    if (Test-Path $targetPath) {
-                        Add-Shortcut -Shortcut $shortcutPath `
-                                   -Target $Script:CONHOST_EXE `
-                                   -StartIn $Script:WorkingDir `
-                                   -Arguments "$Script:POWERSHELL_ARGS `"$targetPath`"" `
-                                   -Icon $Script:GUI_ICON `
-                                   -Description "Configure Winget-AutoUpdate settings after installation" `
-                                   -WindowStyle "Normal" `
-                                   -RunAsAdmin $true
+                # Aggressive icon cleanup before file copying
+                try {
+                    # Clear all icon references
+                    if ($window -and $window.Icon) { 
+                        $window.Icon = $null 
                     }
+                    if ($Script:PopUpWindow -and $Script:PopUpWindow.Icon) { 
+                        $Script:PopUpWindow.Icon = $null 
+                    }
+                    $Script:GUI_ICON = $null
+                    
+                    # Force multiple garbage collections
+                    for ($i = 0; $i -lt 3; $i++) {
+                        [System.GC]::Collect()
+                        [System.GC]::WaitForPendingFinalizers()
+                        [System.GC]::Collect()
+                        Start-Sleep -Milliseconds 200
+                    }
+                    
+                    # Close windows
+                    if ($Script:PopUpWindow) { $Script:PopUpWindow.Close(); $Script:PopUpWindow = $null }
+                    if ($Script:MainWindowStarted -and $window) { $window.Close() }
+                    
+                    # Additional delay for file handles to be released
+                    Start-Sleep -Milliseconds 2000
                 }
-                
-                if ($window -and $window.Icon) { $window.Icon = $null }
-                $Script:GUI_ICON = $null
-                if ($Script:PopUpWindow) { $Script:PopUpWindow.Close(); $Script:PopUpWindow = $null }
+                catch {
+                    Write-Warning "Error during cleanup: $($_.Exception.Message)"
+                }
 
-                # Close the current window BEFORE copying files to release file locks
-                if ($Script:MainWindowStarted -and $window) { $window.Close() }
-                
-                # Force garbage collection to release file handles
-                [System.GC]::Collect()
-                [System.GC]::WaitForPendingFinalizers()
-
-                # Add a small delay to ensure window is closed and files are released
-                Start-Sleep -Milliseconds 1500
-                
                 # Copy new files, overwriting all existing files without exceptions
                 Get-ChildItem -Path $filesToCopy | ForEach-Object {
                     $relativePath = $_.Name
@@ -547,6 +545,32 @@ function Start-WAUGUIUpdate {
                     } else {
                         # For files in root directory, copy directly and overwrite
                         Copy-Item -Path $_.FullName -Destination $destinationPath -Force
+                    }
+                }
+
+                # Create/update the desktop shortcut AFTER copying files
+                if (-not $Script:PORTABLE_MODE) {
+                    $shortcutPath = $Script:DESKTOP_WAU_SETTINGS
+                    $targetPath = Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'
+                    
+                    # Use the NEW icon file path after copying, with fallback
+                    $newIconPath = Join-Path $Script:WorkingDir "config\WAU Settings GUI.ico"
+                    if (-not (Test-Path $newIconPath)) {
+                        # Fallback to system temp icon if new icon doesn't exist
+                        $systemTemp = [System.Environment]::GetEnvironmentVariable("TEMP", [System.EnvironmentVariableTarget]::Machine)
+                        if (-not $systemTemp) { $systemTemp = "$env:SystemRoot\Temp" }
+                        $newIconPath = Join-Path $systemTemp "icon.ico"
+                    }
+                    
+                    if (Test-Path $targetPath) {
+                        Add-Shortcut -Shortcut $shortcutPath `
+                                -Target $Script:CONHOST_EXE `
+                                -StartIn $Script:WorkingDir `
+                                -Arguments "$Script:POWERSHELL_ARGS `"$targetPath`"" `
+                                -Icon $newIconPath `
+                                -Description "Configure Winget-AutoUpdate settings after installation" `
+                                -WindowStyle "Normal" `
+                                -RunAsAdmin $true
                     }
                 }
 
