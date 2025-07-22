@@ -449,6 +449,36 @@ function Start-WAUGUIUpdate {
                     # Continue with installation even if zip creation fails
                 }                
                 
+                # Remove all shortcuts BEFORE copying files to release icon file locks
+                try {
+                    Write-Host "Removing shortcuts to release file locks..."
+                    
+                    # Remove desktop shortcuts
+                    if (Test-Path $Script:DESKTOP_WAU_SETTINGS) {
+                        Remove-Item -Path $Script:DESKTOP_WAU_SETTINGS -Force -ErrorAction SilentlyContinue
+                    }
+                    
+                    # Remove Start Menu shortcuts directory
+                    if (Test-Path $Script:STARTMENU_WAU_DIR) {
+                        Remove-Item -Path $Script:STARTMENU_WAU_DIR -Recurse -Force -ErrorAction SilentlyContinue
+                    }
+                    
+                    # Additional cleanup - remove any WAU-related shortcuts
+                    $desktopPath = [Environment]::GetFolderPath('Desktop')
+                    Get-ChildItem -Path $desktopPath -Filter "*WAU*Settings*.lnk" -ErrorAction SilentlyContinue | 
+                        Remove-Item -Force -ErrorAction SilentlyContinue
+                    
+                    # Force Explorer to refresh and release cached icons
+                    Stop-Process -Name "explorer" -Force -ErrorAction SilentlyContinue
+                    Start-Sleep -Milliseconds 2000
+                    
+                    # Additional delay for file handles to be fully released
+                    Start-Sleep -Milliseconds 1000
+                }
+                catch {
+                    Write-Warning "Error removing shortcuts: $($_.Exception.Message)"
+                }
+
                 # Aggressive icon cleanup before file copying
                 try {
                     # Clear all icon references
