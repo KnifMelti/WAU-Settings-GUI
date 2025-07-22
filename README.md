@@ -99,7 +99,7 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
   ```bash
   "C:\WAU Settings GUI\UnInst.exe" /UNINSTALL /S
   ```
-- This will remove everything, even the **Portable WinGet Package** from the source (it will not show up in the **WinGet** installed list anymore)
+- This will remove everything, including the **Portable WinGet Package** from the source (it will not show up in the **WinGet** installed list anymore)
 - **WAU** will be automatically reinstalled afterward restoring the original current showing **shortcuts**.
 
 ### Screenshots
