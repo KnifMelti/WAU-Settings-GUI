@@ -449,65 +449,19 @@ function Start-WAUGUIUpdate {
                     # Continue with installation even if zip creation fails
                 }                
                 
-                # Remove all shortcuts BEFORE copying files to release icon file locks
-                try {
-                    Write-Host "Removing shortcuts to release file locks..."
-                    
-                    # Remove desktop shortcuts
-                    if (Test-Path $Script:DESKTOP_WAU_SETTINGS) {
-                        Remove-Item -Path $Script:DESKTOP_WAU_SETTINGS -Force -ErrorAction SilentlyContinue
-                    }
-                    
-                    # Remove Start Menu shortcuts directory
-                    if (Test-Path $Script:STARTMENU_WAU_DIR) {
-                        Remove-Item -Path $Script:STARTMENU_WAU_DIR -Recurse -Force -ErrorAction SilentlyContinue
-                    }
-                    
-                    # Additional cleanup - remove any WAU-related shortcuts
-                    $desktopPath = [Environment]::GetFolderPath('Desktop')
-                    Get-ChildItem -Path $desktopPath -Filter "*WAU*Settings*.lnk" -ErrorAction SilentlyContinue | 
-                        Remove-Item -Force -ErrorAction SilentlyContinue
-                    
-                    # Force Explorer to refresh and release cached icons
-                    Stop-Process -Name "explorer" -Force -ErrorAction SilentlyContinue
-                    Start-Sleep -Milliseconds 2000
-                    
-                    # Additional delay for file handles to be fully released
-                    Start-Sleep -Milliseconds 1000
-                }
-                catch {
-                    Write-Warning "Error removing shortcuts: $($_.Exception.Message)"
-                }
+                # Icon cleanup before file copying
+                if ($window -and $window.Icon) { $window.Icon = $null }
+                if ($Script:PopUpWindow) { $Script:PopUpWindow.Close(); $Script:PopUpWindow = $null }
 
-                # Aggressive icon cleanup before file copying
-                try {
-                    # Clear all icon references
-                    if ($window -and $window.Icon) { 
-                        $window.Icon = $null 
-                    }
-                    if ($Script:PopUpWindow -and $Script:PopUpWindow.Icon) { 
-                        $Script:PopUpWindow.Icon = $null 
-                    }
-                    $Script:GUI_ICON = $null
-                    
-                    # Force multiple garbage collections
-                    for ($i = 0; $i -lt 3; $i++) {
-                        [System.GC]::Collect()
-                        [System.GC]::WaitForPendingFinalizers()
-                        [System.GC]::Collect()
-                        Start-Sleep -Milliseconds 200
-                    }
-                    
-                    # Close windows
-                    if ($Script:PopUpWindow) { $Script:PopUpWindow.Close(); $Script:PopUpWindow = $null }
-                    if ($Script:MainWindowStarted -and $window) { $window.Close() }
-                    
-                    # Additional delay for file handles to be released
-                    Start-Sleep -Milliseconds 2000
-                }
-                catch {
-                    Write-Warning "Error during cleanup: $($_.Exception.Message)"
-                }
+                # Force garbage collection to release file handles
+                [System.GC]::Collect()
+                [System.GC]::WaitForPendingFinalizers()
+
+                # Close the current window BEFORE copying files to release file locks
+                if ($Script:MainWindowStarted -and $window) { $window.Close() }
+
+                # Add a small delay to ensure window is closed and files are released
+                Start-Sleep -Milliseconds 1500
 
                 # Copy new files, overwriting all existing files without exceptions
                 Get-ChildItem -Path $filesToCopy | ForEach-Object {
@@ -515,9 +469,8 @@ function Start-WAUGUIUpdate {
                     $destinationPath = Join-Path $Script:WorkingDir $relativePath
                 
                     if ($_.PSIsContainer) {
-                        # For directories, we need special handling to preserve user files
+                        # For directories, we need special handling
                         if ($relativePath -eq "modules") {
-                            # Special handling for modules directory to preserve config_user.psm1
                             if (-not (Test-Path $destinationPath)) {
                                 New-Item -Path $destinationPath -ItemType Directory -Force | Out-Null
                             }
@@ -526,13 +479,7 @@ function Start-WAUGUIUpdate {
                             Get-ChildItem -Path $_.FullName -File | ForEach-Object {
                                 $moduleFile = $_
                                 $moduleDestPath = Join-Path $destinationPath $moduleFile.Name
-                                
-                                # Skip config_user.psm1 if it exists in destination (preserve user's version)
-                                if ($moduleFile.Name -eq "config_user.psm1" -and (Test-Path $moduleDestPath)) {
-                                    Write-Host "Preserving existing config_user.psm1 in modules directory"
-                                } else {
-                                    Copy-Item -Path $moduleFile.FullName -Destination $moduleDestPath -Force
-                                }
+                                Copy-Item -Path $moduleFile.FullName -Destination $moduleDestPath -Force
                             }
                             
                             # Copy subdirectories if any
@@ -540,22 +487,19 @@ function Start-WAUGUIUpdate {
                                 Copy-Item -Path $_.FullName -Destination $destinationPath -Recurse -Force
                             }
                         } elseif ($relativePath -eq "config") {
-                            # Special handling for config directory to preserve user files
+                            # Special handling for config directory to skip locked files
                             if (-not (Test-Path $destinationPath)) {
                                 New-Item -Path $destinationPath -ItemType Directory -Force | Out-Null
                             }
                             
-                            # Files that should be preserved in config directory
-                            $preserveConfigFiles = @("last_update_check.txt")
-                            
-                            # Copy all files from source config except those that should be preserved
+                            # Copy files from source config except locked image files
                             Get-ChildItem -Path $_.FullName -File | ForEach-Object {
                                 $configFile = $_
                                 $configDestPath = Join-Path $destinationPath $configFile.Name
                                 
-                                # Skip preserved files if they already exist
-                                if ($configFile.Name -in $preserveConfigFiles -and (Test-Path $configDestPath)) {
-                                    Write-Host "Preserving existing $($configFile.Name)"
+                                # Skip locked image files in config directory
+                                if ($configFile.Name -like "*.png" -or $configFile.Name -like "*.ico") {
+                                    Write-Host "Preserving existing locked file: config\$($configFile.Name)"
                                 } else {
                                     Copy-Item -Path $configFile.FullName -Destination $configDestPath -Force
                                 }
@@ -577,7 +521,7 @@ function Start-WAUGUIUpdate {
                             Copy-Item -Path $_.FullName -Destination $destinationPath -Force -ErrorAction Stop
                         }
                         catch {
-                            # If file is locked (like icon file), skip it with warning
+                            # If file is locked, skip it with warning
                             if ($_.Exception.Message -like "*being used by another process*") {
                                 Write-Warning "Skipping locked file: $relativePath"
                                 continue
