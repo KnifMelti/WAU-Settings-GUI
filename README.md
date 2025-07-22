@@ -27,17 +27,17 @@ Configure **WAU** settings after installation, including:
 - Managing log files
 - Starting WAU manually
 - Screenshot with masking functionality for documentation (F11)
-- GPO management integration
+- **GPO** management integration
 - Status information display showing version details, last run times, and current configuration state
 - Dev Tools for advanced troubleshooting (F12):
-  - Open **WAU** policies path in registry (if GPO Managed)
+  - Open **WAU** policies path in registry (if **GPO Managed**)
   - Task scheduler access
   - Registry editor access
-  - GUID path exploration
-  - WinGet system wide installed application list
+  - **GUID** path exploration
+  - Open **WinGet** system wide installed application list (if saved by **WAU**)
   - List file management
   - Change colors/update schedule for **WAU Settings GUI**
-  - MSI transform creation (using current showing configuration)
+  - **MSI** transform creation (using current showing configuration)
   - Configuration backup/import (i.e. for sharing settings)
   - Uninstall/install **WAU** (with current showing configuration)
   - Manual/automatic check for updates (checks automatically every week as standard)
@@ -52,7 +52,7 @@ NB: Must be run as **Administrator** (exe and shortcuts have the flag set)
   winget install KnifMelti.WAU-Settings-GUI --scope user
   ```
 
-This will install a **Portable WinGet Package** (with alias: **WAU-Settings-GUI**) to:
+This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **WAU-Settings-GUI**) to:
   
    `%USERPROFILE%\AppData\Local\Microsoft\WinGet\Packages\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe`.
 
@@ -83,12 +83,13 @@ This will install a **Portable WinGet Package** (with alias: **WAU-Settings-GUI*
   ```powershell
   Get-Process powershell | Where-Object {$_.MainWindowTitle -like "WAU Settings*"} | Stop-Process -Force
   ```
-  - Or disable the **WAU** updating via your `excluded_apps.txt`:<br>```KnifMelti.WAU-Settings-GUI``` (the built-in updater is absolutely best!)
-- Alternatively, you can use **WinGet CLI** from **Command Prompt** rudimentary updating to every new release of **WinGet** version of **WAU Settings GUI**:
+  - Disable the **WAU** updating alltogether via your `excluded_apps.txt`:<br>`KnifMelti.WAU-Settings-GUI`
+- Alternatively, you can use **WinGet CLI** from **Command Prompt** to rudimentary update to every new released **WinGet** version of **WAU Settings GUI**:
   
   ```bash
   winget upgrade KnifMelti.WAU-Settings-GUI --scope user
   ```
+ - The built-in updater is absolutely best, making a backup of your current installed version first
 
 
 ### Uninstallation
@@ -98,7 +99,7 @@ This will install a **Portable WinGet Package** (with alias: **WAU-Settings-GUI*
   ```bash
   "C:\WAU Settings GUI\UnInst.exe" /UNINSTALL /S
   ```
-- This will remove everything, even the **WinGet Portable** package from the source (it will not show up in the **WinGet** list anymore)
+- This will remove everything, even the **Portable WinGet Package** from the source (it will not show up in the **WinGet** installed list anymore)
 - **WAU** will be automatically reinstalled afterward restoring the original current showing shortcuts.
 
 ### Screenshots
