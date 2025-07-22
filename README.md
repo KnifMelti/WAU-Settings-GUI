@@ -114,3 +114,8 @@ Managed by GPO (central/local):
 Uninstall:  
 ![image](Sources/assets/Screenshot_Uninstall.png)
 
+---
+
+### GitHub Stats:
+![GitHub all releases](https://img.shields.io/github/downloads/KnifMelti/WAU-Settings-GUI/total)
+![GitHub release (latest by date)](https://img.shields.io/github/downloads/KnifMelti/WAU-Settings-GUI/latest/total)
