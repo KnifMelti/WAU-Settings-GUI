@@ -89,7 +89,7 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
   ```bash
   winget upgrade KnifMelti.WAU-Settings-GUI --scope user
   ```
- - The built-in updater is absolutely best, making a backup of your current installed version first
+ - The built-in updater is absolutely the best, making a backup of your current installed version first and taking care of locked files
 
 
 ### Uninstallation
