@@ -467,6 +467,11 @@ function Start-WAUGUIUpdate {
                     }
                 }
                 
+                if ($window -and $window.Icon) {
+                    $window.Icon = $null
+                }
+                $Script:GUI_ICON = $null
+
                 # Close the current window BEFORE copying files to release file locks
                 if ($Script:MainWindowStarted -and $window) {
                     $window.Close()
