@@ -33,7 +33,7 @@ jobs:
             clean_body=$(echo "$clean_body" | sed 's/[[:space:]]*$//')
             
             # Build the new body
-            stats_section=$(printf "\n\n## 📥 Download Statistics\n\n**Total Downloads: %s**" "$total_downloads")
+            stats_section=$(printf "\n\n## 📥 Download Statistics\n\n**Total Swedish Mornings Downloads: %s**" "$total_downloads")
             
             new_body="${clean_body}${stats_section}"
             escaped_body=$(printf '%s' "$new_body" | jq -Rs .)
