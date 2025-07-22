@@ -78,12 +78,12 @@ This will install a **Portable WinGet Package** (with alias: **WAU-Settings-GUI*
 - If an update exists, **WAU Settings GUI** will ask if you want to download and install the new version
 - Before installing a backup of the current version will be created in `ver\backup` folder
 
-- **WAU** will also update in user scope with every new released **WinGet** version of **WAU Settings GUI** 
+- **WAU** will also update **WAU Settings GUI** in user scope with every new released **WinGet** version 
   - To avoid failed updates you can create a **KnifMelti.WAU-Settings-GUI-preinstall.ps1** script in the **WAU** `mods` folder to shut down **WAU Settings GUI** before updating (open files) or not run it when updating:
   ```powershell
   Get-Process powershell | Where-Object {$_.MainWindowTitle -like "WAU Settings*"} | Stop-Process -Force
   ```
-  - Or disable the **WAU** updating via your `excluded_apps.txt`:<br>```KnifMelti.WAU-Settings-GUI```
+  - Or disable the **WAU** updating via your `excluded_apps.txt`:<br>```KnifMelti.WAU-Settings-GUI``` (the built-in update is absolutely best!)
 - Alternatively, you can use **WinGet CLI** from **Command Prompt** updating to every new release of **WinGet** version of **WAU Settings GUI**:
   
   ```bash
