@@ -1,0 +1,63 @@
+name: Update Release Download Stats
+
+on:
+  schedule:
+    - cron: '0 6 * * *'  # Daily at 6 AM
+  workflow_dispatch:
+
+jobs:
+  update-stats:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update Release Stats (Last 10 releases)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get only the latest 10 releases
+          releases=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/releases?per_page=10")
+          
+          # Loop through each release
+          echo "$releases" | jq -r '.[] | @base64' | while read -r release_data; do
+            release=$(echo "$release_data" | base64 --decode)
+            
+            release_id=$(echo "$release" | jq -r '.id')
+            tag_name=$(echo "$release" | jq -r '.tag_name')
+            current_body=$(echo "$release" | jq -r '.body // ""')
+            
+            # Calculate total downloads for this release
+            total_downloads=$(echo "$release" | jq '[.assets[].download_count] | add // 0')
+            
+            # Get individual asset download counts
+            asset_stats=$(echo "$release" | jq -r '.assets[] | "- \(.name): **\(.download_count)** downloads"' | tr '\n' '\n')
+            
+            # Remove existing stats section if present
+            clean_body=$(echo "$current_body" | sed '/^## 📥 Download Statistics/,/^$/d' | sed '/^---$/d' | sed '$!N;/^\n$/d;P;D')
+            
+            # Create new stats section
+            stats_section="## 📥 Download Statistics
+            
+**Total Downloads: ${total_downloads}**
+
+${asset_stats}
+
+---"
+            
+            # Combine original body with stats
+            if [ -n "$clean_body" ]; then
+              new_body="${clean_body}
+
+${stats_section}"
+            else
+              new_body="$stats_section"
+            fi
+            
+            # Update the release
+            curl -s -X PATCH \
+              -H "Authorization: token $GITHUB_TOKEN" \
+              -H "Content-Type: application/json" \
+              "https://api.github.com/repos/${{ github.repository }}/releases/$release_id" \
+              -d "{\"body\":$(echo "$new_body" | jq -Rs .)}"
+            
+            echo "Updated stats for release $tag_name (Total: $total_downloads downloads)"
+          done
