@@ -418,7 +418,6 @@ IsInternetAvailable() {
 ; Helper function to create MSI parameters from registry values for all WAU settings
 GetMSIParams() {
     msiParams := ""
-    debugInfo := "Registry values found:`n`n"
     
     ; Special case mappings
     specialCases := Map()
@@ -442,9 +441,6 @@ GetMSIParams() {
             try {
                 valueData := RegRead("HKLM\SOFTWARE\Romanitho\Winget-AutoUpdate", valueName)
                 regType := A_LoopRegType
-                
-                ; Add to debug info
-                debugInfo .= valueName . " (" . regType . ") = " . valueData . "`n"
                 
                 ; Determine parameter name (check for special cases first)
                 if (specialCases.Has(valueName)) {
@@ -486,8 +482,8 @@ GetMSIParams() {
                     }
                 }
                 
-            } catch as e {
-                debugInfo .= valueName . " - ERROR: " . e.message . "`n"
+            } catch {
+                ; Ignore errors reading specific values
                 continue
             }
         }
