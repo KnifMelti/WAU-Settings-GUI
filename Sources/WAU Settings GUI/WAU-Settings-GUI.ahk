@@ -3,8 +3,8 @@
 ;@Ahk2Exe-Set CompanyName, KnifMelti
 ;@Ahk2Exe-Set ProductName, WAU Settings GUI
 ;@Ahk2Exe-Set FileDescription, WAU Settings GUI
-;@Ahk2Exe-Set FileVersion, 1.8.1.5
-;@Ahk2Exe-Set ProductVersion, 1.8.1.5
+;@Ahk2Exe-Set FileVersion, 1.8.1.6
+;@Ahk2Exe-Set ProductVersion, 1.8.1.6
 ;@Ahk2Exe-Set InternalName, WAU-Settings-GUI
 ;@Ahk2Exe-SetMainIcon ..\assets\WAU Settings GUI.ico
 ;@Ahk2Exe-UpdateManifest 1
@@ -42,7 +42,7 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
     silent := (A_Args.Length > 1 && (A_Args[2] = "/S"))
     if !silent {
         choice := MsgBox(
-            "Do you want to uninstall WAU Settings GUI?`n`nWAU will be automatically reinstalled afterward`nrestoring the original current showing shortcuts.",
+            "Do you want to uninstall WAU Settings GUI?`n`nWAU will be automatically reinstalled afterward`nrestoring the current showing shortcuts and settings.",
             name_no_ext,
             0x21  ; OK/Cancel with Question icon
         )
@@ -156,11 +156,11 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
                 ; Uninstall using the found GUID and install from the copied WAU.msi in the Package Cache folder
                 if !silent {
                     RunWait('msiexec /x' wauGUID ' /qb', , "Hide")
-                    RunWait('msiexec /i "' cacheMsiPath '" /qb' msiParams, , "Hide")
+                    RunWait('msiexec /i "' cacheMsiPath '" /qb ' msiParams, , "Hide")
                 }                
                 else {
                     RunWait('msiexec /x' wauGUID ' /qn', , "Hide")
-                    RunWait('msiexec /i "' cacheMsiPath '" /qn' msiParams, , "Hide")
+                    RunWait('msiexec /i "' cacheMsiPath '" /qn ' msiParams, , "Hide")
                 }
             } else if (IsInternetAvailable()) {
                 ; WAU.msi not found in original source, download the original version and trigger MSI reinstall
@@ -415,45 +415,95 @@ IsInternetAvailable() {
     return DllCall("wininet.dll\InternetGetConnectedState", "UInt*", 0, "UInt", 0)
 }
 
+; Helper function to create MSI parameters from registry values for all WAU settings
 GetMSIParams() {
-    startMenu := ""
-    desktopWAU := ""
-    desktopAppInstaller := ""
-
-    try {
-        shortcutFlag := RegRead("HKLM\SOFTWARE\Romanitho\Winget-AutoUpdate", "WAU_StartMenuShortcut")
-    } catch {
-        shortcutFlag := 0
-    }
-    if shortcutFlag = 1 {
-        startMenu := "STARTMENUSHORTCUT=1"
-    }
-
-    try {
-        shortcutFlag := RegRead("HKLM\SOFTWARE\Romanitho\Winget-AutoUpdate", "WAU_DesktopShortcut")
-    } catch {
-        shortcutFlag := 0
-    }
-    if shortcutFlag = 1 {
-        desktopWAU := "DESKTOPSHORTCUT=1"
-    }
-
-    try {
-        shortcutFlag := RegRead("HKLM\SOFTWARE\Romanitho\Winget-AutoUpdate", "WAU_AppInstallerShortcut")
-    } catch {
-        shortcutFlag := 0
-    }
-    if shortcutFlag = 1 {
-        desktopAppInstaller := "APPINSTALLERSHORTCUT=1"
-    }
-
     msiParams := ""
-    if (startMenu != "")
-        msiParams .= " " startMenu
-    if (desktopWAU != "")
-        msiParams .= " " desktopWAU
-    if (desktopAppInstaller != "")
-        msiParams .= " " desktopAppInstaller
-
+    debugInfo := "Registry values found:`n`n"
+    
+    ; Special case mappings
+    specialCases := Map()
+    specialCases["WAU_UpdatesTimeDelay"] := "UPDATESATTIMEDELAY"
+    specialCases["WAU_DisableAutoUpdate"] := "DISABLEWAUAUTOUPDATE"
+    
+    ; Non-boolean parameters (numeric or string values)
+    nonBooleanParams := ["MAXLOGFILES", "MAXLOGSIZE", "UPDATESATTIME", "UPDATESATTIMEDELAY",
+                        "UPDATESINTERVAL", "NOTIFICATIONLEVEL", "LISTPATH", "MODSPATH", "AZUREBLOBSASURL"]
+    
+    ; Store all parameters with priority (DWORD > REG_SZ)
+    params := Map()
+    
+    ; Loop through all values in the registry key
+    Loop Reg, "HKLM\SOFTWARE\Romanitho\Winget-AutoUpdate", "V"
+    {
+        valueName := A_LoopRegName
+        
+        ; Check if the value name starts with "WAU_"
+        if (SubStr(valueName, 1, 4) = "WAU_") {
+            try {
+                valueData := RegRead("HKLM\SOFTWARE\Romanitho\Winget-AutoUpdate", valueName)
+                regType := A_LoopRegType
+                
+                ; Add to debug info
+                debugInfo .= valueName . " (" . regType . ") = " . valueData . "`n"
+                
+                ; Determine parameter name (check for special cases first)
+                if (specialCases.Has(valueName)) {
+                    paramName := specialCases[valueName]
+                } else {
+                    paramName := StrUpper(SubStr(valueName, 5))  ; Remove "WAU_" prefix and convert to uppercase
+                }
+                
+                ; Handle different registry types
+                if (regType = "REG_DWORD") {
+                    ; DWORD values have priority - always overwrite
+                    numValue := Integer(valueData)
+                    
+                    ; Check if this is a non-boolean parameter
+                    isNonBooleanParam := false
+                    for nonBoolParam in nonBooleanParams {
+                        if (nonBoolParam = paramName) {
+                            isNonBooleanParam := true
+                            break
+                        }
+                    }
+                    
+                    if (isNonBooleanParam) {
+                        ; Numeric parameters: accept any positive number
+                        if (numValue >= 0) {
+                            params[paramName] := String(numValue)
+                        }
+                    } else {
+                        ; Boolean parameters: only accept 0 or 1
+                        if (numValue = 0 || numValue = 1) {
+                            params[paramName] := String(numValue)
+                        }
+                    }
+                }
+                else if (regType = "REG_SZ" || regType = "REG_EXPAND_SZ") {
+                    ; String values - only add if not already exists (DWORD has priority)
+                    if (valueData != "" && !params.Has(paramName)) {
+                        params[paramName] := valueData
+                    }
+                }
+                
+            } catch as e {
+                debugInfo .= valueName . " - ERROR: " . e.message . "`n"
+                continue
+            }
+        }
+    }
+    
+    ; Build MSI parameters string from collected parameters
+    for paramName, paramValue in params {
+        if (msiParams != "")
+            msiParams .= " "
+        msiParams .= paramName . "=" . paramValue
+    }
+    
+    ; Add REBOOT=R at the end
+    if (msiParams != "")
+        msiParams .= " "
+    msiParams .= "REBOOT=R"
+    
     return msiParams
 }
