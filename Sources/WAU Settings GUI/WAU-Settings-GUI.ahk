@@ -3,8 +3,8 @@
 ;@Ahk2Exe-Set CompanyName, KnifMelti
 ;@Ahk2Exe-Set ProductName, WAU Settings GUI
 ;@Ahk2Exe-Set FileDescription, WAU Settings GUI
-;@Ahk2Exe-Set FileVersion, 1.8.1.6
-;@Ahk2Exe-Set ProductVersion, 1.8.1.6
+;@Ahk2Exe-Set FileVersion, 1.8.1.7
+;@Ahk2Exe-Set ProductVersion, 1.8.1.7
 ;@Ahk2Exe-Set InternalName, WAU-Settings-GUI
 ;@Ahk2Exe-SetMainIcon ..\assets\WAU Settings GUI.ico
 ;@Ahk2Exe-UpdateManifest 1
@@ -418,89 +418,102 @@ IsInternetAvailable() {
 ; Helper function to create MSI parameters from registry values for all WAU settings
 GetMSIParams() {
     msiParams := ""
-    debugInfo := "Registry values found:`n`n"
     
-    ; Special case mappings
-    specialCases := Map()
-    specialCases["WAU_UpdatesTimeDelay"] := "UPDATESATTIMEDELAY"
-    specialCases["WAU_DisableAutoUpdate"] := "DISABLEWAUAUTOUPDATE"
+    ; Parameter configuration: [MSI_NAME, TYPE, PRIORITY]
+    ; TYPE: "boolean" (0/1), "numeric" (>=0), "string" 
+    ; PRIORITY: "dword" (DWORD > REG_SZ), "string" (REG_SZ > DWORD)
+    paramConfig := Map()
+    paramConfig["WAU_AppInstallerShortcut"] := ["APPINSTALLERSHORTCUT", "boolean", "dword"]
+    paramConfig["WAU_AzureBlobSASURL"] := ["AZUREBLOBSASURL", "string", "string"]
+    paramConfig["WAU_BypassListForUsers"] := ["BYPASSLISTFORUSERS", "boolean", "dword"]
+    paramConfig["WAU_DesktopShortcut"] := ["DESKTOPSHORTCUT", "boolean", "dword"]
+    paramConfig["WAU_DisableAutoUpdate"] := ["DISABLEWAUAUTOUPDATE", "boolean", "dword"]
+    paramConfig["WAU_DoNotRunOnMetered"] := ["DONOTRUNONMETERED", "boolean", "dword"]
+    paramConfig["WAU_ListPath"] := ["LISTPATH", "string", "string"]
+    paramConfig["WAU_MaxLogFiles"] := ["MAXLOGFILES", "numeric", "dword"]
+    paramConfig["WAU_MaxLogSize"] := ["MAXLOGSIZE", "numeric", "dword"]
+    paramConfig["WAU_ModsPath"] := ["MODSPATH", "string", "string"]
+    paramConfig["WAU_NotificationLevel"] := ["NOTIFICATIONLEVEL", "string", "string"]
+    paramConfig["WAU_StartMenuShortcut"] := ["STARTMENUSHORTCUT", "boolean", "dword"]
+    paramConfig["WAU_UpdatePrerelease"] := ["UPDATEPRERELEASE", "boolean", "dword"]
+    paramConfig["WAU_UpdatesAtLogon"] := ["UPDATESATLOGON", "boolean", "dword"]
+    paramConfig["WAU_UpdatesAtTime"] := ["UPDATESATTIME", "string", "string"]
+    paramConfig["WAU_UpdatesInterval"] := ["UPDATESINTERVAL", "string", "string"]
+    paramConfig["WAU_UpdatesTimeDelay"] := ["UPDATESATTIMEDELAY", "string", "string"]
+    paramConfig["WAU_UserContext"] := ["USERCONTEXT", "boolean", "dword"]
+    paramConfig["WAU_UseWhiteList"] := ["USEWHITELIST", "boolean", "dword"]
     
-    ; Non-boolean parameters (numeric or string values)
-    nonBooleanParams := ["MAXLOGFILES", "MAXLOGSIZE", "UPDATESATTIME", "UPDATESATTIMEDELAY",
-                        "UPDATESINTERVAL", "NOTIFICATIONLEVEL", "LISTPATH", "MODSPATH", "AZUREBLOBSASURL"]
-    
-    ; Store all parameters with priority (DWORD > REG_SZ)
+    ; Collect all parameters with priority handling
     params := Map()
     
-    ; Loop through all values in the registry key
     Loop Reg, "HKLM\SOFTWARE\Romanitho\Winget-AutoUpdate", "V"
     {
         valueName := A_LoopRegName
         
-        ; Check if the value name starts with "WAU_"
-        if (SubStr(valueName, 1, 4) = "WAU_") {
+        ; Only process WAU_ parameters that are in our config
+        if (SubStr(valueName, 1, 4) = "WAU_" && paramConfig.Has(valueName)) {
             try {
                 valueData := RegRead("HKLM\SOFTWARE\Romanitho\Winget-AutoUpdate", valueName)
                 regType := A_LoopRegType
+                config := paramConfig[valueName]
+                msiName := config[1]
+                paramType := config[2]
+                priority := config[3]
                 
-                ; Add to debug info
-                debugInfo .= valueName . " (" . regType . ") = " . valueData . "`n"
-                
-                ; Determine parameter name (check for special cases first)
-                if (specialCases.Has(valueName)) {
-                    paramName := specialCases[valueName]
-                } else {
-                    paramName := StrUpper(SubStr(valueName, 5))  ; Remove "WAU_" prefix and convert to uppercase
+                ; Apply priority rules
+                shouldProcess := false
+                if (priority = "dword" && regType = "REG_DWORD") {
+                    shouldProcess := true  ; DWORD always overwrites
+                } else if (priority = "dword" && regType != "REG_DWORD" && !params.Has(msiName)) {
+                    shouldProcess := true  ; REG_SZ only if no DWORD exists
+                } else if (priority = "string" && regType != "REG_DWORD") {
+                    shouldProcess := true  ; REG_SZ always overwrites
+                } else if (priority = "string" && regType = "REG_DWORD" && !params.Has(msiName)) {
+                    shouldProcess := true  ; DWORD only if no REG_SZ exists
                 }
                 
-                ; Handle different registry types
-                if (regType = "REG_DWORD") {
-                    ; DWORD values have priority - always overwrite
-                    numValue := Integer(valueData)
+                if (shouldProcess) {
+                    validValue := ""
                     
-                    ; Check if this is a non-boolean parameter
-                    isNonBooleanParam := false
-                    for nonBoolParam in nonBooleanParams {
-                        if (nonBoolParam = paramName) {
-                            isNonBooleanParam := true
-                            break
-                        }
+                    ; Validate based on parameter type
+                    switch paramType {
+                        case "boolean":
+                            numValue := Integer(valueData)
+                            if (numValue = 0 || numValue = 1) {
+                                validValue := String(numValue)
+                            }
+                        case "numeric":
+                            if (regType = "REG_DWORD") {
+                                numValue := Integer(valueData)
+                                if (numValue >= 0) {
+                                    validValue := String(numValue)
+                                }
+                            }
+                        case "string":
+                            if (valueData != "") {
+                                validValue := valueData
+                            }
                     }
                     
-                    if (isNonBooleanParam) {
-                        ; Numeric parameters: accept any positive number
-                        if (numValue >= 0) {
-                            params[paramName] := String(numValue)
-                        }
-                    } else {
-                        ; Boolean parameters: only accept 0 or 1
-                        if (numValue = 0 || numValue = 1) {
-                            params[paramName] := String(numValue)
-                        }
-                    }
-                }
-                else if (regType = "REG_SZ" || regType = "REG_EXPAND_SZ") {
-                    ; String values - only add if not already exists (DWORD has priority)
-                    if (valueData != "" && !params.Has(paramName)) {
-                        params[paramName] := valueData
+                    if (validValue != "") {
+                        params[msiName] := validValue
                     }
                 }
                 
-            } catch as e {
-                debugInfo .= valueName . " - ERROR: " . e.message . "`n"
+            } catch {
                 continue
             }
         }
     }
     
-    ; Build MSI parameters string from collected parameters
-    for paramName, paramValue in params {
+    ; Build MSI parameters string
+    for msiName, paramValue in params {
         if (msiParams != "")
             msiParams .= " "
-        msiParams .= paramName . "=" . paramValue
+        msiParams .= msiName . "=" . paramValue
     }
     
-    ; Add REBOOT=R at the end
+    ; Add REBOOT=R
     if (msiParams != "")
         msiParams .= " "
     msiParams .= "REBOOT=R"
