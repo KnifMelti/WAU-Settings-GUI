@@ -2478,19 +2478,11 @@ function Update-WAUGUIFromConfig {
                 # If we can't read first run time, proceed with normal check
             }
 
-            # Always create/update timestamp file regardless of grace period
-            try {
-                $today = Get-Date -Format "yyyy-MM-dd"
-                Set-Content -Path $timestampFile -Value $today -Force
-            }
-            catch {
-                # Silent fail if we can't write timestamp file
-            }
-
             # Only do actual update check if not in grace period and interval allows
             if (-not $inGracePeriod) {
                 $shouldCheck = $true
                 
+                # Check if we should skip based on last check date
                 if (Test-Path $timestampFile) {
                     try {
                         $lastCheckDate = Get-Content $timestampFile -ErrorAction Stop
@@ -2499,19 +2491,46 @@ function Update-WAUGUIFromConfig {
                         
                         $daysSinceLastCheck = ($today - $lastCheck).Days
                         
-                        if ($daysSinceLastCheck -lt $Script:AUTOUPDATE_DAYS) {
+                        # Special case: 0 means check every time GUI opens
+                        if ($Script:AUTOUPDATE_DAYS -eq 0) {
+                            $shouldCheck = $true
+                        } elseif ($daysSinceLastCheck -lt $Script:AUTOUPDATE_DAYS) {
                             $shouldCheck = $false
                         }
                     }
                     catch {
                         # If file is corrupted or invalid, proceed with check
+                        $shouldCheck = $true
                     }
                 }
                 
                 if ($shouldCheck) {
                     $updateInfo = Test-WAUGUIUpdate
+                    
+                    # Update timestamp file ONLY after performing the actual check
+                    try {
+                        $today = Get-Date -Format "yyyy-MM-dd"
+                        Set-Content -Path $timestampFile -Value $today -Force
+                    }
+                    catch {
+                        # Silent fail if we can't write timestamp file
+                    }
+                    
                     if ($updateInfo.UpdateAvailable -and -not $updateInfo.Error) {
-                        $message = "Update available!`n`nCurrent version: $($updateInfo.CurrentVersion)`nLatest version: $($updateInfo.LatestVersion)`nRelease notes:`n$($updateInfo.ReleaseNotes -split "`n" | Where-Object { $_ -match '^\s*[\*\-]' -and $_ -notmatch '^\s*\*\*' })`n`nDo you want to download the update?"
+                        # Clean and filter release notes
+                        $cleanedNotes = $updateInfo.ReleaseNotes -replace '\*\*[^*]*\*\*', '' # Remove markdown bold
+                        $cleanedNotes = $cleanedNotes -replace '\*{3,}', '' # Remove multiple asterisks
+                        $releaseNotesList = $cleanedNotes -split "`n" | Where-Object { 
+                            $_ -match '^\s*[\*\-]\s+\w+' -and $_.Trim().Length -gt 5 
+                        } | Select-Object -First 5 # Limit to first 5 bullet points
+
+                        $notesText = if ($releaseNotesList) { 
+                            ($releaseNotesList -join "`n").Trim() 
+                        } else { 
+                            "See GitHub for release notes" 
+                        }
+
+                        $message = "Update available!`n`nCurrent version: $($updateInfo.CurrentVersion)`nLatest version: $($updateInfo.LatestVersion)`nRelease notes:`n$notesText`n`nDo you want to download the update?"
                         $result = [System.Windows.MessageBox]::Show($message, "Update Available", "OkCancel", "Question")
                         if ($result -eq 'Ok') {
                             Start-WAUGUIUpdate -updateInfo $updateInfo
