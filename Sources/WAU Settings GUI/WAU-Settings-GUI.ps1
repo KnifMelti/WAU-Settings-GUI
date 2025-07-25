@@ -310,7 +310,7 @@ function Get-CleanReleaseNotes {
     }
     
     # Extract bullet points from "What's Changed" section
-    $lines = $RawNotes -split "`n"
+    $lines = $RawNotes -split "`r?`n"  # Split on both \r\n and \n
     $inChangedSection = $false
     $bulletPoints = @()
     
@@ -331,7 +331,7 @@ function Get-CleanReleaseNotes {
             # Extract bullet points (handles *, -, and indented bullets)
             if ($line -match '^\s*([\*\-])\s+(.+)') {
                 $bulletChar = $matches[1]
-                $bulletText = $matches[2]
+                $bulletText = $matches[2].Trim()  # Extra trim to remove any \r characters
                 # Remove "by @username in url" parts
                 $bulletText = $bulletText -replace '\s+by\s+@\w+\s+in\s+https://[^\s]*', ''
                 # Remove markdown links
