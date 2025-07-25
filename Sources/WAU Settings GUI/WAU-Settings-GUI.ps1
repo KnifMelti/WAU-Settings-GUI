@@ -302,6 +302,55 @@ function Test-WAUGUIUpdate {
         }
     }
 }
+function Get-CleanReleaseNotes {
+    param([string]$RawNotes)
+    
+    if ([string]::IsNullOrWhiteSpace($RawNotes)) {
+        return "Se GitHub för release notes"
+    }
+    
+    # Extract bullet points from "What's Changed" section
+    $lines = $RawNotes -split "`n"
+    $inChangedSection = $false
+    $bulletPoints = @()
+    
+    foreach ($line in $lines) {
+        $trimmedLine = $line.Trim()
+        
+        if ($trimmedLine -match '^## What''s Changed') {
+            $inChangedSection = $true
+            continue
+        }
+        
+        if ($inChangedSection) {
+            # Stop at next section or download statistics
+            if ($trimmedLine -match '^## ' -and $trimmedLine -notmatch '^## What''s Changed') {
+                break
+            }
+            
+            # Extract bullet points and clean them
+            if ($trimmedLine -match '^\*\s+(.+)') {
+                $bulletText = $matches[1]
+                # Remove "by @username in url" parts
+                $bulletText = $bulletText -replace '\s+by\s+@\w+\s+in\s+https://[^\s]*', ''
+                # Remove markdown links
+                $bulletText = $bulletText -replace '\[([^\]]+)\]\([^\)]+\)', '$1'
+                # Remove markdown formatting
+                $bulletText = $bulletText -replace '\*\*([^*]+)\*\*', '$1'
+                
+                if ($bulletText.Length -gt 5) {
+                    $bulletPoints += "• $bulletText"
+                }
+            }
+        }
+    }
+    
+    if ($bulletPoints.Count -gt 0) {
+        return ($bulletPoints | Select-Object -First 4) -join "`n"
+    } else {
+        return "Se GitHub för release notes"
+    }
+}
 function Start-WAUGUIUpdate {
     param($updateInfo)
     
@@ -2182,7 +2231,6 @@ function Update-GPOManagementState {
     
     return $gpoControlsActive
 }
-
 function Update-WAUGUIFromConfig {
     param($controls)
     
@@ -2517,19 +2565,7 @@ function Update-WAUGUIFromConfig {
                     }
                     
                     if ($updateInfo.UpdateAvailable -and -not $updateInfo.Error) {
-                        # Clean and filter release notes
-                        $cleanedNotes = $updateInfo.ReleaseNotes -replace '\*\*[^*]*\*\*', '' # Remove markdown bold
-                        $cleanedNotes = $cleanedNotes -replace '\*{3,}', '' # Remove multiple asterisks
-                        $releaseNotesList = $cleanedNotes -split "`n" | Where-Object { 
-                            $_ -match '^\s*[\*\-]\s+\w+' -and $_.Trim().Length -gt 5 
-                        } | Select-Object -First 5 # Limit to first 5 bullet points
-
-                        $notesText = if ($releaseNotesList) { 
-                            ($releaseNotesList -join "`n").Trim() 
-                        } else { 
-                            "See GitHub for release notes" 
-                        }
-
+                        $notesText = Get-CleanReleaseNotes -RawNotes $updateInfo.ReleaseNotes
                         $message = "Update available!`n`nCurrent version: $($updateInfo.CurrentVersion)`nLatest version: $($updateInfo.LatestVersion)`nRelease notes:`n$notesText`n`nDo you want to download the update?"
                         $result = [System.Windows.MessageBox]::Show($message, "Update Available", "OkCancel", "Question")
                         if ($result -eq 'Ok') {
