@@ -71,7 +71,7 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
 - In the **GUI** you now have **☐|☑ Start Menu shortcuts** / **☐|☑ WAU Desktop shortcut** / **☐|☑ App Installer shortcut** options showing the current installed **WAU** configuration
 - Configure every setting to your preferences and `Save Settings`
 - The **WAU Settings (Administrator)** shortcut has now been created under **Start Menu\Programs\Winget-AutoUpdate** folder (along with the other **WAU** shortcuts) or on your own **Desktop** (pin to taskbar when running maybe?) depending on your choice
-- If **WAU** is updated and some shortcut goes missing their icons you'll have to toggle the **☐|☑ Start Menu shortcuts** / **☐|☑ WAU Desktop shortcut** / **☐|☑ App Installer shortcut** options again to create new shortcuts so that they are updated to the new **WAU** version icon
+- If **WAU** is updated and some shortcut icons goes missing, you'll have to toggle the **☐|☑ Start Menu shortcuts** / **☐|☑ WAU Desktop shortcut** / **☐|☑ App Installer shortcut** options again to create new shortcuts so that they are updated to the new **WAU** version icon
 
 ### Updating
 - Dev Tools (**F12**): Click the button `[ver]`
