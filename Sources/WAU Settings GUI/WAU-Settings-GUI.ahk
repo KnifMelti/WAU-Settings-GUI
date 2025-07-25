@@ -3,8 +3,8 @@
 ;@Ahk2Exe-Set CompanyName, KnifMelti
 ;@Ahk2Exe-Set ProductName, WAU Settings GUI
 ;@Ahk2Exe-Set FileDescription, WAU Settings GUI
-;@Ahk2Exe-Set FileVersion, 1.8.1.7
-;@Ahk2Exe-Set ProductVersion, 1.8.1.7
+;@Ahk2Exe-Set FileVersion, 1.8.1.8
+;@Ahk2Exe-Set ProductVersion, 1.8.1.8
 ;@Ahk2Exe-Set InternalName, WAU-Settings-GUI
 ;@Ahk2Exe-SetMainIcon ..\assets\WAU Settings GUI.ico
 ;@Ahk2Exe-UpdateManifest 1
@@ -101,30 +101,42 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
     ; MSI uninstall/install to restore WAU from current showing shortcut settings in the GUI
     try {
         ; Use PowerShell to find the product code (GUID) for Winget-AutoUpdate
-        psCommand := 'powershell.exe -NoProfile -Command "$pkg = Get-Package -Name \"Winget-AutoUpdate\" -ProviderName msi -ErrorAction SilentlyContinue; if ($pkg) { $productCode = $pkg.Metadata[\"ProductCode\"]; $installSource = (Get-ItemProperty -Path \"HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$productCode\" -Name \"InstallSource\" -ErrorAction SilentlyContinue).InstallSource; Write-Host \"ProductCode: $productCode\"; Write-Host \"InstallSource: $installSource\"; Write-Host \"Version: $($pkg.Version)\" }"'
+        psCommand := 'powershell.exe -NoProfile -Command "$pkg = Get-Package -Name \"Winget-AutoUpdate\" -ProviderName msi -ErrorAction SilentlyContinue; if ($pkg) { $productCode = $pkg.Metadata[\"ProductCode\"]; $regPath = \"HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\$productCode\"; $installSource = (Get-ItemProperty -Path $regPath -Name \"InstallSource\" -ErrorAction SilentlyContinue).InstallSource; $comments = (Get-ItemProperty -Path $regPath -Name \"Comments\" -ErrorAction SilentlyContinue).Comments; Write-Host \"ProductCode: $productCode\"; Write-Host \"Comments: $comments\"; Write-Host \"InstallSource: $installSource\"; Write-Host \"Version: $($pkg.Version)\" }"'
         tempFile := A_Temp "\wau_guid.tmp"
         
         ; Run the command, redirecting output to a temporary file
         RunWait(A_ComSpec ' /c "' psCommand ' > "' tempFile '"', , "Hide")
         
         wauGUID := ""
+        wauComments := ""
         wauSource := ""
         wauVersion := ""
+
         if FileExist(tempFile) {
             fileContent := Trim(FileRead(tempFile))
             FileDelete(tempFile)
-            
-            ; Parse the three lines to extract ProductCode, InstallSource and Version
+
+            ; Parse the four lines to extract ProductCode, Comments, InstallSource and Version
             lines := StrSplit(fileContent, "`n")
             for line in lines {
                 line := Trim(line)
                 if InStr(line, "ProductCode: ") = 1 {
                     wauGUID := SubStr(line, 14)  ; Extract after "ProductCode: "
+                } else if InStr(line, "Comments: ") = 1 {
+                    wauComments := SubStr(line, 11)  ; Extract after "Comments: "
                 } else if InStr(line, "InstallSource: ") = 1 {
                     wauSource := RTrim(SubStr(line, 16), "\")  ; Extract after "InstallSource: " and remove trailing backslash
                 } else if InStr(line, "Version: ") = 1 {
-                    wauLongVersion := "v" . SubStr(line, 10)  ; Extract after "Version: " (keep full version, including last dot and numbers)
+                    wauLongVersion := "v" . SubStr(line, 10)  ; Extract after "Version: " (add "v" prefix, keep full version, including last dot and numbers)
                     wauVersion := "v" . RegExReplace(SubStr(line, 10), "\.\d+$", "")  ; Extract after "Version: ", add "v" prefix, remove last dot and numbers
+                }
+            }
+            if (wauComments != "STABLE") {
+                ; Extract version number from Comments if not "STABLE"
+                ; Example: "WAU 2.7.0-0 [Nightly Build]" -> "v2.7.0-0"
+                m := ""
+                if RegExMatch(wauComments, "WAU\s+([0-9]+\.[0-9]+\.[0-9]+(?:-\d+)?)(?:\s|\[)", &m) {
+                    wauVersion := "v" . m[1]
                 }
             }
         }
