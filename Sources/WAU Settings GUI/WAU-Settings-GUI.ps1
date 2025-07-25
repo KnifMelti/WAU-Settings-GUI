@@ -328,9 +328,10 @@ function Get-CleanReleaseNotes {
                 break
             }
             
-            # Extract bullet points and clean them
-            if ($trimmedLine -match '^\*\s+(.+)') {
-                $bulletText = $matches[1]
+            # Extract bullet points (handles *, -, and indented bullets)
+            if ($line -match '^\s*([\*\-])\s+(.+)') {
+                $bulletChar = $matches[1]
+                $bulletText = $matches[2]
                 # Remove "by @username in url" parts
                 $bulletText = $bulletText -replace '\s+by\s+@\w+\s+in\s+https://[^\s]*', ''
                 # Remove markdown links
@@ -339,14 +340,15 @@ function Get-CleanReleaseNotes {
                 $bulletText = $bulletText -replace '\*\*([^*]+)\*\*', '$1'
                 
                 if ($bulletText.Length -gt 5) {
-                    $bulletPoints += "• $bulletText"
+                    $bulletPoints += "$bulletChar $bulletText"
                 }
             }
         }
     }
     
     if ($bulletPoints.Count -gt 0) {
-        return ($bulletPoints | Select-Object -First 4) -join "`n"
+        # Use Windows-style line breaks
+        return ($bulletPoints | Select-Object -First 3) -join "`r`n"
     } else {
         return "Se GitHub för release notes"
     }
@@ -3809,7 +3811,8 @@ function Show-WAUSettingsGUI {
             }
             
             if ($updateInfo.UpdateAvailable) {
-                $message = "Update available!`n`nCurrent version: $($updateInfo.CurrentVersion)`nLatest version: $($updateInfo.LatestVersion)`nRelease notes:`n$($updateInfo.ReleaseNotes -split "`n" | Where-Object { $_ -match '^(?:\*|-)[^*-]' })`n`nDo you want to download the update?"
+                $notesText = Get-CleanReleaseNotes -RawNotes $updateInfo.ReleaseNotes
+                $message = "Update available!`r`n`r`nCurrent version: $($updateInfo.CurrentVersion)`r`nLatest version: $($updateInfo.LatestVersion)`r`nRelease notes:`r`n$notesText`r`n`r`nDo you want to download the update?"
                 $result = [System.Windows.MessageBox]::Show($message, "Update Available", "OkCancel", "Question")
                 
                 if ($result -eq 'Ok') {
