@@ -167,9 +167,9 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
                 }
             } else {
                 ; First check for local MSI in version-specific folder structure
-                localVersion := wauVersion  ; Keep "v" prefix for folder/file names (e.g. \msi\v2.6.1\WAU-v2.6.1.msi)
+                localVersion := RegExReplace(wauVersion, "^v")  ; Remove "v" prefix for folder name
                 localMsiDir := A_WorkingDir "\msi\" localVersion
-                localMsiPath := localMsiDir "\WAU-" localVersion ".msi"
+                localMsiPath := localMsiDir "\WAU-" wauVersion ".msi"  ; Keep "v" prefix for file name
                 
                 if (FileExist(localMsiPath)) {
                     ; Copy local MSI to %ProgramData%\Package Cache folder for MSI reinstall
