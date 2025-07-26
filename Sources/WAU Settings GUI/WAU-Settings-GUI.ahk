@@ -165,59 +165,90 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
                     RunWait('msiexec /x' wauGUID ' /qn', , "Hide")
                     RunWait('msiexec /i "' cacheMsiPath '" /qn ' msiParams, , "Hide")
                 }
-            } else if (IsInternetAvailable()) {
-                ; WAU.msi not found in original source, download the original version and trigger MSI reinstall
-                downloadUrl := "https://github.com/Romanitho/Winget-AutoUpdate/releases/download/" wauVersion "/WAU.msi"
-                wauMsiPath := A_WorkingDir "\WAU.msi"
-                try {
-                    Download(downloadUrl, wauMsiPath)
-                    ; Check MSI file signature (first 8 bytes should be MSI signature)
+            } else {
+                ; First check for local MSI in version-specific folder structure
+                localVersion := StrReplace(wauVersion, "v", "")  ; Remove "v" prefix for folder/file names
+                localMsiDir := A_WorkingDir "\msi\" localVersion
+                localMsiPath := localMsiDir "\WAU-" localVersion ".msi"
+                
+                if (FileExist(localMsiPath)) {
+                    ; Copy local MSI to %ProgramData%\Package Cache folder for MSI reinstall
+                    cacheDir := A_AppDataCommon "\Package Cache\" wauGUID wauLongVersion "\Installers"
+                    if !DirExist(cacheDir) {
+                        DirCreate(cacheDir)
+                    }
+                    cacheMsiPath := cacheDir "\WAU.msi"
+                    ; Only copy if wauSource is NOT under Package Cache
+                    if InStr(wauSource, "\Package Cache\" wauGUID wauLongVersion "\Installers", false) = 0 {
+                        FileCopy(localMsiPath, cacheMsiPath, 1)
+                    }
+
+                    msiParams := GetMSIParams()
+
+                    ; Uninstall using the found GUID and install from the copied local MSI
+                    if !silent {
+                        RunWait('msiexec /x' wauGUID ' /qn', , "Hide")
+                        RunWait('msiexec /i "' cacheMsiPath '" /qb ' msiParams, , "Hide")
+                    } else {
+                        RunWait('msiexec /x' wauGUID ' /qn', , "Hide")
+                        RunWait('msiexec /i "' cacheMsiPath '" /qn ' msiParams, , "Hide")
+                    }
+                } else if (IsInternetAvailable()) {
+                    ; No local MSI found, download the original version and trigger MSI reinstall
+                    downloadUrl := "https://github.com/Romanitho/Winget-AutoUpdate/releases/download/" wauVersion "/WAU.msi"
+                    wauMsiPath := A_WorkingDir "\WAU.msi"
                     try {
-                        f := FileOpen(wauMsiPath, "r")
-                        if !f {
-                            throw Error("Could not open downloaded file for validation.")
-                        }
-                        ; Read first 8 bytes as hex values
-                        signature := ""
-                        Loop 8 {
-                            signature .= Format("{:02X}", f.ReadUChar())
-                        }
-                        f.Close()
-                        if (signature != "D0CF11E0A1B11AE1") { ; OLE/COM compound document signature
-                            throw Error("Downloaded file is not a valid MSI file (invalid signature).")
+                        Download(downloadUrl, wauMsiPath)
+                        ; Check MSI file signature (first 8 bytes should be MSI signature)
+                        try {
+                            f := FileOpen(wauMsiPath, "r")
+                            if !f {
+                                throw Error("Could not open downloaded file for validation.")
+                            }
+                            ; Read first 8 bytes as hex values
+                            signature := ""
+                            Loop 8 {
+                                signature .= Format("{:02X}", f.ReadUChar())
+                            }
+                            f.Close()
+                            if (signature != "D0CF11E0A1B11AE1") { ; OLE/COM compound document signature
+                                throw Error("Downloaded file is not a valid MSI file (invalid signature).")
+                            }
+                        } catch as e {
+                            throw Error("Failed to validate MSI file signature: " e.Message)
                         }
                     } catch as e {
-                        throw Error("Failed to validate MSI file signature: " e.Message)
+                        throw Error("Failed to download WAU.msi from GitHub: " downloadUrl "`nError: " e.Message)
                     }
-                } catch as e {
-                    throw Error("Failed to download WAU.msi from GitHub: " downloadUrl "`nError: " e.Message)
+
+                    wauSource := A_WorkingDir
+                    ; Copy WAU.msi to %ProgramData%\Package Cache folder for MSI repair
+                    cacheDir := A_AppDataCommon "\Package Cache\" wauGUID wauLongVersion "\Installers"
+                    if !DirExist(cacheDir) {
+                        DirCreate(cacheDir)
+                    }
+                    cacheMsiPath := cacheDir "\WAU.msi"
+                    ; Only copy if wauSource is NOT under Package Cache
+                    if InStr(wauSource, "\Package Cache\" wauGUID wauLongVersion "\Installers", false) = 0 {
+                        FileCopy(wauSource "\WAU.msi", cacheMsiPath, 1)
+                    }
+
+                    wauSource := cacheDir
+
+                    msiParams := GetMSIParams()
+
+                    ; Uninstall using the found GUID and install from the copied WAU.msi
+                    if !silent {
+                        RunWait('msiexec /x' wauGUID ' /qn', , "Hide")
+                        RunWait('msiexec /i "' cacheMsiPath '" /qb ' msiParams, , "Hide")
+                    } else {
+                        RunWait('msiexec /x' wauGUID ' /qn', , "Hide")
+                        RunWait('msiexec /i "' cacheMsiPath '" /qn ' msiParams, , "Hide")
+                    }
+                } else {
+                    throw Error("WAU.msi not found in install source: " (wauSource != "" ? wauSource : "Unknown") ", no local MSI found in: " localMsiDir ", and couldn't be downloaded.`nPlease check your internet connection or download WAU.msi manually from GitHub.")
                 }
-
-                wauSource := A_WorkingDir
-                ; Copy WAU.msi to %ProgramData%\Package Cache folder for MSI repair (msi folder will be deleted later)
-                cacheDir := A_AppDataCommon "\Package Cache\" wauGUID wauLongVersion "\Installers"
-                if !DirExist(cacheDir) {
-                    DirCreate(cacheDir)
-                }
-                cacheMsiPath := cacheDir "\WAU.msi"
-                FileCopy(wauSource "\WAU.msi", cacheMsiPath, 1)
-
-                wauSource := cacheDir
-
-                msiParams := GetMSIParams()
-
-                ; Uninstall using the found GUID and install from the copied WAU.msi in the Package Cache folder
-                if !silent {
-                    RunWait('msiexec /x' wauGUID ' /qn', , "Hide")
-                    RunWait('msiexec /i "' cacheMsiPath '" /qb' msiParams, , "Hide")
-                }                
-                else {
-                    RunWait('msiexec /x' wauGUID ' /qn', , "Hide")
-                    RunWait('msiexec /i "' cacheMsiPath '" /qn' msiParams, , "Hide")
-                }
-            } else {
-                throw Error("WAU.msi not found in install source: " (wauSource != "" ? wauSource : "Unknown") " and couldn't be downloaded.`nPlease check your internet connection or download WAU.msi manually from GitHub.")
-            }
+            }            
         } else {
             throw Error("WAU GUID not found via PowerShell")
         }
