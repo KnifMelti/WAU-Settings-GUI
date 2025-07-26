@@ -1123,7 +1123,13 @@ function Set-WAUConfig {
                     if (-not (Test-Path $logsDir)) {
                         New-Item -Path $logsDir -ItemType Directory -Force | Out-Null
                     }
-                    Add-Shortcut "$Script:STARTMENU_WAU_DIR\Open Logs.lnk" $logsDir "" "" "" "Open WAU Logs" "Normal"
+                    # Ensure updates.log exists in logs directory, create empty file if missing
+                    $updatesLogPath = Join-Path $logsDir "updates.log"
+                    if (-not (Test-Path $updatesLogPath)) {
+                        New-Item -Path $updatesLogPath -ItemType File -Force | Out-Null
+                    }
+                    Add-Shortcut "$Script:STARTMENU_WAU_DIR\Open log.lnk" $updatesLogPath "" "" "" "Open WAU log" "Normal"
+                    Add-Shortcut "$Script:STARTMENU_WAU_DIR\Open Logs.lnk" $logsDir "" "" "" "Open WAU Logs Directory" "Normal"
                     Add-Shortcut "$Script:STARTMENU_WAU_DIR\WAU App Installer.lnk" $Script:CONHOST_EXE "$($currentConfig.InstallLocation)" "$Script:POWERSHELL_ARGS `"$($currentConfig.InstallLocation)WAU-Installer-GUI.ps1`"" "$Script:WAU_ICON" "Search for and Install WinGet Apps, etc..." "Normal"
                     if (-not $Script:PORTABLE_MODE) {
                         Add-Shortcut "$Script:STARTMENU_WAU_DIR\$Script:GUI_TITLE.lnk" $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$((Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'))`"" "$Script:GUI_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
