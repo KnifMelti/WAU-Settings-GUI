@@ -3870,7 +3870,6 @@ function Show-WAUSettingsGUI {
                         if ($uninstallResult) {
                             $installResult = Install-WAU -msiFilePath $msiResult.MsiFilePath -controls $controls
                             if ($installResult) {
-                                [System.Windows.MessageBox]::Show("WAU has been reinstalled with the current settings.", "Reinstall Complete", "OK", "Information")
                                 Update-WAUGUIFromConfig -Controls $controls
                             }
                         }
@@ -3889,7 +3888,6 @@ function Show-WAUSettingsGUI {
                     if ($msiResult -and $msiResult.MsiFilePath) {
                         $installResult = Install-WAU -msiFilePath $msiResult.MsiFilePath -controls $controls
                         if ($installResult) {
-                            [System.Windows.MessageBox]::Show("WAU has been installed with the current settings.", "Install Complete", "OK", "Information")
                             Update-WAUGUIFromConfig -Controls $controls
                         }
                     }
