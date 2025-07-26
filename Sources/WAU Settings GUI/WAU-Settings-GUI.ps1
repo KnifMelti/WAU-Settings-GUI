@@ -332,8 +332,9 @@ function Get-CleanReleaseNotes {
             if ($line -match '^\s*([\*\-])\s+(.+)') {
                 $bulletChar = $matches[1]
                 $bulletText = $matches[2].Trim()  # Extra trim to remove any \r characters
-                # Remove "by @username in url" parts
-                $bulletText = $bulletText -replace '\s+by\s+@\w+\s+in\s+https://[^\s]*', ''
+                
+                # Remove "by @username in url" parts more thoroughly
+                $bulletText = $bulletText -replace '\s+by\s+@\w+(\s+in\s+https://[^\s]*)?', ''
                 # Remove markdown links
                 $bulletText = $bulletText -replace '\[([^\]]+)\]\([^\)]+\)', '$1'
                 # Remove markdown formatting
@@ -347,8 +348,17 @@ function Get-CleanReleaseNotes {
     }
     
     if ($bulletPoints.Count -gt 0) {
+        # Show 6 bullet points
+        $maxBullets = 6
+        $selectedBullets = $bulletPoints | Select-Object -First $maxBullets
+        
+        # Add "..." if there are more bullet points
+        if ($bulletPoints.Count -gt $maxBullets) {
+            $selectedBullets += "..."
+        }
+        
         # Use Windows-style line breaks
-        return ($bulletPoints | Select-Object -First 3) -join "`r`n"
+        return $selectedBullets -join "`r`n"
     } else {
         return "Se GitHub för release notes"
     }

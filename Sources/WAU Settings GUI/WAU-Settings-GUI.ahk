@@ -3,8 +3,8 @@
 ;@Ahk2Exe-Set CompanyName, KnifMelti
 ;@Ahk2Exe-Set ProductName, WAU Settings GUI
 ;@Ahk2Exe-Set FileDescription, WAU Settings GUI
-;@Ahk2Exe-Set FileVersion, 1.8.2.0
-;@Ahk2Exe-Set ProductVersion, 1.8.2.0
+;@Ahk2Exe-Set FileVersion, 1.8.2.1
+;@Ahk2Exe-Set ProductVersion, 1.8.2.1
 ;@Ahk2Exe-Set InternalName, WAU-Settings-GUI
 ;@Ahk2Exe-SetMainIcon ..\assets\WAU Settings GUI.ico
 ;@Ahk2Exe-UpdateManifest 1
@@ -167,11 +167,13 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
                 }
             } else {
                 ; First check for local MSI in version-specific folder structure
-                localVersion := StrReplace(wauVersion, "v", "")  ; Remove "v" prefix for folder/file names
+                localVersion := RegExReplace(wauVersion, "^v")  ; Remove "v" prefix for folder name
                 localMsiDir := A_WorkingDir "\msi\" localVersion
-                localMsiPath := localMsiDir "\WAU-" localVersion ".msi"
+                localMsiPath := localMsiDir "\WAU-" wauVersion ".msi"  ; Keep "v" prefix for file name
                 
                 if (FileExist(localMsiPath)) {
+                    if !silent
+                        MsgBox("Found local MSI: " localMsiPath, name_no_ext, "0x40 T5")  ; Information icon + 5 second timeout
                     ; Copy local MSI to %ProgramData%\Package Cache folder for MSI reinstall
                     cacheDir := A_AppDataCommon "\Package Cache\" wauGUID wauLongVersion "\Installers"
                     if !DirExist(cacheDir) {
@@ -194,6 +196,8 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
                         RunWait('msiexec /i "' cacheMsiPath '" /qn ' msiParams, , "Hide")
                     }
                 } else if (IsInternetAvailable()) {
+                    if !silent
+                        MsgBox("No local MSI found in: " localMsiDir ", downloading WAU.msi from GitHub.", name_no_ext, "0x40 T5")  ; Information icon + 5 second timeout
                     ; No local MSI found, download the original version and trigger MSI reinstall
                     downloadUrl := "https://github.com/Romanitho/Winget-AutoUpdate/releases/download/" wauVersion "/WAU.msi"
                     wauMsiPath := A_WorkingDir "\WAU.msi"
