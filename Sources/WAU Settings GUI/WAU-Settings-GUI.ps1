@@ -333,8 +333,10 @@ function Get-CleanReleaseNotes {
                 $bulletChar = $matches[1]
                 $bulletText = $matches[2].Trim()  # Extra trim to remove any \r characters
                 
-                # Remove "by @username in url" parts more thoroughly
-                $bulletText = $bulletText -replace '\s+by\s+@\w+(\s+in\s+https://[^\s]*)?', ''
+                # Skip bullet if it contains "by @username"
+                if ($bulletText -match 'by\s+@\w+') {
+                    continue
+                }
                 # Remove markdown links
                 $bulletText = $bulletText -replace '\[([^\]]+)\]\([^\)]+\)', '$1'
                 # Remove markdown formatting
@@ -1806,7 +1808,6 @@ function Uninstall-WAU {
         }
         Close-PopUp
         
-        [System.Windows.MessageBox]::Show("WAU uninstalled successfully.", "Uninstall Complete", "OK", "Information")
         return $true
     } 
     catch {
@@ -3833,102 +3834,69 @@ function Show-WAUSettingsGUI {
         try {
             # Check if WAU is installed
             $installedWAU = Test-InstalledWAU -DisplayName "Winget-AutoUpdate"
-            
+
             if ($installedWAU.Count -gt 0) {
-                # WAU is installed - save version info before uninstalling
+                # WAU is installed - get version info from registry
                 $savedVersion = $null
                 try {
-                    # Read version info from registry (same as Dev [guid] button)
                     if ($Script:WAU_GUID) {
                         $registryPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$($Script:WAU_GUID)"
                         $wauRegistry = Get-ItemProperty -Path $registryPath -ErrorAction Stop
-                        
                         $comments = $wauRegistry.Comments
                         $displayVersion = $wauRegistry.DisplayVersion
-                        
-                        # Determine version string like AHK code
                         if ($comments -and $comments -ne "STABLE") {
-                            # Pre-release version - extract from Comments
                             if ($comments -match "WAU\s+([0-9]+\.[0-9]+\.[0-9]+(?:-\d+)?)(?:\s|\[)") {
                                 $savedVersion = "v$($matches[1])"
                             } else {
                                 $savedVersion = "v$displayVersion"
                             }
                         } else {
-                            # Stable version - remove last dot and numbers
                             $savedVersion = "v$($displayVersion -replace '\.\d+$', '')"
                         }
                     }
-                } catch {
-                    # Continue without saved version if registry read fails
-                }
-                
-                # Ask user if they want to uninstall
+                } catch {}
+
+                # Always do reinstall if WAU is installed
                 $result = [System.Windows.MessageBox]::Show(
-                    "WAU is currently installed$(if($savedVersion){" ($savedVersion)"}).`n`nDo you want to uninstall it?", 
-                    "Uninstall WAU", 
-                    "OkCancel", 
+                    "WAU is installed ($savedVersion).`n`nDo you want to reinstall WAU with the current settings?",
+                    "Reinstall WAU",
+                    "OkCancel",
                     "Question"
                 )
-                
                 if ($result -eq 'Ok') {
-                    # Perform uninstallation
-                    $uninstallResult = Uninstall-WAU
-                    if ($uninstallResult) {
-                        # Store saved version for potential reinstall
-                        $Script:LAST_UNINSTALLED_WAU_VERSION = $savedVersion
-
-                        # Delete WAU Desktop Shortcuts
-                        Remove-Item -Path $Script:DESKTOP_WAU_APPINSTALLER -ErrorAction SilentlyContinue
-                        Remove-Item -Path $Script:DESKTOP_RUN_WAU -ErrorAction SilentlyContinue
-
-                        # Update status to "Done"
-                        $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
-                        $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED
+                    $msiResult = Get-WAUMsi -SpecificVersion $savedVersion
+                    if ($msiResult -and $msiResult.MsiFilePath) {
+                        $uninstallResult = Uninstall-WAU
+                        if ($uninstallResult) {
+                            $installResult = Install-WAU -msiFilePath $msiResult.MsiFilePath -controls $controls
+                            if ($installResult) {
+                                [System.Windows.MessageBox]::Show("WAU has been reinstalled with the current settings.", "Reinstall Complete", "OK", "Information")
+                                Update-WAUGUIFromConfig -Controls $controls
+                            }
+                        }
                     }
                 }
             } else {
-                # WAU is not installed - check if we have a saved version from previous uninstall
-                $installVersion = if ($Script:LAST_UNINSTALLED_WAU_VERSION) {
-                    $Script:LAST_UNINSTALLED_WAU_VERSION
-                } else {
-                    "latest stable"
-                }
-                
-                # Ask user if they want to install
+                # WAU is not installed
                 $result = [System.Windows.MessageBox]::Show(
-                    "WAU is not installed.`n`nDo you want to download and install $installVersion with current showing configuration?", 
-                    "Install WAU", 
-                    "OkCancel", 
+                    "WAU is not installed.`n`nDo you want to download and install WAU with the current settings?",
+                    "Install WAU",
+                    "OkCancel",
                     "Question"
                 )
-                
                 if ($result -eq 'Ok') {
-                    # Download MSI - use saved version if available, otherwise latest
-                    $result = if ($Script:LAST_UNINSTALLED_WAU_VERSION) {
-                        Get-WAUMsi -SpecificVersion $Script:LAST_UNINSTALLED_WAU_VERSION
-                    } else {
-                        Get-WAUMsi  # Downloads latest stable
-                    }
-                    
-                    if ($result) {
-                        $msiFilePath = $result.MsiFilePath
-                        
-                        # Perform installation with current GUI configuration
-                        $installResult = Install-WAU -msiFilePath $msiFilePath -controls $controls
+                    $msiResult = Get-WAUMsi
+                    if ($msiResult -and $msiResult.MsiFilePath) {
+                        $installResult = Install-WAU -msiFilePath $msiResult.MsiFilePath -controls $controls
                         if ($installResult) {
-                            # Clear saved version after successful reinstall
-                            $Script:LAST_UNINSTALLED_WAU_VERSION = $null
-                            
-                            # Update status to "Done"
-                            $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
-                            $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED
+                            [System.Windows.MessageBox]::Show("WAU has been installed with the current settings.", "Install Complete", "OK", "Information")
+                            Update-WAUGUIFromConfig -Controls $controls
                         }
                     }
                 }
             }
-            
-            # Create timer to reset status back to ready after standard wait time
+
+            # Timer to reset status bar
             $window.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Background, [Action]{
                 Start-Sleep -Milliseconds $Script:WAIT_TIME
                 $controls.StatusBarText.Text = $Script:STATUS_READY_TEXT
@@ -3936,8 +3904,8 @@ function Show-WAUSettingsGUI {
             }) | Out-Null
         }
         catch {
-            [System.Windows.MessageBox]::Show("Failed to process WAU installation/uninstallation: $($_.Exception.Message)", "Error", "OK", "Error")
-        }        
+            [System.Windows.MessageBox]::Show("Error during WAU reinstall: $($_.Exception.Message)", "Error", "OK", "Error")
+        }
     })
 
     $controls.DevVerButton.Add_Click({
