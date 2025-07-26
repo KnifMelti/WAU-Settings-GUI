@@ -156,14 +156,6 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
 
                 msiParams := GetMSIParams()
 
-                ; Delete existing Startmenu
-                try {
-                    if FileExist(A_ProgramsCommon "\Winget-AutoUpdate")
-                        FileDelete(A_ProgramsCommon "\Winget-AutoUpdate")
-                } catch {
-                    ; Ignore errors from MSI subsystem
-                }
-
                 ; Uninstall using the found GUID and install from the copied WAU.msi in the Package Cache folder
                 if !silent {
                     RunWait('msiexec /x' wauGUID ' /qb', , "Hide")
@@ -213,14 +205,6 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
                 wauSource := cacheDir
 
                 msiParams := GetMSIParams()
-
-                ; Delete existing Startmenu
-                try {
-                    if FileExist(A_ProgramsCommon "\Winget-AutoUpdate")
-                        FileDelete(A_ProgramsCommon "\Winget-AutoUpdate")
-                } catch {
-                    ; Ignore errors from MSI subsystem
-                }
 
                 ; Uninstall using the found GUID and install from the copied WAU.msi in the Package Cache folder
                 if !silent {
