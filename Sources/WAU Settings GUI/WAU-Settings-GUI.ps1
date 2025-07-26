@@ -3835,100 +3835,117 @@ function Show-WAUSettingsGUI {
             $installedWAU = Test-InstalledWAU -DisplayName "Winget-AutoUpdate"
             
             if ($installedWAU.Count -gt 0) {
-                # WAU is installed - save version info before uninstalling
-                $savedVersion = $null
+                # WAU is installed - attempt repair with current configuration
+                
+                # Try to find original installation source
+                $originalMsiPath = $null
                 try {
-                    # Read version info from registry (same as Dev [guid] button)
                     if ($Script:WAU_GUID) {
                         $registryPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$($Script:WAU_GUID)"
                         $wauRegistry = Get-ItemProperty -Path $registryPath -ErrorAction Stop
+                        $installSource = $wauRegistry.InstallSource
                         
-                        $comments = $wauRegistry.Comments
-                        $displayVersion = $wauRegistry.DisplayVersion
-                        
-                        # Determine version string like AHK code
-                        if ($comments -and $comments -ne "STABLE") {
-                            # Pre-release version - extract from Comments
-                            if ($comments -match "WAU\s+([0-9]+\.[0-9]+\.[0-9]+(?:-\d+)?)(?:\s|\[)") {
-                                $savedVersion = "v$($matches[1])"
-                            } else {
-                                $savedVersion = "v$displayVersion"
-                            }
-                        } else {
-                            # Stable version - remove last dot and numbers
-                            $savedVersion = "v$($displayVersion -replace '\.\d+$', '')"
+                        if ($installSource -and (Test-Path "$installSource\WAU.msi")) {
+                            $originalMsiPath = "$installSource\WAU.msi"
                         }
                     }
                 } catch {
-                    # Continue without saved version if registry read fails
+                    # Continue without original source if registry read fails
                 }
                 
-                # Ask user if they want to uninstall
-                $result = [System.Windows.MessageBox]::Show(
-                    "WAU is currently installed$(if($savedVersion){" ($savedVersion)"}).`n`nDo you want to uninstall it?", 
-                    "Uninstall WAU", 
-                    "OkCancel", 
-                    "Question"
-                )
-                
-                if ($result -eq 'Ok') {
-                    # Perform uninstallation
-                    $uninstallResult = Uninstall-WAU
-                    if ($uninstallResult) {
-                        # Store saved version for potential reinstall
-                        $Script:LAST_UNINSTALLED_WAU_VERSION = $savedVersion
-
-                        # Delete WAU Desktop Shortcuts
-                        Remove-Item -Path $Script:DESKTOP_WAU_APPINSTALLER -ErrorAction SilentlyContinue
-                        Remove-Item -Path $Script:DESKTOP_RUN_WAU -ErrorAction SilentlyContinue
-
-                        # Update status to "Done"
-                        $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
-                        $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED
+                if ($originalMsiPath) {
+                    # Original MSI found - perform repair with current configuration
+                    $result = [System.Windows.MessageBox]::Show(
+                        "WAU will be repaired with current showing configuration using original installation media.`n`nContinue?", 
+                        "Repair WAU", 
+                        "OkCancel", 
+                        "Question"
+                    )
+                    
+                    if ($result -eq 'Ok') {
+                        Start-PopUp "Repairing WAU with current configuration..."
+                        
+                        # Create transform with current GUI settings
+                        $transformResult = New-MSITransformFromControls -msiFilePath $originalMsiPath -controls $controls -createFiles $false
+                        
+                        if ($transformResult.Success) {
+                            # Perform repair with transform
+                            Start-Process -FilePath "msiexec.exe" -ArgumentList "/fa `"$originalMsiPath`" TRANSFORMS=`"$($transformResult.TransformPath)`" /qb" -Wait
+                            
+                            Close-PopUp
+                            [System.Windows.MessageBox]::Show("WAU repair completed successfully!", "Repair Complete", "OK", "Information")
+                            
+                            # Reload configuration after repair
+                            Update-WAUGUIFromConfig -Controls $controls
+                        } else {
+                            Close-PopUp
+                            throw "Failed to create transform: $($transformResult.Message)"
+                        }
+                    }
+                } else {
+                    # Original MSI not found - download and perform uninstall/install
+                    $result = [System.Windows.MessageBox]::Show(
+                        "Original installation media not found.`n`nWAU will be uninstalled and reinstalled with current showing configuration using latest version.`n`nContinue?", 
+                        "Reinstall WAU", 
+                        "OkCancel", 
+                        "Question"
+                    )
+                    
+                    if ($result -eq 'Ok') {
+                        Start-PopUp "Downloading latest WAU for reinstallation..."
+                        
+                        # Download latest MSI
+                        $downloadResult = Get-WAUMsi -ForceDownload
+                        if ($downloadResult) {
+                            $msiFilePath = $downloadResult.MsiFilePath
+                            
+                            Start-PopUp "Uninstalling current WAU..."
+                            # Uninstall current version
+                            Start-Process -FilePath "msiexec.exe" -ArgumentList "/x `"$($Script:WAU_GUID)`" /qb" -Wait
+                            
+                            Start-PopUp "Installing WAU with current configuration..."
+                            # Install with current configuration
+                            $installResult = Install-WAU -msiFilePath $msiFilePath -controls $controls
+                            
+                            Close-PopUp
+                            if ($installResult) {
+                                [System.Windows.MessageBox]::Show("WAU reinstallation completed successfully!", "Reinstall Complete", "OK", "Information")
+                            }
+                        } else {
+                            Close-PopUp
+                            throw "Failed to download WAU installation media"
+                        }
                     }
                 }
             } else {
-                # WAU is not installed - check if we have a saved version from previous uninstall
-                $installVersion = if ($Script:LAST_UNINSTALLED_WAU_VERSION) {
-                    $Script:LAST_UNINSTALLED_WAU_VERSION
-                } else {
-                    "latest stable"
-                }
-                
-                # Ask user if they want to install
+                # WAU is not installed - download and install with current configuration
                 $result = [System.Windows.MessageBox]::Show(
-                    "WAU is not installed.`n`nDo you want to download and install $installVersion with current showing configuration?", 
+                    "WAU is not installed.`n`nDo you want to download and install latest version with current showing configuration?", 
                     "Install WAU", 
                     "OkCancel", 
                     "Question"
                 )
                 
                 if ($result -eq 'Ok') {
-                    # Download MSI - use saved version if available, otherwise latest
-                    $result = if ($Script:LAST_UNINSTALLED_WAU_VERSION) {
-                        Get-WAUMsi -SpecificVersion $Script:LAST_UNINSTALLED_WAU_VERSION
-                    } else {
-                        Get-WAUMsi  # Downloads latest stable
-                    }
-                    
-                    if ($result) {
-                        $msiFilePath = $result.MsiFilePath
+                    # Download and install
+                    $downloadResult = Get-WAUMsi
+                    if ($downloadResult) {
+                        $msiFilePath = $downloadResult.MsiFilePath
                         
-                        # Perform installation with current GUI configuration
+                        # Install with current configuration
                         $installResult = Install-WAU -msiFilePath $msiFilePath -controls $controls
                         if ($installResult) {
-                            # Clear saved version after successful reinstall
-                            $Script:LAST_UNINSTALLED_WAU_VERSION = $null
-                            
-                            # Update status to "Done"
-                            $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
-                            $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED
+                            [System.Windows.MessageBox]::Show("WAU installation completed successfully!", "Installation Complete", "OK", "Information")
                         }
                     }
                 }
             }
             
-            # Create timer to reset status back to ready after standard wait time
+            # Update status to "Done"
+            $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
+            $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED
+            
+            # Reset status after standard wait time
             $window.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Background, [Action]{
                 Start-Sleep -Milliseconds $Script:WAIT_TIME
                 $controls.StatusBarText.Text = $Script:STATUS_READY_TEXT
@@ -3936,7 +3953,8 @@ function Show-WAUSettingsGUI {
             }) | Out-Null
         }
         catch {
-            [System.Windows.MessageBox]::Show("Failed to process WAU installation/uninstallation: $($_.Exception.Message)", "Error", "OK", "Error")
+            Close-PopUp
+            [System.Windows.MessageBox]::Show("Failed to process WAU operation: $($_.Exception.Message)", "Error", "OK", "Error")
         }        
     })
 
