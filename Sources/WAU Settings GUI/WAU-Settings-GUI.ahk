@@ -173,7 +173,7 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
                 
                 if (FileExist(localMsiPath)) {
                     if !silent
-                        MsgBox("Found local MSI: " localMsiPath, name_no_ext, "0x40 T5")  ; Information icon + 5 second timeout
+                        MsgBox("Found local MSI: " localMsiPath "`n`n(This dialog will close automatically in 5 seconds)", name_no_ext, "0x40 T5")  ; Information icon + 5 second timeout
                     ; Copy local MSI to %ProgramData%\Package Cache folder for MSI reinstall
                     cacheDir := A_AppDataCommon "\Package Cache\" wauGUID wauLongVersion "\Installers"
                     if !DirExist(cacheDir) {
@@ -197,7 +197,7 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
                     }
                 } else if (IsInternetAvailable()) {
                     if !silent
-                        MsgBox("No local MSI found in: " localMsiDir ", downloading WAU.msi from GitHub.", name_no_ext, "0x40 T5")  ; Information icon + 5 second timeout
+                        MsgBox("No local MSI found in: " localMsiDir ", downloading WAU.msi from GitHub.`n`n(This dialog will close automatically in 5 seconds)", name_no_ext, "0x40 T5")  ; Information icon + 5 second timeout
                     ; No local MSI found, download the original version and trigger MSI reinstall
                     downloadUrl := "https://github.com/Romanitho/Winget-AutoUpdate/releases/download/" wauVersion "/WAU.msi"
                     wauMsiPath := A_WorkingDir "\WAU.msi"
