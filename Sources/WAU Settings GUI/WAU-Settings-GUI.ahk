@@ -26,7 +26,7 @@ shortcutStartMenu := A_ProgramsCommon "\Winget-AutoUpdate\WAU Settings (Administ
 shortcutOpenLogs := A_ProgramsCommon "\Winget-AutoUpdate\Open Logs.lnk"
 shortcutAppInstaller := A_ProgramsCommon "\Winget-AutoUpdate\WAU App Installer.lnk"
 
-; Original: 4 shortcuts for Run WAU and updates.log
+; Original: 4 shortcuts for 'Run WAU', 'Open log' and 'WAU App Installer' on Desktop and Startmenu
 ; wauRunWau := A_ProgramsCommon "\Winget-AutoUpdate\Run WAU.lnk" ; C:\Windows\System32\conhost.exe --headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\Winget-AutoUpdate\User-Run.ps1"
 ; wauOpenLog := A_ProgramsCommon "\Winget-AutoUpdate\Open log.lnk" ; ""C:\Program Files\Winget-AutoUpdate\logs\updates.log""
 ; wauDesktop := A_DesktopCommon "\Run WAU.lnk" ; C:\Windows\System32\conhost.exe --headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\Winget-AutoUpdate\User-Run.ps1"
