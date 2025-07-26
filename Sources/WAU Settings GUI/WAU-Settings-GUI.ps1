@@ -1118,13 +1118,12 @@ function Set-WAUConfig {
                         New-Item -Path $Script:STARTMENU_WAU_DIR -ItemType Directory | Out-Null
                     }
                     Add-Shortcut "$Script:STARTMENU_WAU_DIR\Run WAU.lnk" $Script:CONHOST_EXE "$($currentConfig.InstallLocation)" "$Script:POWERSHELL_ARGS `"$($currentConfig.InstallLocation)$Script:USER_RUN_SCRIPT`"" "$Script:WAU_ICON" "Run Winget AutoUpdate" "Normal"
-                    # Ensure logs directory exists before creating shortcut
+                    # Ensure logs directory and updates.log exist before creating shortcut
                     $logsDir = Join-Path $currentConfig.InstallLocation "logs"
+                    $updatesLogPath = Join-Path $logsDir "updates.log"
                     if (-not (Test-Path $logsDir)) {
                         New-Item -Path $logsDir -ItemType Directory -Force | Out-Null
                     }
-                    # Ensure updates.log exists in logs directory, create empty file if missing
-                    $updatesLogPath = Join-Path $logsDir "updates.log"
                     if (-not (Test-Path $updatesLogPath)) {
                         New-Item -Path $updatesLogPath -ItemType File -Force | Out-Null
                     }
