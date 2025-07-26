@@ -39,7 +39,7 @@ Configure **WAU** settings after installation, including:
   - Change colors/update schedule for **WAU Settings GUI**
   - **MSI** transform creation (using current showing configuration)
   - Configuration backup/import (i.e. for sharing settings)
-  - Uninstall/install **WAU** (with current showing configuration)
+  - Reinstall (Uninstall/install) **WAU** (with current showing configuration)
   - Manual/automatic check for updates (checks automatically every week as standard)
   - Direct access to the **WAU Settings GUI** install folder
 
