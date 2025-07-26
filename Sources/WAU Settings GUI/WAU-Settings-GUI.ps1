@@ -718,6 +718,14 @@ function Get-WAUCurrentConfig {
             Close-PopUp
         }
         
+        # Skip installation dialog if we just uninstalled WAU via Dev [wau]
+        if ($Script:LAST_UNINSTALLED_WAU_VERSION) {
+            # WAU was recently uninstalled via Dev [wau], don't prompt for installation
+            if ($Script:MainWindowStarted) {
+                return $null  # Return to main window without installation dialog
+            }
+        }
+
         # Show initial prompt
         $userWantsToInstall = [System.Windows.MessageBox]::Show(
             "WAU configuration not found. Please ensure WAU is properly installed.`n`nDo you want to download and install WAU now?", 
@@ -727,8 +735,13 @@ function Get-WAUCurrentConfig {
         ) -eq 'Ok'
         
         if ($userWantsToInstall) {
-            # Download MSI file
-            $result = Get-WAUMsi
+            # Check if we have a saved version from previous uninstall
+            $result = if ($Script:LAST_UNINSTALLED_WAU_VERSION) {
+                Get-WAUMsi -SpecificVersion $Script:LAST_UNINSTALLED_WAU_VERSION
+            } else {
+                Get-WAUMsi  # Downloads latest stable
+            }
+            
             if ($result) {
                 $msiFilePath = $result.MsiFilePath
             }
@@ -737,11 +750,16 @@ function Get-WAUCurrentConfig {
                 # Install WAU using the downloaded MSI file
                 $installResult = Install-WAU -msiFilePath $msiFilePath
                 
+                # Clear saved version after successful installation (if it was used)
+                if ($installResult -and $Script:LAST_UNINSTALLED_WAU_VERSION) {
+                    $Script:LAST_UNINSTALLED_WAU_VERSION = $null
+                }
+                
                 # Handle post-installation logic
                 if ($Script:MainWindowStarted) {
                     return $null  # Return to main window regardless of install result
                 }
-                
+                        
                 # Create desktop shortcut for settings
                 if (-not $Script:PORTABLE_MODE) {
                     Add-Shortcut $Script:DESKTOP_WAU_SETTINGS $Script:CONHOST_EXE $Script:WorkingDir "$Script:POWERSHELL_ARGS `"$((Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'))`"" $Script:GUI_ICON "Configure Winget-AutoUpdate settings after installation" "Normal" $true
@@ -1118,12 +1136,17 @@ function Set-WAUConfig {
                         New-Item -Path $Script:STARTMENU_WAU_DIR -ItemType Directory | Out-Null
                     }
                     Add-Shortcut "$Script:STARTMENU_WAU_DIR\Run WAU.lnk" $Script:CONHOST_EXE "$($currentConfig.InstallLocation)" "$Script:POWERSHELL_ARGS `"$($currentConfig.InstallLocation)$Script:USER_RUN_SCRIPT`"" "$Script:WAU_ICON" "Run Winget AutoUpdate" "Normal"
-                    # Ensure logs directory exists before creating shortcut
+                    # Ensure logs directory and updates.log exist before creating shortcut
                     $logsDir = Join-Path $currentConfig.InstallLocation "logs"
+                    $updatesLogPath = Join-Path $logsDir "updates.log"
                     if (-not (Test-Path $logsDir)) {
                         New-Item -Path $logsDir -ItemType Directory -Force | Out-Null
                     }
-                    Add-Shortcut "$Script:STARTMENU_WAU_DIR\Open Logs.lnk" $logsDir "" "" "" "Open WAU Logs" "Normal"
+                    if (-not (Test-Path $updatesLogPath)) {
+                        New-Item -Path $updatesLogPath -ItemType File -Force | Out-Null
+                    }
+                    Add-Shortcut "$Script:STARTMENU_WAU_DIR\Open log.lnk" $updatesLogPath "" "" "" "Open WAU log" "Normal"
+                    Add-Shortcut "$Script:STARTMENU_WAU_DIR\Open Logs.lnk" $logsDir "" "" "" "Open WAU Logs Directory" "Normal"
                     Add-Shortcut "$Script:STARTMENU_WAU_DIR\WAU App Installer.lnk" $Script:CONHOST_EXE "$($currentConfig.InstallLocation)" "$Script:POWERSHELL_ARGS `"$($currentConfig.InstallLocation)WAU-Installer-GUI.ps1`"" "$Script:WAU_ICON" "Search for and Install WinGet Apps, etc..." "Normal"
                     if (-not $Script:PORTABLE_MODE) {
                         Add-Shortcut "$Script:STARTMENU_WAU_DIR\$Script:GUI_TITLE.lnk" $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$((Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'))`"" "$Script:GUI_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
@@ -1483,18 +1506,59 @@ msiexec /x"$($guid)" REBOOT=R /qn /l*v "%~dp0Uninst-$logFileName"
         if ($installer) { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($installer) | Out-Null }
     }
 }
+# Modified Test-LocalMSIVersion to work with new folder structure
 function Test-LocalMSIVersion {
     param(
-        [string]$msiDirectory = (Join-Path $Script:WorkingDir "msi")
+        [string]$msiDirectory = (Join-Path $Script:WorkingDir "msi"),
+        [string]$targetVersion = $null
     )
     
     try {
+        # If no target version specified, try to get installed version
+        if (-not $targetVersion) {
+            try {
+                if ($Script:WAU_GUID) {
+                    $registryPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$($Script:WAU_GUID)"
+                    $wauRegistry = Get-ItemProperty -Path $registryPath -ErrorAction Stop
+                    
+                    $comments = $wauRegistry.Comments
+                    $displayVersion = $wauRegistry.DisplayVersion
+                    
+                    if ($comments -and $comments -ne "STABLE") {
+                        if ($comments -match "WAU\s+([0-9]+\.[0-9]+\.[0-9]+(?:-\d+)?)(?:\s|\[)") {
+                            $targetVersion = "v$($matches[1])"
+                        }
+                    } else {
+                        $targetVersion = "v$($displayVersion -replace '\.\d+$', '')"
+                    }
+                }
+            } catch {
+                # Continue without target version
+            }
+        }
+        
+        # Look for MSI in version-specific folder
+        $versionDir = if ($targetVersion) {
+            Join-Path $msiDirectory $targetVersion.TrimStart('v')
+        } else {
+            $msiDirectory
+        }
+        
+        if (-not (Test-Path $versionDir)) {
+            return @{
+                UpdateNeeded = $true
+                Reason = "Version folder not found: $versionDir"
+                LocalVersion = $null
+                LatestVersion = $null
+            }
+        }
+        
         # Find local MSI file
-        $localMSI = Get-ChildItem -Path $msiDirectory -Filter "*.msi" -File | Select-Object -First 1
+        $localMSI = Get-ChildItem -Path $versionDir -Filter "*.msi" -File | Select-Object -First 1
         if (-not $localMSI) {
             return @{
                 UpdateNeeded = $true
-                Reason = "No local MSI found"
+                Reason = "No local MSI found in: $versionDir"
                 LocalVersion = $null
                 LatestVersion = $null
             }
@@ -1516,20 +1580,11 @@ function Test-LocalMSIVersion {
         [System.Runtime.InteropServices.Marshal]::ReleaseComObject($database) | Out-Null
         [System.Runtime.InteropServices.Marshal]::ReleaseComObject($installer) | Out-Null
         
-        # Get latest version from GitHub
-        $ApiUrl = "https://api.github.com/repos/$Script:WAU_REPO/releases/latest"
-        $Release = Invoke-RestMethod -Uri $ApiUrl -UseBasicParsing
-        $latestVersion = $Release.tag_name.TrimStart('v')
-        
-        # Compare versions (3 digits: major.minor.patch)
-        $localVer = [Version]$localVersion
-        $latestVer = [Version]$latestVersion
-        
         return @{
-            UpdateNeeded = ($latestVer -gt $localVer)
-            Reason = if ($latestVer -gt $localVer) { "Local version ($localVersion) is older than latest ($latestVersion)" } else { "Local version is current" }
+            UpdateNeeded = $false
+            Reason = "Local MSI found and current"
             LocalVersion = $localVersion
-            LatestVersion = $latestVersion
+            LatestVersion = $localVersion
             LocalMSIPath = $localMSI.FullName
         }
     }
@@ -1542,67 +1597,114 @@ function Test-LocalMSIVersion {
         }
     }
 }
+# Modified Get-WAUMsi for specific version and folder structure
 function Get-WAUMsi {
     param(
-        [switch]$ForceDownload
+        [switch]$ForceDownload,
+        [string]$SpecificVersion  # New parameter for specific version
     )
     
-    # Configuration
     $msiDir = Join-Path $Script:WorkingDir "msi"
-
-    # Create temp directory
     if (!(Test-Path $msiDir)) {
         New-Item -ItemType Directory -Path $msiDir -Force | Out-Null
     }
-
-    # Check if we need to download unless forced
-    if (-not $ForceDownload) {
-        $versionCheck = Test-LocalMSIVersion -msiDirectory $msiDir
-        
-        if (-not $versionCheck.UpdateNeeded) {
-            # Local MSI is current, return existing file
-            return @{
-                MsiAsset = @{ name = (Split-Path -Leaf $versionCheck.LocalMSIPath) }
-                MsiFilePath = $versionCheck.LocalMSIPath
-                VersionInfo = "Using local MSI: $($versionCheck.LocalVersion)"
+    
+    # Determine which version to download
+    $targetVersion = $null
+    $isPreRelease = $false
+    
+    if ($SpecificVersion) {
+        $targetVersion = $SpecificVersion
+    } else {
+        # Try to get installed version from registry
+        try {
+            if ($Script:WAU_GUID) {
+                $registryPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$($Script:WAU_GUID)"
+                $wauRegistry = Get-ItemProperty -Path $registryPath -ErrorAction Stop
+                
+                $comments = $wauRegistry.Comments
+                $displayVersion = $wauRegistry.DisplayVersion
+                
+                # Determine version string like AHK code
+                if ($comments -and $comments -ne "STABLE") {
+                    $isPreRelease = $true
+                    # Extract version number from Comments if not "STABLE"
+                    # Example: "WAU 2.7.0-0 [Nightly Build]" -> "v2.7.0-0"
+                    if ($comments -match "WAU\s+([0-9]+\.[0-9]+\.[0-9]+(?:-\d+)?)(?:\s|\[)") {
+                        $targetVersion = "v$($matches[1])"
+                    } else {
+                        $targetVersion = "v$displayVersion"
+                    }
+                } else {
+                    # Remove last dot and numbers for STABLE version
+                    $targetVersion = "v$($displayVersion -replace '\.\d+$', '')"
+                }
+                
+                Write-Host "Using installed version: $targetVersion $(if($isPreRelease){'(Pre-release)'}else{'(Stable)'})"
             }
+        } catch {
+            Write-Host "Could not determine installed version, using latest stable"
+            # Fallback to latest stable
         }
-        
-        Start-PopUp "Local MSI outdated ($($versionCheck.LocalVersion) < $($versionCheck.LatestVersion)). Downloading latest..."
     }
-
+    
+    # Create version folder
+    $versionDir = if ($targetVersion) {
+        Join-Path $msiDir $targetVersion.TrimStart('v')
+    } else {
+        Join-Path $msiDir "latest"
+    }
+    
+    if (!(Test-Path $versionDir)) {
+        New-Item -ItemType Directory -Path $versionDir -Force | Out-Null
+    }
+    
+    # Check if MSI already exists for this version
+    $expectedMsiName = if ($targetVersion) {
+        "WAU-$targetVersion.msi"
+    } else {
+        "WAU-latest.msi"
+    }
+    $localMsiPath = Join-Path $versionDir $expectedMsiName
+    
+    if ((Test-Path $localMsiPath) -and -not $ForceDownload) {
+        return @{
+            MsiAsset = @{ name = $expectedMsiName }
+            MsiFilePath = $localMsiPath
+            VersionInfo = "Using cached MSI: $targetVersion"
+            IsPreRelease = $isPreRelease
+        }
+    }
+    
     try {
-        # Get latest release info from GitHub API
-        $ApiUrl = "https://api.github.com/repos/$Script:WAU_REPO/releases/latest"
-        $Release = Invoke-RestMethod -Uri $ApiUrl -UseBasicParsing
-
-        # Find MSI download URL
-        $MsiAsset = $Release.assets | Where-Object { $_.name -like "*.msi" }
-        if (!$MsiAsset) {
-            throw "MSI file not found in latest release"
+        if ($targetVersion) {
+            # Download specific version
+            $downloadUrl = "https://github.com/$Script:WAU_REPO/releases/download/$targetVersion/WAU.msi"
+            Start-PopUp "Downloading WAU $targetVersion..."
+        } else {
+            # Download latest stable
+            $ApiUrl = "https://api.github.com/repos/$Script:WAU_REPO/releases/latest"
+            $Release = Invoke-RestMethod -Uri $ApiUrl -UseBasicParsing
+            $MsiAsset = $Release.assets | Where-Object { $_.name -like "*.msi" }
+            if (!$MsiAsset) {
+                throw "MSI file not found in latest release"
+            }
+            $downloadUrl = $MsiAsset.browser_download_url
+            $expectedMsiName = $MsiAsset.name
+            $localMsiPath = Join-Path $versionDir $expectedMsiName
+            Start-PopUp "Downloading latest WAU: $($MsiAsset.name)..."
         }
         
-        if (-not $ForceDownload) {
-            Start-PopUp "Downloading latest MSI: $($MsiAsset.name)..."
-        }
-        
-        $MsiUrl = $MsiAsset.browser_download_url
-        $msiFilePath = Join-Path $msiDir $MsiAsset.name
-        
-        # Remove old MSI files first
-        Get-ChildItem -Path $msiDir -Filter "*.msi" | Remove-Item -Force -ErrorAction SilentlyContinue
-        
-        Invoke-WebRequest -Uri $MsiUrl -OutFile $msiFilePath -UseBasicParsing
-        
+        Invoke-WebRequest -Uri $downloadUrl -OutFile $localMsiPath -UseBasicParsing
         Close-PopUp
         
-        # Return both asset och filepath
         return @{
-            MsiAsset = $MsiAsset
-            MsiFilePath = $msiFilePath
-            VersionInfo = "Downloaded latest MSI: $($Release.tag_name.TrimStart('v'))"
+            MsiAsset = @{ name = $expectedMsiName }
+            MsiFilePath = $localMsiPath
+            VersionInfo = "Downloaded: $targetVersion"
+            IsPreRelease = $isPreRelease
         }
-    } 
+    }
     catch {
         Close-PopUp
         [System.Windows.MessageBox]::Show("Failed to download WAU: $($_.Exception.Message)", "Error", "OK", "Error")
@@ -1703,110 +1805,71 @@ function Uninstall-WAU {
         return $false
     }
 }
+# Modified New-WAUTransformFile to use installed version
 function New-WAUTransformFile {
     param($controls)
     try {
-        # Configuration
-        $msiDir = Join-Path $Script:WorkingDir "msi"
-
-        # Create temp directory
-        if (!(Test-Path $msiDir)) {
-            New-Item -ItemType Directory -Path $msiDir -Force | Out-Null
-        }
+        # Get installed WAU version from registry (same as Dev [guid] button)
+        $targetVersion = $null
+        $isPreRelease = $false
         
-        # Check if we have a current MSI file or need to download
-        $versionCheck = Test-LocalMSIVersion -msiDirectory $msiDir
-        $msiFilePath = $null
-        $MsiAsset = @{}
-        
-        if (-not $versionCheck.UpdateNeeded -and $versionCheck.LocalMSIPath) {
-            # We have a current local MSI
-            $msiFilePath = $versionCheck.LocalMSIPath
-            $MsiAsset = @{ name = Split-Path -Leaf $msiFilePath }
-            Start-PopUp "Using current local MSI: v$($versionCheck.LocalVersion)"
-            Start-Sleep -Milliseconds ($Script:WAIT_TIME / 2)
-        } else {
-            # Need to download latest MSI
-            if ($versionCheck.LocalVersion) {
-                Start-PopUp "Local MSI outdated (v$($versionCheck.LocalVersion) < v$($versionCheck.LatestVersion)). Downloading latest..."
-            } else {
-                Start-PopUp "No local MSI found. Downloading latest..."
-            }
-            
-            try {
-                $result = Get-WAUMsi -ForceDownload
-                if ($result) {
-                    $MsiAsset = $result.MsiAsset
-                    $msiFilePath = $result.MsiFilePath
-                    Start-PopUp "Downloaded v$($versionCheck.LatestVersion). Ready to create transform..."
-                    Start-Sleep -Milliseconds ($Script:WAIT_TIME / 2)
-                }
-                if (-not $msiFilePath) {
-                    throw "Failed to download MSI file"
-                }
-            } catch {
-                Close-PopUp
-                [System.Windows.MessageBox]::Show("No MSI file found in $Script:WAU_REPO latest release", "Error", "OK", "Error")
-                $MsiAsset = @{ name = '*.msi' }
-                Start-PopUp "Locate $($MsiAsset.name)..."
-            }
-        }
-        
-        # If we have a valid MSI file path, skip the file dialog and create transform directly
-        if ($msiFilePath -and (Test-Path $msiFilePath)) {
-            Close-PopUp
-            Start-PopUp "Creating transform file..."
-            
-            # Use the transform generation function directly
-            $result = New-MSITransformFromControls -msiFilePath $msiFilePath -controls $controls -createFiles $true
-            Close-PopUp
-            
-            if ($result.Success) {
-                $versionInfo = if ($versionCheck.LocalVersion) { 
-                    "Using WAU v$($versionCheck.LocalVersion)"
-                } else { 
-                    "Using latest WAU version"
-                }
-                $fullMessage = "$($result.Message)`n`n$versionInfo"
-                [System.Windows.MessageBox]::Show($fullMessage, "Transform Created", "OK", "Information")
-                Start-Process "explorer.exe" -ArgumentList $result.Directory
-            } else {
-                [System.Windows.MessageBox]::Show($result.Message, "Error", "OK", "Error")
-            }
-        } else {
-            # Fallback to file dialog if something went wrong with automatic download/detection
-            Start-PopUp "Locate $($MsiAsset.name)..."
-            
-            # Open a file selection dialog to choose a location for WAU.msi
-            $openFileDialog = New-Object System.Windows.Forms.OpenFileDialog
-            $openFileDialog.Title = "Locate $($MsiAsset.name)"
-            $openFileDialog.Filter = "$($MsiAsset.name)|$($MsiAsset.name)"
-            $openFileDialog.FileName = "$($MsiAsset.name)"
-            $openFileDialog.InitialDirectory = $msiDir
-            $openFileDialog.RestoreDirectory = $true
-            
-            if ($openFileDialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-                $selectedFile = $openFileDialog.FileName
-                Close-PopUp
+        try {
+            if ($Script:WAU_GUID) {
+                $registryPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$($Script:WAU_GUID)"
+                $wauRegistry = Get-ItemProperty -Path $registryPath -ErrorAction Stop
                 
-                # Use the transform generation function
-                $result = New-MSITransformFromControls -msiFilePath $selectedFile -controls $controls -createFiles $true
-                if ($result.Success) {
-                    [System.Windows.MessageBox]::Show($result.Message, "Transform Created", "OK", "Information")
-                    Start-Process "explorer.exe" -ArgumentList $result.Directory
+                $comments = $wauRegistry.Comments
+                $displayVersion = $wauRegistry.DisplayVersion
+                
+                # Determine version string like AHK code
+                if ($comments -and $comments -ne "STABLE") {
+                    $isPreRelease = $true
+                    if ($comments -match "WAU\s+([0-9]+\.[0-9]+\.[0-9]+(?:-\d+)?)(?:\s|\[)") {
+                        $targetVersion = "v$($matches[1])"
+                    } else {
+                        $targetVersion = "v$displayVersion"
+                    }
                 } else {
-                    [System.Windows.MessageBox]::Show($result.Message, "Error", "OK", "Error")
+                    $targetVersion = "v$($displayVersion -replace '\.\d+$', '')"
                 }
-            } else {
-                Close-PopUp
+                
+                Start-PopUp "Creating transform for installed WAU version: $targetVersion..."
             }
+        } catch {
+            Start-PopUp "Could not determine installed version, using latest..."
+        }
+        
+        # Download/use correct MSI version
+        $result = Get-WAUMsi -SpecificVersion $targetVersion
+        if ($result) {
+            $msiFilePath = $result.MsiFilePath
+        }
+        
+        if (-not $msiFilePath -or -not (Test-Path $msiFilePath)) {
+            throw "Failed to get MSI file for version: $targetVersion"
+        }
+        
+        Close-PopUp
+        Start-PopUp "Creating transform file..."
+        
+        # Use existing transform generation
+        $transformResult = New-MSITransformFromControls -msiFilePath $msiFilePath -controls $controls -createFiles $true
+        Close-PopUp
+        
+        if ($transformResult.Success) {
+            $versionInfo = "Using WAU $targetVersion $(if($isPreRelease){'(Pre-release)'}else{'(Stable)'})"
+            $fullMessage = "$($transformResult.Message)`n`n$versionInfo"
+            [System.Windows.MessageBox]::Show($fullMessage, "Transform Created", "OK", "Information")
+            Start-Process "explorer.exe" -ArgumentList $transformResult.Directory
+        } else {
+            [System.Windows.MessageBox]::Show($transformResult.Message, "Error", "OK", "Error")
         }
         
         return $true
     }
     catch {
         Close-PopUp
-        [System.Windows.MessageBox]::Show("Failed to process MSI file: $($_.Exception.Message)", "Error", "OK", "Error")
+        [System.Windows.MessageBox]::Show("Failed to create transform: $($_.Exception.Message)", "Error", "OK", "Error")
         return $false
     }
 }
@@ -3121,6 +3184,26 @@ function Close-WindowGracefully {
     param($controls, $window)
     
     try {
+        # Skip settings changed check if WAU was recently uninstalled via Dev [wau]
+        if ($Script:LAST_UNINSTALLED_WAU_VERSION) {
+            # WAU was recently uninstalled, just close without checking for changes
+            $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
+            $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED
+            
+            $timer = New-Object System.Windows.Threading.DispatcherTimer
+            $timer.Interval = [TimeSpan]::FromMilliseconds($Script:WAIT_TIME / 2)
+            $timer.Add_Tick({
+                $controls.StatusBarText.Text = "$Script:STATUS_READY_TEXT"
+                $controls.StatusBarText.Foreground = "$Script:COLOR_INACTIVE"
+                if ($null -ne $timer) {
+                    $timer.Stop()
+                }
+                $window.Close()
+            })
+            $timer.Start()
+            return
+        }
+
         # Check if settings have changed
         $changeResult = Test-SettingsChanged -controls $controls
         
@@ -3737,48 +3820,96 @@ function Show-WAUSettingsGUI {
     })
 
     $controls.DevWAUButton.Add_Click({
-        # Check if WAU is installed and uninstall it
-        # If not installed, install it
         try {
             # Check if WAU is installed
             $installedWAU = Test-InstalledWAU -DisplayName "Winget-AutoUpdate"
             
             if ($installedWAU.Count -gt 0) {
-                # WAU is installed - ask user if they want to uninstall
+                # WAU is installed - save version info before uninstalling
+                $savedVersion = $null
+                try {
+                    # Read version info from registry (same as Dev [guid] button)
+                    if ($Script:WAU_GUID) {
+                        $registryPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$($Script:WAU_GUID)"
+                        $wauRegistry = Get-ItemProperty -Path $registryPath -ErrorAction Stop
+                        
+                        $comments = $wauRegistry.Comments
+                        $displayVersion = $wauRegistry.DisplayVersion
+                        
+                        # Determine version string like AHK code
+                        if ($comments -and $comments -ne "STABLE") {
+                            # Pre-release version - extract from Comments
+                            if ($comments -match "WAU\s+([0-9]+\.[0-9]+\.[0-9]+(?:-\d+)?)(?:\s|\[)") {
+                                $savedVersion = "v$($matches[1])"
+                            } else {
+                                $savedVersion = "v$displayVersion"
+                            }
+                        } else {
+                            # Stable version - remove last dot and numbers
+                            $savedVersion = "v$($displayVersion -replace '\.\d+$', '')"
+                        }
+                    }
+                } catch {
+                    # Continue without saved version if registry read fails
+                }
+                
+                # Ask user if they want to uninstall
                 $result = [System.Windows.MessageBox]::Show(
-                    "WAU is currently installed. Do you want to uninstall it?", 
+                    "WAU is currently installed$(if($savedVersion){" ($savedVersion)"}).`n`nDo you want to uninstall it?", 
                     "Uninstall WAU", 
                     "OkCancel", 
                     "Question"
                 )
                 
                 if ($result -eq 'Ok') {
+                    # Perform uninstallation
                     $uninstallResult = Uninstall-WAU
                     if ($uninstallResult) {
+                        # Store saved version for potential reinstall
+                        $Script:LAST_UNINSTALLED_WAU_VERSION = $savedVersion
+
+                        # Delete WAU Desktop Shortcuts
+                        Remove-Item -Path $Script:DESKTOP_WAU_APPINSTALLER -ErrorAction SilentlyContinue
+                        Remove-Item -Path $Script:DESKTOP_RUN_WAU -ErrorAction SilentlyContinue
+
                         # Update status to "Done"
                         $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
                         $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED
                     }
                 }
             } else {
-                # WAU is not installed - download and install
+                # WAU is not installed - check if we have a saved version from previous uninstall
+                $installVersion = if ($Script:LAST_UNINSTALLED_WAU_VERSION) {
+                    $Script:LAST_UNINSTALLED_WAU_VERSION
+                } else {
+                    "latest stable"
+                }
+                
+                # Ask user if they want to install
                 $result = [System.Windows.MessageBox]::Show(
-                    "WAU is not installed. Do you want to download and install it with current showing configuration?", 
+                    "WAU is not installed.`n`nDo you want to download and install $installVersion with current showing configuration?", 
                     "Install WAU", 
                     "OkCancel", 
                     "Question"
                 )
                 
                 if ($result -eq 'Ok') {
-                    # Download MSI file
-                    $result = Get-WAUMsi
+                    # Download MSI - use saved version if available, otherwise latest
+                    $result = if ($Script:LAST_UNINSTALLED_WAU_VERSION) {
+                        Get-WAUMsi -SpecificVersion $Script:LAST_UNINSTALLED_WAU_VERSION
+                    } else {
+                        Get-WAUMsi  # Downloads latest stable
+                    }
+                    
                     if ($result) {
                         $msiFilePath = $result.MsiFilePath
-                    }
-                    if ($msiFilePath) {
-                        # Install WAU
+                        
+                        # Perform installation with current GUI configuration
                         $installResult = Install-WAU -msiFilePath $msiFilePath -controls $controls
                         if ($installResult) {
+                            # Clear saved version after successful reinstall
+                            $Script:LAST_UNINSTALLED_WAU_VERSION = $null
+                            
                             # Update status to "Done"
                             $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
                             $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED

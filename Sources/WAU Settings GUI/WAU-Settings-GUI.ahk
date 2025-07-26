@@ -3,8 +3,8 @@
 ;@Ahk2Exe-Set CompanyName, KnifMelti
 ;@Ahk2Exe-Set ProductName, WAU Settings GUI
 ;@Ahk2Exe-Set FileDescription, WAU Settings GUI
-;@Ahk2Exe-Set FileVersion, 1.8.1.9
-;@Ahk2Exe-Set ProductVersion, 1.8.1.9
+;@Ahk2Exe-Set FileVersion, 1.8.2.0
+;@Ahk2Exe-Set ProductVersion, 1.8.2.0
 ;@Ahk2Exe-Set InternalName, WAU-Settings-GUI
 ;@Ahk2Exe-SetMainIcon ..\assets\WAU Settings GUI.ico
 ;@Ahk2Exe-UpdateManifest 1
@@ -26,7 +26,7 @@ shortcutStartMenu := A_ProgramsCommon "\Winget-AutoUpdate\WAU Settings (Administ
 shortcutOpenLogs := A_ProgramsCommon "\Winget-AutoUpdate\Open Logs.lnk"
 shortcutAppInstaller := A_ProgramsCommon "\Winget-AutoUpdate\WAU App Installer.lnk"
 
-; Original: 4 shortcuts for Run WAU and updates.log
+; Original: 4 shortcuts for 'Run WAU', 'Open log' and 'WAU App Installer' on Desktop and Startmenu
 ; wauRunWau := A_ProgramsCommon "\Winget-AutoUpdate\Run WAU.lnk" ; C:\Windows\System32\conhost.exe --headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\Winget-AutoUpdate\User-Run.ps1"
 ; wauOpenLog := A_ProgramsCommon "\Winget-AutoUpdate\Open log.lnk" ; ""C:\Program Files\Winget-AutoUpdate\logs\updates.log""
 ; wauDesktop := A_DesktopCommon "\Run WAU.lnk" ; C:\Windows\System32\conhost.exe --headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\Winget-AutoUpdate\User-Run.ps1"
@@ -60,20 +60,19 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
 
     ; Remove WAU Settings (Administrator) shortcuts if they exist
     if FileExist(shortcutDesktop) || FileExist(shortcutStartMenu) {
-            try {
-                if FileExist(shortcutDesktop)
-                FileDelete(shortcutDesktop)
-                if FileExist(shortcutStartMenu)
-                FileDelete(shortcutStartMenu)
-                if FileExist(shortcutOpenLogs)
-                FileDelete(shortcutOpenLogs)
-                if FileExist(shortcutAppInstaller)
-                FileDelete(shortcutAppInstaller)
-            } catch {
-                ; Ignore errors from MSI subsystem
-            }
+        try {
+            if FileExist(shortcutDesktop)
+            FileDelete(shortcutDesktop)
+            if FileExist(shortcutStartMenu)
+            FileDelete(shortcutStartMenu)
+            if FileExist(shortcutOpenLogs)
+            FileDelete(shortcutOpenLogs)
+            if FileExist(shortcutAppInstaller)
+            FileDelete(shortcutAppInstaller)
+        } catch {
+            ; Ignore errors from MSI subsystem
+        }
     }
-
 
     ; Check if working dir is under '\WinGet\Packages\'
     if InStr(A_WorkingDir, "\WinGet\Packages\", false) > 0 {
@@ -142,14 +141,6 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
         }
         
         if (wauGUID != "") {
-            ; Delete existing Startmenu
-            try {
-                if FileExist(A_ProgramsCommon "\Winget-AutoUpdate")
-                    FileDelete(A_ProgramsCommon "\Winget-AutoUpdate")
-            } catch {
-                ; Ignore errors from MSI subsystem
-            }
-
             ; Check if WAU.msi exists in the install source before attempting uninstall/install
             if (wauSource != "" && FileExist(wauSource "\WAU.msi")) {
                 ; Copy WAU.msi to %ProgramData%\Package Cache folder for MSI uninstall/install
@@ -174,66 +165,97 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
                     RunWait('msiexec /x' wauGUID ' /qn', , "Hide")
                     RunWait('msiexec /i "' cacheMsiPath '" /qn ' msiParams, , "Hide")
                 }
-            } else if (IsInternetAvailable()) {
-                ; WAU.msi not found in original source, download the original version and trigger MSI reinstall
-                downloadUrl := "https://github.com/Romanitho/Winget-AutoUpdate/releases/download/" wauVersion "/WAU.msi"
-                wauMsiPath := A_WorkingDir "\WAU.msi"
-                try {
-                    Download(downloadUrl, wauMsiPath)
-                    ; Check MSI file signature (first 8 bytes should be MSI signature)
+            } else {
+                ; First check for local MSI in version-specific folder structure
+                localVersion := StrReplace(wauVersion, "v", "")  ; Remove "v" prefix for folder/file names
+                localMsiDir := A_WorkingDir "\msi\" localVersion
+                localMsiPath := localMsiDir "\WAU-" localVersion ".msi"
+                
+                if (FileExist(localMsiPath)) {
+                    ; Copy local MSI to %ProgramData%\Package Cache folder for MSI reinstall
+                    cacheDir := A_AppDataCommon "\Package Cache\" wauGUID wauLongVersion "\Installers"
+                    if !DirExist(cacheDir) {
+                        DirCreate(cacheDir)
+                    }
+                    cacheMsiPath := cacheDir "\WAU.msi"
+                    ; Only copy if wauSource is NOT under Package Cache
+                    if InStr(wauSource, "\Package Cache\" wauGUID wauLongVersion "\Installers", false) = 0 {
+                        FileCopy(localMsiPath, cacheMsiPath, 1)
+                    }
+
+                    msiParams := GetMSIParams()
+
+                    ; Uninstall using the found GUID and install from the copied local MSI
+                    if !silent {
+                        RunWait('msiexec /x' wauGUID ' /qn', , "Hide")
+                        RunWait('msiexec /i "' cacheMsiPath '" /qb ' msiParams, , "Hide")
+                    } else {
+                        RunWait('msiexec /x' wauGUID ' /qn', , "Hide")
+                        RunWait('msiexec /i "' cacheMsiPath '" /qn ' msiParams, , "Hide")
+                    }
+                } else if (IsInternetAvailable()) {
+                    ; No local MSI found, download the original version and trigger MSI reinstall
+                    downloadUrl := "https://github.com/Romanitho/Winget-AutoUpdate/releases/download/" wauVersion "/WAU.msi"
+                    wauMsiPath := A_WorkingDir "\WAU.msi"
                     try {
-                        f := FileOpen(wauMsiPath, "r")
-                        if !f {
-                            throw Error("Could not open downloaded file for validation.")
-                        }
-                        ; Read first 8 bytes as hex values
-                        signature := ""
-                        Loop 8 {
-                            signature .= Format("{:02X}", f.ReadUChar())
-                        }
-                        f.Close()
-                        if (signature != "D0CF11E0A1B11AE1") { ; OLE/COM compound document signature
-                            throw Error("Downloaded file is not a valid MSI file (invalid signature).")
+                        Download(downloadUrl, wauMsiPath)
+                        ; Check MSI file signature (first 8 bytes should be MSI signature)
+                        try {
+                            f := FileOpen(wauMsiPath, "r")
+                            if !f {
+                                throw Error("Could not open downloaded file for validation.")
+                            }
+                            ; Read first 8 bytes as hex values
+                            signature := ""
+                            Loop 8 {
+                                signature .= Format("{:02X}", f.ReadUChar())
+                            }
+                            f.Close()
+                            if (signature != "D0CF11E0A1B11AE1") { ; OLE/COM compound document signature
+                                throw Error("Downloaded file is not a valid MSI file (invalid signature).")
+                            }
+                        } catch as e {
+                            throw Error("Failed to validate MSI file signature: " e.Message)
                         }
                     } catch as e {
-                        throw Error("Failed to validate MSI file signature: " e.Message)
+                        throw Error("Failed to download WAU.msi from GitHub: " downloadUrl "`nError: " e.Message)
                     }
-                } catch as e {
-                    throw Error("Failed to download WAU.msi from GitHub: " downloadUrl "`nError: " e.Message)
+
+                    wauSource := A_WorkingDir
+                    ; Copy WAU.msi to %ProgramData%\Package Cache folder for MSI repair
+                    cacheDir := A_AppDataCommon "\Package Cache\" wauGUID wauLongVersion "\Installers"
+                    if !DirExist(cacheDir) {
+                        DirCreate(cacheDir)
+                    }
+                    cacheMsiPath := cacheDir "\WAU.msi"
+                    ; Only copy if wauSource is NOT under Package Cache
+                    if InStr(wauSource, "\Package Cache\" wauGUID wauLongVersion "\Installers", false) = 0 {
+                        FileCopy(wauSource "\WAU.msi", cacheMsiPath, 1)
+                    }
+
+                    wauSource := cacheDir
+
+                    msiParams := GetMSIParams()
+
+                    ; Uninstall using the found GUID and install from the copied WAU.msi
+                    if !silent {
+                        RunWait('msiexec /x' wauGUID ' /qn', , "Hide")
+                        RunWait('msiexec /i "' cacheMsiPath '" /qb ' msiParams, , "Hide")
+                    } else {
+                        RunWait('msiexec /x' wauGUID ' /qn', , "Hide")
+                        RunWait('msiexec /i "' cacheMsiPath '" /qn ' msiParams, , "Hide")
+                    }
+                } else {
+                    throw Error("WAU.msi not found in install source: " (wauSource != "" ? wauSource : "Unknown") ", no local MSI found in: " localMsiDir ", and couldn't be downloaded.`nPlease check your internet connection or download WAU.msi manually from GitHub.")
                 }
-
-                wauSource := A_WorkingDir
-                ; Copy WAU.msi to %ProgramData%\Package Cache folder for MSI repair (msi folder will be deleted later)
-                cacheDir := A_AppDataCommon "\Package Cache\" wauGUID wauLongVersion "\Installers"
-                if !DirExist(cacheDir) {
-                    DirCreate(cacheDir)
-                }
-                cacheMsiPath := cacheDir "\WAU.msi"
-                FileCopy(wauSource "\WAU.msi", cacheMsiPath, 1)
-
-                wauSource := cacheDir
-
-                msiParams := GetMSIParams()
-
-                ; Uninstall using the found GUID and install from the copied WAU.msi in the Package Cache folder
-                if !silent {
-                    RunWait('msiexec /x' wauGUID ' /qn', , "Hide")
-                    RunWait('msiexec /i "' cacheMsiPath '" /qb' msiParams, , "Hide")
-                }                
-                else {
-                    RunWait('msiexec /x' wauGUID ' /qn', , "Hide")
-                    RunWait('msiexec /i "' cacheMsiPath '" /qn' msiParams, , "Hide")
-                }
-            } else {
-                throw Error("WAU.msi not found in install source: " (wauSource != "" ? wauSource : "Unknown") " and couldn't be downloaded.`nPlease check your internet connection or download WAU.msi manually from GitHub.")
-            }
+            }            
         } else {
             throw Error("WAU GUID not found via PowerShell")
         }
             
     } catch as e {
         if !silent {
-            MsgBox("Failed to trigger MSI repair. Please repair WAU manually from Apps & Features.`n`nError: " e.Message, name_no_ext, 0x10)
+            MsgBox("Failed to trigger MSI reinstallation. Please repair WAU manually from Apps & Features.`n`nError: " e.Message, name_no_ext, 0x10)
         }
     }
 
