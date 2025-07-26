@@ -3,8 +3,8 @@
 ;@Ahk2Exe-Set CompanyName, KnifMelti
 ;@Ahk2Exe-Set ProductName, WAU Settings GUI
 ;@Ahk2Exe-Set FileDescription, WAU Settings GUI
-;@Ahk2Exe-Set FileVersion, 1.8.1.9
-;@Ahk2Exe-Set ProductVersion, 1.8.1.9
+;@Ahk2Exe-Set FileVersion, 1.8.2.0
+;@Ahk2Exe-Set ProductVersion, 1.8.2.0
 ;@Ahk2Exe-Set InternalName, WAU-Settings-GUI
 ;@Ahk2Exe-SetMainIcon ..\assets\WAU Settings GUI.ico
 ;@Ahk2Exe-UpdateManifest 1
@@ -60,20 +60,19 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
 
     ; Remove WAU Settings (Administrator) shortcuts if they exist
     if FileExist(shortcutDesktop) || FileExist(shortcutStartMenu) {
-            try {
-                if FileExist(shortcutDesktop)
-                FileDelete(shortcutDesktop)
-                if FileExist(shortcutStartMenu)
-                FileDelete(shortcutStartMenu)
-                if FileExist(shortcutOpenLogs)
-                FileDelete(shortcutOpenLogs)
-                if FileExist(shortcutAppInstaller)
-                FileDelete(shortcutAppInstaller)
-            } catch {
-                ; Ignore errors from MSI subsystem
-            }
+        try {
+            if FileExist(shortcutDesktop)
+            FileDelete(shortcutDesktop)
+            if FileExist(shortcutStartMenu)
+            FileDelete(shortcutStartMenu)
+            if FileExist(shortcutOpenLogs)
+            FileDelete(shortcutOpenLogs)
+            if FileExist(shortcutAppInstaller)
+            FileDelete(shortcutAppInstaller)
+        } catch {
+            ; Ignore errors from MSI subsystem
+        }
     }
-
 
     ; Check if working dir is under '\WinGet\Packages\'
     if InStr(A_WorkingDir, "\WinGet\Packages\", false) > 0 {
@@ -142,14 +141,6 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
         }
         
         if (wauGUID != "") {
-            ; Delete existing Startmenu
-            try {
-                if FileExist(A_ProgramsCommon "\Winget-AutoUpdate")
-                    FileDelete(A_ProgramsCommon "\Winget-AutoUpdate")
-            } catch {
-                ; Ignore errors from MSI subsystem
-            }
-
             ; Check if WAU.msi exists in the install source before attempting uninstall/install
             if (wauSource != "" && FileExist(wauSource "\WAU.msi")) {
                 ; Copy WAU.msi to %ProgramData%\Package Cache folder for MSI uninstall/install
@@ -164,6 +155,14 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
                 }
 
                 msiParams := GetMSIParams()
+
+                ; Delete existing Startmenu
+                try {
+                    if FileExist(A_ProgramsCommon "\Winget-AutoUpdate")
+                        FileDelete(A_ProgramsCommon "\Winget-AutoUpdate")
+                } catch {
+                    ; Ignore errors from MSI subsystem
+                }
 
                 ; Uninstall using the found GUID and install from the copied WAU.msi in the Package Cache folder
                 if !silent {
@@ -215,6 +214,14 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
 
                 msiParams := GetMSIParams()
 
+                ; Delete existing Startmenu
+                try {
+                    if FileExist(A_ProgramsCommon "\Winget-AutoUpdate")
+                        FileDelete(A_ProgramsCommon "\Winget-AutoUpdate")
+                } catch {
+                    ; Ignore errors from MSI subsystem
+                }
+
                 ; Uninstall using the found GUID and install from the copied WAU.msi in the Package Cache folder
                 if !silent {
                     RunWait('msiexec /x' wauGUID ' /qn', , "Hide")
@@ -233,7 +240,7 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
             
     } catch as e {
         if !silent {
-            MsgBox("Failed to trigger MSI repair. Please repair WAU manually from Apps & Features.`n`nError: " e.Message, name_no_ext, 0x10)
+            MsgBox("Failed to trigger MSI reinstallation. Please repair WAU manually from Apps & Features.`n`nError: " e.Message, name_no_ext, 0x10)
         }
     }
 
