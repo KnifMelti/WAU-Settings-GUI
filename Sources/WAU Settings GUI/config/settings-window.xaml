@@ -74,7 +74,7 @@
                         <Button x:Name="DevCfgButton" Content="[cfg]" Width="34" Height="20" FontSize="9" Visibility="Collapsed" Margin="0,0,2,0"
                             ToolTip="backup current &amp; import 'WAU' settings file"/>
                         <Button x:Name="DevWAUButton" Content="[wau]" Width="34" Height="20" FontSize="9" Visibility="Collapsed" Margin="0,0,2,0"
-                            ToolTip="uninstall/install 'WAU' with current showing configuration"/>
+                            ToolTip="reinstall 'WAU' with current showing configuration"/>
                         <Button x:Name="DevVerButton" Content="[ver]" Width="34" Height="20" FontSize="9" Visibility="Collapsed" Margin="0,0,2,0"
                             ToolTip="check if there's a newer version of 'WAU Settings GUI' available"/>
                         <Button x:Name="DevSrcButton" Content="[src]" Width="34" Height="20" FontSize="9" Visibility="Collapsed" Margin="0,0,0,0"
