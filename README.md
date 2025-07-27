@@ -40,7 +40,7 @@ Configure **WAU** settings after installation, including:
   - **MSI** transform creation (using current showing configuration)
   - Configuration backup/import (i.e. for sharing settings)
   - Reinstall (uninstall/install) **WAU** (with current showing configuration)
-    - Saves installation source to `%ProgramData%\Package Cache` (enabling future **WAU** repairs)
+    - Stores source in `%ProgramData%\Package Cache` (enables **WAU** `Repair` in **Programs and Features**)
   - Manual/automatic check for updates (checks automatically every week as standard)
   - Direct access to the **WAU Settings GUI** install folder
 
