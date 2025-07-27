@@ -40,7 +40,7 @@ Configure **WAU** settings after installation, including:
   - **MSI** transform creation (using current showing configuration)
   - Configuration backup/import (i.e. for sharing settings)
   - Reinstall (uninstall/install) **WAU** (with current showing configuration)
-    - Stores source in `%ProgramData%\Package Cache` (enables **WAU** `Repair` in **Programs and Features**)
+    - Stores source in `[INSTALLDIR]\msi\[VERSION]` (enables **WAU** `Repair` in **Programs and Features**)
   - Manual/automatic check for updates (checks automatically every week as standard)
   - Direct access to the **WAU Settings GUI** install folder
 
@@ -103,6 +103,7 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
   ```
 - This will remove everything, including the **Portable WinGet Package** from the source (it will not show up in the **WinGet** installed list anymore)
 - **WAU** will be automatically reinstalled afterward restoring the current showing configuration
+- Stores source in `%ProgramData%\Package Cache` (enables **WAU** `Repair` in **Programs and Features**)
 
 ### Screenshots
 Managed by Registry (local):  
