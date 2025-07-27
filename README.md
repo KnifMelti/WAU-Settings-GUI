@@ -103,7 +103,7 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
   ```
 - This will remove everything, including the **Portable WinGet Package** from the source (it will not show up in the **WinGet** installed list anymore)
 - **WAU** will be automatically reinstalled afterward restoring the current showing configuration
-  - Stores source in `%ProgramData%\Package Cache` (enables **WAU** `Repair` in **Programs and Features**)
+  - Stores source in `%ProgramData%\Package Cache\[GUID][LONGVERSION]` (enables **WAU** `Repair` in **Programs and Features**)
 
 ### Screenshots
 Managed by Registry (local):  
