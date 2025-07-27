@@ -3,8 +3,8 @@
 ;@Ahk2Exe-Set CompanyName, KnifMelti
 ;@Ahk2Exe-Set ProductName, WAU Settings GUI
 ;@Ahk2Exe-Set FileDescription, WAU Settings GUI
-;@Ahk2Exe-Set FileVersion, 1.8.2.1
-;@Ahk2Exe-Set ProductVersion, 1.8.2.1
+;@Ahk2Exe-Set FileVersion, 1.8.2.2
+;@Ahk2Exe-Set ProductVersion, 1.8.2.2
 ;@Ahk2Exe-Set InternalName, WAU-Settings-GUI
 ;@Ahk2Exe-SetMainIcon ..\assets\WAU Settings GUI.ico
 ;@Ahk2Exe-UpdateManifest 1
@@ -42,7 +42,7 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
     silent := (A_Args.Length > 1 && (A_Args[2] = "/S"))
     if !silent {
         choice := MsgBox(
-            "Do you want to uninstall WAU Settings GUI?`n`nWAU will be automatically reinstalled afterward`nrestoring the current showing shortcuts and settings.",
+            "Do you want to uninstall WAU Settings GUI?`n`nWAU will be automatically reinstalled afterward`nrestoring the current showing configuration.",
             name_no_ext,
             0x21  ; OK/Cancel with Question icon
         )
