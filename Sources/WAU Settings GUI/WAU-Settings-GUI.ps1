@@ -738,14 +738,16 @@ function Get-WAUCurrentConfig {
             "Question"
         ) -eq 'Ok'
         
-        if ($userWantsToInstall) {
-            if ($result) {
-                $msiFilePath = $result.MsiFilePath
-            }
-            
-            if ($msiFilePath) {
-                # Install WAU using the downloaded MSI file
-                $installResult = Install-WAU -msiFilePath $msiFilePath
+            if ($userWantsToInstall) {
+                $result = Get-WAUMsi  # Download latest stable WAU
+                
+                if ($result) {
+                    $msiFilePath = $result.MsiFilePath
+                }
+                
+                if ($msiFilePath) {
+                    # Install WAU using the downloaded MSI file
+                    $installResult = Install-WAU -msiFilePath $msiFilePath
                 
                 # Handle post-installation logic
                 if ($Script:MainWindowStarted) {
