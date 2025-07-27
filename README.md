@@ -34,12 +34,13 @@ Configure **WAU** settings after installation, including:
   - Task scheduler access
   - Registry editor access
   - **GUID** path exploration
-  - Open **WinGet** system wide installed application list (if saved by **WAU**)
+  - Open **WinGet** system wide installed application list (if previous saved by **WAU**)
   - List file management
   - Change colors/update schedule for **WAU Settings GUI**
   - **MSI** transform creation (using current showing configuration)
   - Configuration backup/import (i.e. for sharing settings)
   - Reinstall (uninstall/install) **WAU** (with current showing configuration)
+    - Saves installation source to `%ProgramData%\Package Cache` (enabling future **WAU** repairs)
   - Manual/automatic check for updates (checks automatically every week as standard)
   - Direct access to the **WAU Settings GUI** install folder
 
