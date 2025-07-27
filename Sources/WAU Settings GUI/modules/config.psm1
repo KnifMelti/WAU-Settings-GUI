@@ -24,7 +24,6 @@ $ConfigVariables = @{
 	'STATUS_READY_TEXT' = "Ready (F5 Load/F12 Dev)"
 	'STATUS_DONE_TEXT' = "Done"
 	'WAIT_TIME' = 1000 # 1 second wait time for UI updates
-	'LAST_UNINSTALLED_WAU_VERSION' = $null # Track last uninstalled WAU version for dev [wau] button
 }
 
 $Global:Config = $ConfigVariables

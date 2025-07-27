@@ -730,14 +730,6 @@ function Get-WAUCurrentConfig {
             Close-PopUp
         }
         
-        # Skip installation dialog if we just uninstalled WAU via Dev [wau]
-        if ($Script:LAST_UNINSTALLED_WAU_VERSION) {
-            # WAU was recently uninstalled via Dev [wau], don't prompt for installation
-            if ($Script:MainWindowStarted) {
-                return $null  # Return to main window without installation dialog
-            }
-        }
-
         # Show initial prompt
         $userWantsToInstall = [System.Windows.MessageBox]::Show(
             "WAU configuration not found. Please ensure WAU is properly installed.`n`nDo you want to download and install WAU now?", 
@@ -747,13 +739,6 @@ function Get-WAUCurrentConfig {
         ) -eq 'Ok'
         
         if ($userWantsToInstall) {
-            # Check if we have a saved version from previous uninstall
-            $result = if ($Script:LAST_UNINSTALLED_WAU_VERSION) {
-                Get-WAUMsi -SpecificVersion $Script:LAST_UNINSTALLED_WAU_VERSION
-            } else {
-                Get-WAUMsi  # Downloads latest stable
-            }
-            
             if ($result) {
                 $msiFilePath = $result.MsiFilePath
             }
@@ -761,11 +746,6 @@ function Get-WAUCurrentConfig {
             if ($msiFilePath) {
                 # Install WAU using the downloaded MSI file
                 $installResult = Install-WAU -msiFilePath $msiFilePath
-                
-                # Clear saved version after successful installation (if it was used)
-                if ($installResult -and $Script:LAST_UNINSTALLED_WAU_VERSION) {
-                    $Script:LAST_UNINSTALLED_WAU_VERSION = $null
-                }
                 
                 # Handle post-installation logic
                 if ($Script:MainWindowStarted) {
@@ -3195,26 +3175,6 @@ function Close-WindowGracefully {
     param($controls, $window)
     
     try {
-        # Skip settings changed check if WAU was recently uninstalled via Dev [wau]
-        if ($Script:LAST_UNINSTALLED_WAU_VERSION) {
-            # WAU was recently uninstalled, just close without checking for changes
-            $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
-            $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED
-            
-            $timer = New-Object System.Windows.Threading.DispatcherTimer
-            $timer.Interval = [TimeSpan]::FromMilliseconds($Script:WAIT_TIME / 2)
-            $timer.Add_Tick({
-                $controls.StatusBarText.Text = "$Script:STATUS_READY_TEXT"
-                $controls.StatusBarText.Foreground = "$Script:COLOR_INACTIVE"
-                if ($null -ne $timer) {
-                    $timer.Stop()
-                }
-                $window.Close()
-            })
-            $timer.Start()
-            return
-        }
-
         # Check if settings have changed
         $changeResult = Test-SettingsChanged -controls $controls
         
