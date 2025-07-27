@@ -439,6 +439,16 @@ CreateUninstall(uninstPath, name_no_ext, targetDir) {
     RegWrite("1", "REG_DWORD", regPath, "NoModify")
     RegWrite("1", "REG_DWORD", regPath, "NoRepair")
 
+    ; Calculate total installed size in KB for EstimatedSize (sum of all files in targetDir, including subfolders)
+    totalBytes := 0
+    Loop Files targetDir "\*", "FR" {
+        if !(A_LoopFileAttrib ~= "D") { ; Only count files, not directories
+            totalBytes += FileGetSize(A_LoopFileFullPath)
+        }
+    }
+    estimatedSizeKB := Round(totalBytes / 1024)
+    RegWrite(estimatedSizeKB, "REG_DWORD", regPath, "EstimatedSize")
+
     ; Create README link in installation directory and delete README.md if it exists
     readmeUrl := "https://github.com/KnifMelti/" name_no_ext
     urlContent := "[InternetShortcut]`nURL=" readmeUrl "`n"
