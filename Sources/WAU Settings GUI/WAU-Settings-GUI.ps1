@@ -1500,7 +1500,6 @@ msiexec /x"$($guid)" REBOOT=R /qn /l*v "%~dp0Uninst-$logFileName"
         if ($installer) { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($installer) | Out-Null }
     }
 }
-# Modified Test-LocalMSIVersion to work with new folder structure
 function Test-LocalMSIVersion {
     param(
         [string]$msiDirectory = (Join-Path $Script:WorkingDir "msi"),
@@ -1591,11 +1590,10 @@ function Test-LocalMSIVersion {
         }
     }
 }
-# Modified Get-WAUMsi for specific version and folder structure
 function Get-WAUMsi {
     param(
         [switch]$ForceDownload,
-        [string]$SpecificVersion  # New parameter for specific version
+        [string]$SpecificVersion  # Parameter for specific version
     )
     
     $msiDir = Join-Path $Script:WorkingDir "msi"
@@ -1653,39 +1651,49 @@ function Get-WAUMsi {
         New-Item -ItemType Directory -Path $versionDir -Force | Out-Null
     }
     
-    # Check if MSI already exists for this version
-    $expectedMsiName = if ($targetVersion) {
-        "WAU-$targetVersion.msi"
-    } else {
-        "WAU-latest.msi"
-    }
-    $localMsiPath = Join-Path $versionDir $expectedMsiName
-    
-    if ((Test-Path $localMsiPath) -and -not $ForceDownload) {
-        return @{
-            MsiAsset = @{ name = $expectedMsiName }
-            MsiFilePath = $localMsiPath
-            VersionInfo = "Using cached MSI: $targetVersion"
-            IsPreRelease = $isPreRelease
-        }
-    }
-    
     try {
         if ($targetVersion) {
+            # Handle specific version
+            $expectedMsiName = "WAU-$targetVersion.msi"
+            $localMsiPath = Join-Path $versionDir $expectedMsiName
+            
+            # Check cache for specific version
+            if ((Test-Path $localMsiPath) -and -not $ForceDownload) {
+                return @{
+                    MsiAsset = @{ name = $expectedMsiName }
+                    MsiFilePath = $localMsiPath
+                    VersionInfo = "Using cached MSI: $targetVersion"
+                    IsPreRelease = $isPreRelease
+                }
+            }
+            
             # Download specific version
             $downloadUrl = "https://github.com/$Script:WAU_REPO/releases/download/$targetVersion/WAU.msi"
             Start-PopUp "Downloading WAU $targetVersion..."
+            
         } else {
-            # Download latest stable
+            # Handle latest version - check online first to get correct filename
             $ApiUrl = "https://api.github.com/repos/$Script:WAU_REPO/releases/latest"
             $Release = Invoke-RestMethod -Uri $ApiUrl -UseBasicParsing
             $MsiAsset = $Release.assets | Where-Object { $_.name -like "*.msi" }
             if (!$MsiAsset) {
                 throw "MSI file not found in latest release"
             }
-            $downloadUrl = $MsiAsset.browser_download_url
+            
             $expectedMsiName = $MsiAsset.name
             $localMsiPath = Join-Path $versionDir $expectedMsiName
+            $downloadUrl = $MsiAsset.browser_download_url
+            
+            # Check cache with correct filename
+            if ((Test-Path $localMsiPath) -and -not $ForceDownload) {
+                return @{
+                    MsiAsset = @{ name = $expectedMsiName }
+                    MsiFilePath = $localMsiPath
+                    VersionInfo = "Using cached MSI: latest ($expectedMsiName)"
+                    IsPreRelease = $false
+                }
+            }
+            
             Start-PopUp "Downloading latest WAU: $($MsiAsset.name)..."
         }
         
@@ -1695,7 +1703,7 @@ function Get-WAUMsi {
         return @{
             MsiAsset = @{ name = $expectedMsiName }
             MsiFilePath = $localMsiPath
-            VersionInfo = "Downloaded: $targetVersion"
+            VersionInfo = "Downloaded: $(if ($targetVersion) { $targetVersion } else { "latest ($expectedMsiName)" })"
             IsPreRelease = $isPreRelease
         }
     }
@@ -1798,7 +1806,6 @@ function Uninstall-WAU {
         return $false
     }
 }
-# Modified New-WAUTransformFile to use installed version
 function New-WAUTransformFile {
     param($controls)
     try {
