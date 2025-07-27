@@ -102,7 +102,7 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
   "C:\WAU Settings GUI\UnInst.exe" /UNINSTALL /S
   ```
 - This will remove everything, including the **Portable WinGet Package** from the source (it will not show up in the **WinGet** installed list anymore)
-- **WAU** will be automatically reinstalled afterward restoring the current showing shortcuts and settings
+- **WAU** will be automatically reinstalled afterward restoring the current showing configuration
 
 ### Screenshots
 Managed by Registry (local):  
