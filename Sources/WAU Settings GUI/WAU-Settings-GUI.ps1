@@ -38,6 +38,11 @@ param(
 # Set portable mode flag
 $Script:PORTABLE_MODE = $Portable.IsPresent
 
+# Set essential variables, used already in <# MAIN #>
+$Script:WorkingDir = $PSScriptRoot
+$Script:WAU_GUI_NAME = "WAU-Settings-GUI"  # Default name for WAU Settings GUI executable
+$Script:WAU_GUI_REPO = "KnifMelti/WAU-Settings-GUI" # GitHub repository for WAU Settings GUI
+
 <# FUNCTIONS #>
 # 0. Initialization function
 function Initialize-GUI {
@@ -45,9 +50,6 @@ function Initialize-GUI {
     Add-Type -AssemblyName System.Windows.Forms
     Add-Type -AssemblyName System.Drawing
     Add-Type -AssemblyName PresentationFramework
-
-    # Get current script directory
-    $Script:WorkingDir = $PSScriptRoot
 
     # Set modules path
     $modulesPath = Join-Path -Path $Script:WorkingDir -ChildPath "modules"
@@ -4044,61 +4046,9 @@ $ProgressPreference = 'SilentlyContinue'
 if (-not (Test-Administrator)) {
     # Import required assemblies
     Add-Type -AssemblyName System.Windows.Forms
-    Add-Type -AssemblyName System.Drawing
     Add-Type -AssemblyName PresentationFramework
     [System.Windows.MessageBox]::Show("This application must be run as Administrator to modify WAU settings.", "Administrator Required", "OK", "Warning")
     exit 1
-}
-
-# Initialize
-try {
-    Initialize-GUI
-} catch {
-    Close-PopUp
-    [System.Windows.Forms.MessageBox]::Show("Error: $($_.Exception.Message)", "Application Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
-    exit 1
-}
-
-# Set WAU Settings GUI icon
-$guiIconPath = Join-Path $Script:WorkingDir "config\WAU Settings GUI.ico"
-if (Test-Path $guiIconPath) {
-    $Script:GUI_ICON = $guiIconPath
-} else {
-    # If missing, fallback and extract icon from PowerShell.exe and save as icon.ico in SYSTEM TEMP
-    $iconSource = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
-    $systemTemp = [System.Environment]::GetEnvironmentVariable("TEMP", [System.EnvironmentVariableTarget]::Machine)
-    if (-not $systemTemp) { $systemTemp = "$env:SystemRoot\Temp" }
-    $iconDest = Join-Path $systemTemp "icon.ico"
-    # Only extract if the icon doesn't already exist
-    if (-not (Test-Path $iconDest)) {
-        $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($iconSource)
-        $fs = [System.IO.File]::Open($iconDest, [System.IO.FileMode]::Create)
-        $icon.Save($fs)
-        $fs.Close()
-    }
-    $Script:GUI_ICON = $iconDest
-}
-
-# Load PopUp XAML from config file and store as constant
-$xamlConfigPath = Join-Path $Script:WorkingDir "config\settings-popup.xaml"
-if (Test-Path $xamlConfigPath) {
-    $inputXML = Get-Content $xamlConfigPath -Raw
-    
-    # Replace PowerShell variables with actual values
-    $inputXML = $inputXML -replace '\$Script:GUI_TITLE', $Script:GUI_TITLE
-    $Script:POPUP_XAML = $inputXML.Trim()
-} else {
-    [System.Windows.MessageBox]::Show("PopUp XAML config file not found: $xamlConfigPath", "$Script:GUI_TITLE", "OK", "Warning")
-    exit 1
-}
-
-#Pop "Starting..."
-Start-PopUp "Gathering WAU Data..."
-
-# Remove old config\version.txt if it exists
-$oldVersionFile = Join-Path $Script:WorkingDir "config\version.txt"
-if (Test-Path $oldVersionFile) {
-    Remove-Item $oldVersionFile -Force -ErrorAction SilentlyContinue
 }
 
 # Version information, takes care of if upgraded from external (WinGet/WAU)
@@ -4147,6 +4097,104 @@ if (Test-Path $exePath) {
         Copy-Item -Path $uninstPath -Destination $exePath -Force -ErrorAction SilentlyContinue
     }
     # If neither file exists, keep default "0.0.0.0"
+}
+
+$Script:WAU_GUI_VERSION = "1.8.2.1" # Set default version for testing purposes
+
+# Ensure the original version ZIP exists in \ver
+$verDir = Join-Path $Script:WorkingDir "ver"
+if (-not (Test-Path $verDir)) {
+    New-Item -ItemType Directory -Path $verDir -Force | Out-Null
+}
+
+$expectedZipName = "*$Script:WAU_GUI_VERSION*.zip"
+$existingZip = Get-ChildItem -Path $verDir -Filter $expectedZipName -File | Select-Object -First 1
+
+if (-not $existingZip) {
+    try {
+        # Fetch latest release info from GitHub
+        $apiUrl = "https://api.github.com/repos/$Script:WAU_GUI_REPO/releases"
+        $releases = Invoke-RestMethod -Uri $apiUrl -UseBasicParsing
+        $release = $releases | Where-Object { $_.tag_name.TrimStart('v') -eq $Script:WAU_GUI_VERSION } | Select-Object -First 1
+        if (-not $release) {
+            throw "No GitHub release found for version $Script:WAU_GUI_VERSION"
+        }
+
+        # Look for the correct asset
+        $asset = $release.assets | Where-Object { $_.name -like "*.zip" } | Select-Object -First 1
+        if (-not $asset) {
+            throw "No ZIP file found in the GitHub release for version $Script:WAU_GUI_VERSION"
+        }
+
+        $downloadPath = Join-Path $verDir $asset.name
+        # Download the ZIP file
+        $headers = @{ 'User-Agent' = 'WAU-Settings-GUI-Repair/1.0' }
+        Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $downloadPath -UseBasicParsing -Headers $headers
+
+        # Validate that it is a valid ZIP
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        try {
+            [System.IO.Compression.ZipFile]::OpenRead($downloadPath).Dispose()
+        } catch {
+            Remove-Item $downloadPath -Force -ErrorAction SilentlyContinue
+            throw "The downloaded file is not a valid ZIP archive."
+        }
+    } catch {
+        # Import required assemblies
+        Add-Type -AssemblyName System.Windows.Forms
+        Add-Type -AssemblyName PresentationFramework
+        [System.Windows.MessageBox]::Show("Could not download the original version ZIP for repair:`n$($_.Exception.Message)", "Download Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+    }
+}
+
+# Initialize
+try {
+    Initialize-GUI
+} catch {
+    [System.Windows.Forms.MessageBox]::Show("Error: $($_.Exception.Message)", "Application Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+    exit 1
+}
+
+# Set WAU Settings GUI icon
+$guiIconPath = Join-Path $Script:WorkingDir "config\WAU Settings GUI.ico"
+if (Test-Path $guiIconPath) {
+    $Script:GUI_ICON = $guiIconPath
+} else {
+    # If missing, fallback and extract icon from PowerShell.exe and save as icon.ico in SYSTEM TEMP
+    $iconSource = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
+    $systemTemp = [System.Environment]::GetEnvironmentVariable("TEMP", [System.EnvironmentVariableTarget]::Machine)
+    if (-not $systemTemp) { $systemTemp = "$env:SystemRoot\Temp" }
+    $iconDest = Join-Path $systemTemp "icon.ico"
+    # Only extract if the icon doesn't already exist
+    if (-not (Test-Path $iconDest)) {
+        $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($iconSource)
+        $fs = [System.IO.File]::Open($iconDest, [System.IO.FileMode]::Create)
+        $icon.Save($fs)
+        $fs.Close()
+    }
+    $Script:GUI_ICON = $iconDest
+}
+
+# Load PopUp XAML from config file and store as constant
+$xamlConfigPath = Join-Path $Script:WorkingDir "config\settings-popup.xaml"
+if (Test-Path $xamlConfigPath) {
+    $inputXML = Get-Content $xamlConfigPath -Raw
+    
+    # Replace PowerShell variables with actual values
+    $inputXML = $inputXML -replace '\$Script:GUI_TITLE', $Script:GUI_TITLE
+    $Script:POPUP_XAML = $inputXML.Trim()
+} else {
+    [System.Windows.MessageBox]::Show("PopUp XAML config file not found: $xamlConfigPath", "$Script:GUI_TITLE", "OK", "Warning")
+    exit 1
+}
+
+#Pop "Starting..."
+Start-PopUp "Gathering WAU Data..."
+
+# Remove old config\version.txt if it exists
+$oldVersionFile = Join-Path $Script:WorkingDir "config\version.txt"
+if (Test-Path $oldVersionFile) {
+    Remove-Item $oldVersionFile -Force -ErrorAction SilentlyContinue
 }
 
 # Load Window XAML from config file and store as constant

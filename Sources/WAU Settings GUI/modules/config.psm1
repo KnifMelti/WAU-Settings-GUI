@@ -2,8 +2,6 @@
 
 # Basic variables first
 $ConfigVariables = @{
-	'WAU_GUI_NAME' = "WAU-Settings-GUI"
-	'WAU_GUI_REPO' = "KnifMelti/WAU-Settings-GUI"
 	'WAU_REPO' = "Romanitho/Winget-AutoUpdate"
 	'WAU_REGISTRY_PATH' = "HKLM:\SOFTWARE\Romanitho\Winget-AutoUpdate"
 	'WAU_POLICIES_PATH' = "HKLM:\SOFTWARE\Policies\Romanitho\Winget-AutoUpdate"
