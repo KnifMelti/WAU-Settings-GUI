@@ -4152,6 +4152,7 @@ try {
     Initialize-GUI
 } catch {
     [System.Windows.Forms.MessageBox]::Show("Error: $($_.Exception.Message)", "Application Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+    # No 'modules' or no 'config.psm1' - Repair if possible
     exit 1
 }
 
@@ -4159,7 +4160,11 @@ try {
 $guiIconPath = Join-Path $Script:WorkingDir "config\WAU Settings GUI.ico"
 if (Test-Path $guiIconPath) {
     $Script:GUI_ICON = $guiIconPath
-} else {
+} else { # elseif
+    # No 'config\WAU Settings GUI.ico' - Repair if possible
+
+    #else
+
     # If missing, fallback and extract icon from PowerShell.exe and save as icon.ico in SYSTEM TEMP
     $iconSource = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
     $systemTemp = [System.Environment]::GetEnvironmentVariable("TEMP", [System.EnvironmentVariableTarget]::Machine)
@@ -4184,6 +4189,7 @@ if (Test-Path $xamlConfigPath) {
     $inputXML = $inputXML -replace '\$Script:GUI_TITLE', $Script:GUI_TITLE
     $Script:POPUP_XAML = $inputXML.Trim()
 } else {
+    # No 'config\settings-popup.xaml' - Repair if possible
     [System.Windows.MessageBox]::Show("PopUp XAML config file not found: $xamlConfigPath", "$Script:GUI_TITLE", "OK", "Warning")
     exit 1
 }
@@ -4216,6 +4222,7 @@ if (Test-Path $xamlConfigPath) {
     $inputXML = $inputXML -replace '\$Script:STATUS_READY_TEXT', $Script:STATUS_READY_TEXT
     $Script:WINDOW_XAML = $inputXML.Trim()
 } else {
+    # No 'config\settings-window.xaml' - Repair if possible
     [System.Windows.MessageBox]::Show("Window XAML config file not found: $xamlConfigPath", "$Script:GUI_TITLE", "OK", "Warning")
     exit 1
 }
