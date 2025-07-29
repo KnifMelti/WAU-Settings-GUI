@@ -4102,10 +4102,10 @@ function Show-WAUSettingsGUI {
             if ($hasBackups) {
                 # Show dialog with update/restore options
                 $backupList = ($backupFiles | Select-Object -First 5 | ForEach-Object { 
-                    "• $($_.Name) ($(Get-Date $_.CreationTime -Format 'yyyy-MM-dd HH:mm'))"
+                    "- $($_.Name) ($(Get-Date $_.CreationTime -Format 'yyyy-MM-dd HH:mm'))"
                 }) -join "`n"
                 
-                $message = "Available backup versions:`n$backupList`n`nWhat would you like to do?"
+                $message = "Available backup versions:`n$backupList`n`nWhat would you like to do?`n`nYes = Check for updates`nNo = Restore from backup`nCancel = Do nothing"
                 $result = [System.Windows.MessageBox]::Show(
                     $message,
                     "Update or Restore?",
@@ -4113,7 +4113,7 @@ function Show-WAUSettingsGUI {
                     "Question",
                     "Yes"
                 )
-                
+                                
                 switch ($result) {
                     'Yes' {
                         # Continue with update check
