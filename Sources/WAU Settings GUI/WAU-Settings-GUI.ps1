@@ -3514,7 +3514,47 @@ function Show-WAUSettingsGUI {
             # Open Registry Editor (it will open at the last key location)
             Start-Process "regedit.exe"
 
+            # Open installer folder
             Start-Process "explorer.exe" -ArgumentList "${env:SystemRoot}\Installer\${Script:WAU_GUID}"
+
+            # Check for install source and open only if MSI exists there
+            try {
+                $registryPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$($Script:WAU_GUID)"
+                $installSource = (Get-ItemProperty -Path $registryPath -Name "InstallSource" -ErrorAction SilentlyContinue).InstallSource
+                
+                if ($installSource -and (Test-Path $installSource)) {
+                    $installSource = $installSource.TrimEnd('\')
+                    
+                    # Look for WAU MSI files (prioritize WAU.msi, then WAU-*.msi, then any *.msi)
+                    $msiFile = $null
+                    
+                    # First try standard WAU.msi
+                    $standardMsi = Join-Path $installSource "WAU.msi"
+                    if (Test-Path $standardMsi) {
+                        $msiFile = $standardMsi
+                    } else {
+                        # Then try WAU-*.msi pattern
+                        $wauMsiFiles = Get-ChildItem -Path $installSource -Filter "WAU-*.msi" -File | Select-Object -First 1
+                        if ($wauMsiFiles) {
+                            $msiFile = $wauMsiFiles.FullName
+                        } else {
+                            # Finally try any *.msi file
+                            $anyMsiFiles = Get-ChildItem -Path $installSource -Filter "*.msi" -File | Select-Object -First 1
+                            if ($anyMsiFiles) {
+                                $msiFile = $anyMsiFiles.FullName
+                            }
+                        }
+                    }
+                    
+                    # Only open install source if MSI file was found
+                    if ($msiFile) {
+                        Start-Process "explorer.exe" -ArgumentList "/select,`"$msiFile`""
+                    }
+                }
+            }
+            catch {
+                # Silent fail if we can't access install source
+            }
 
             # Update status to "Done"
             $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
