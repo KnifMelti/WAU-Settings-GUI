@@ -3108,6 +3108,19 @@ function Invoke-SettingsLoad {
     $controls.StatusBarText.Foreground = $Script:COLOR_ACTIVE
     Start-PopUp "Loading WAU Data..."
     try {
+        # Update WAU version info before refreshing GUI
+        $Script:WAU_INSTALL_INFO = Test-InstalledWAU -DisplayName "Winget-AutoUpdate"
+        $Script:WAU_VERSION = if ($Script:WAU_INSTALL_INFO.Count -ge 1) { $Script:WAU_INSTALL_INFO[0] } else { "Unknown" }
+        $Script:WAU_GUID = if ($Script:WAU_INSTALL_INFO.Count -ge 2) { $Script:WAU_INSTALL_INFO[1] } else { $null }
+        
+        # Update WinGet version
+        try {
+            $wingetVersionOutput = winget -v 2>$null
+            $Script:WINGET_VERSION = $wingetVersionOutput.Trim().TrimStart("v")
+        } catch {
+            $Script:WINGET_VERSION = "Unknown"
+        }
+        
         # Refresh all settings from config and policies
         Update-WAUGUIFromConfig -Controls $controls
         Update-GPOManagementState -controls $controls -skipPopup $true
