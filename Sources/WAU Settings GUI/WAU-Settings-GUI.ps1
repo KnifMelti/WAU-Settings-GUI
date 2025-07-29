@@ -4105,7 +4105,7 @@ function Show-WAUSettingsGUI {
                     "- $($_.Name) ($(Get-Date $_.CreationTime -Format 'yyyy-MM-dd HH:mm'))"
                 }) -join "`n"
                 
-                $message = "Available backup versions:`n$backupList`n`nWhat would you like to do?`n`nChoose Yes to check for updates, No to restore, or Cancel to exit."
+                $message = "Available backup versions:`n$backupList`n`nWhat would you like to do?`n`nChoose Yes to update, No to restore, or Cancel to exit."
                 $result = [System.Windows.MessageBox]::Show(
                     $message,
                     "Update or Restore?",
