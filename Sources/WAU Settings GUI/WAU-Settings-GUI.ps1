@@ -657,6 +657,163 @@ function Start-WAUGUIUpdate {
         return $false
     }
 }
+function Start-RestoreFromBackup {
+    param(
+        [string]$backupPath,
+        $controls,
+        $window
+    )
+    
+    try {
+        Start-PopUp "Restoring from backup..."
+        
+        # Extract backup to temp location
+        $tempExtractDir = Join-Path ([System.IO.Path]::GetTempPath()) "WAU-Settings-GUI-Restore-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+        
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        [System.IO.Compression.ZipFile]::ExtractToDirectory($backupPath, $tempExtractDir)
+        
+        # Icon cleanup before file copying (same as in Start-WAUGUIUpdate)
+        if ($window -and $window.Icon) { $window.Icon = $null }
+        if ($Script:PopUpWindow) { $Script:PopUpWindow.Close(); $Script:PopUpWindow = $null }
+
+        # Force garbage collection to release file handles
+        [System.GC]::Collect()
+        [System.GC]::WaitForPendingFinalizers()
+
+        # Close the current window BEFORE copying files to release file locks
+        if ($Script:MainWindowStarted -and $window) { $window.Close() }
+
+        # Add a small delay to ensure window is closed and files are released
+        Start-Sleep -Milliseconds 1500
+
+        # Copy restored files, overwriting current files (same logic as in Start-WAUGUIUpdate)
+        Get-ChildItem -Path $tempExtractDir | ForEach-Object {
+            $relativePath = $_.Name
+            $destinationPath = Join-Path $Script:WorkingDir $relativePath
+        
+            if ($_.PSIsContainer) {
+                # For directories, we need special handling
+                if ($relativePath -eq "modules") {
+                    if (-not (Test-Path $destinationPath)) {
+                        New-Item -Path $destinationPath -ItemType Directory -Force | Out-Null
+                    }
+                    
+                    # Copy all files from source modules
+                    Get-ChildItem -Path $_.FullName -File | ForEach-Object {
+                        $moduleFile = $_
+                        $moduleDestPath = Join-Path $destinationPath $moduleFile.Name
+                        Copy-Item -Path $moduleFile.FullName -Destination $moduleDestPath -Force
+                    }
+                    
+                    # Copy subdirectories if any
+                    Get-ChildItem -Path $_.FullName -Directory | ForEach-Object {
+                        Copy-Item -Path $_.FullName -Destination $destinationPath -Recurse -Force
+                    }
+                } elseif ($relativePath -eq "config") {
+                    # Special handling for config directory to skip locked files
+                    if (-not (Test-Path $destinationPath)) {
+                        New-Item -Path $destinationPath -ItemType Directory -Force | Out-Null
+                    }
+                    
+                    # Copy files from source config except locked image files
+                    Get-ChildItem -Path $_.FullName -File | ForEach-Object {
+                        $configFile = $_
+                        $configDestPath = Join-Path $destinationPath $configFile.Name
+                        
+                        # Skip locked image files in config directory
+                        if ($configFile.Name -like "*.png" -or $configFile.Name -like "*.ico") {
+                            Write-Host "Preserving existing locked file: config\$($configFile.Name)"
+                        } else {
+                            Copy-Item -Path $configFile.FullName -Destination $configDestPath -Force
+                        }
+                    }
+                    
+                    # Copy subdirectories if any
+                    Get-ChildItem -Path $_.FullName -Directory | ForEach-Object {
+                        Copy-Item -Path $_.FullName -Destination $destinationPath -Recurse -Force
+                    }
+                } else {
+                    # For other directories, remove existing and copy fresh
+                    if (Test-Path $destinationPath) {
+                        Remove-Item -Path $destinationPath -Recurse -Force
+                    }
+                    Copy-Item -Path $_.FullName -Destination $Script:WorkingDir -Recurse -Force
+                }
+            } else {
+                try {
+                    Copy-Item -Path $_.FullName -Destination $destinationPath -Force -ErrorAction Stop
+                }
+                catch {
+                    # If file is locked, skip it with warning
+                    if ($_.Exception.Message -like "*being used by another process*") {
+                        Write-Warning "Skipping locked file: $relativePath"
+                        continue
+                    }
+                    throw
+                }
+            }
+        }
+
+        # Create/update the desktop shortcut AFTER copying files (same as in Start-WAUGUIUpdate)
+        if (-not $Script:PORTABLE_MODE) {
+            $shortcutPath = $Script:DESKTOP_WAU_SETTINGS
+            $targetPath = Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'
+            $newIconPath = Join-Path $Script:WorkingDir "config\WAU Settings GUI.ico"
+            
+            if (Test-Path $targetPath) {
+                Add-Shortcut -Shortcut $shortcutPath `
+                        -Target $Script:CONHOST_EXE `
+                        -StartIn $Script:WorkingDir `
+                        -Arguments "$Script:POWERSHELL_ARGS `"$targetPath`"" `
+                        -Icon $newIconPath `
+                        -Description "Configure Winget-AutoUpdate settings after installation" `
+                        -WindowStyle "Normal" `
+                        -RunAsAdmin $true
+            }
+        }
+
+        # Clean up extraction directory AFTER copying files
+        Remove-Item -Path $tempExtractDir -Recurse -Force -ErrorAction SilentlyContinue
+        
+        # Close popup and show success message AFTER everything is completed successfully
+        Close-PopUp
+        
+        [System.Windows.MessageBox]::Show(
+            "Restore completed successfully!`n`nThe application will now restart with the restored version.",
+            "Restore Complete",
+            "OK",
+            "Information"
+        )
+        
+        # Restart the application with the restored version
+        if (-not $Script:PORTABLE_MODE) {
+            Start-Process -FilePath $Script:DESKTOP_WAU_SETTINGS
+        } else {
+            Start-Process -FilePath "powershell.exe" -ArgumentList "-File `"$(Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1')`" -Portable"
+        }
+        exit
+    }
+    catch {
+        Close-PopUp
+        [System.Windows.MessageBox]::Show("Failed to restore from backup: $($_.Exception.Message)", "Restore Error", "OK", "Error")
+        
+        # Cleanup on failure
+        if (Test-Path $tempExtractDir) {
+            Remove-Item -Path $tempExtractDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        
+        # Fallback to manual restoration
+        Start-Process "explorer.exe" "$Script:WorkingDir"
+        Start-Process "explorer.exe" "$backupPath"
+        
+        # Only call Close-WindowGracefully if we still have a valid window
+        if ($Script:MainWindowStarted -and $window -and -not $window.IsClosed) {
+            Close-WindowGracefully -controls $controls -window $window
+        }
+        exit
+    }
+}
 
 # 2. Configuration functions
 function Get-DisplayValue {
@@ -3932,26 +4089,142 @@ function Show-WAUSettingsGUI {
 
     $controls.DevVerButton.Add_Click({
         try {
-            Start-PopUp "Checking for updates..."
-            $updateInfo = Test-WAUGUIUpdate
-            Close-PopUp
+            # Check for existing backups first
+            $backupDir = Join-Path $Script:WorkingDir "ver\backup"
+            $hasBackups = $false
+            $backupFiles = @()
             
-            if ($updateInfo.Error) {
-                [System.Windows.MessageBox]::Show("Failed to check for updates: $($updateInfo.Error)", "Update Check Failed", "OK", "Warning")
-                return
+            if (Test-Path $backupDir) {
+                $backupFiles = Get-ChildItem -Path $backupDir -Filter "*.zip" | Sort-Object CreationTime -Descending
+                $hasBackups = $backupFiles.Count -gt 0
             }
             
-            if ($updateInfo.UpdateAvailable) {
-                $notesText = Get-CleanReleaseNotes -RawNotes $updateInfo.ReleaseNotes
-                $message = "Update available!`r`n`r`nCurrent version: $($updateInfo.CurrentVersion)`r`nLatest version: $($updateInfo.LatestVersion)`r`nRelease notes:`r`n$notesText`r`n`r`nDo you want to download the update?"
-                $result = [System.Windows.MessageBox]::Show($message, "Update Available", "OkCancel", "Question")
+            if ($hasBackups) {
+                # Show dialog with update/restore options
+                $backupList = ($backupFiles | Select-Object -First 5 | ForEach-Object { 
+                    "• $($_.Name) ($(Get-Date $_.CreationTime -Format 'yyyy-MM-dd HH:mm'))"
+                }) -join "`n"
                 
-                if ($result -eq 'Ok') {
-                    Start-WAUGUIUpdate -updateInfo $updateInfo
+                $message = "Available backup versions:`n$backupList`n`nWhat would you like to do?"
+                $result = [System.Windows.MessageBox]::Show(
+                    $message,
+                    "Update or Restore?",
+                    "YesNoCancel",
+                    "Question",
+                    "Yes"
+                )
+                
+                switch ($result) {
+                    'Yes' {
+                        # Continue with update check
+                        Start-PopUp "Checking for updates..."
+                        $updateInfo = Test-WAUGUIUpdate
+                        Close-PopUp
+                        
+                        if ($updateInfo.Error) {
+                            [System.Windows.MessageBox]::Show("Failed to check for updates: $($updateInfo.Error)", "Update Check Failed", "OK", "Warning")
+                            return
+                        }
+                        
+                        if ($updateInfo.UpdateAvailable) {
+                            $notesText = Get-CleanReleaseNotes -RawNotes $updateInfo.ReleaseNotes
+                            $updateMessage = "Update available!`r`n`r`nCurrent version: $($updateInfo.CurrentVersion)`r`nLatest version: $($updateInfo.LatestVersion)`r`nRelease notes:`r`n$notesText`r`n`r`nDo you want to download the update?"
+                            $updateResult = [System.Windows.MessageBox]::Show($updateMessage, "Update Available", "OkCancel", "Question")
+                            
+                            if ($updateResult -eq 'Ok') {
+                                Start-WAUGUIUpdate -updateInfo $updateInfo
+                            }
+                        } else {
+                            [System.Windows.MessageBox]::Show("You are running the latest version ($($updateInfo.CurrentVersion))", "No Updates Available", "OK", "Information")
+                        }
+                    }
+                    'No' {
+                        # Show restore dialog
+                        Start-PopUp "Select backup to restore..."
+                        
+                        # Create custom selection dialog
+                        $restoreDialog = New-Object System.Windows.Forms.Form
+                        $restoreDialog.Text = "Select Backup to Restore"
+                        $restoreDialog.Size = New-Object System.Drawing.Size(500, 300)
+                        $restoreDialog.StartPosition = "CenterParent"
+                        $restoreDialog.FormBorderStyle = "FixedDialog"
+                        $restoreDialog.MaximizeBox = $false
+                        $restoreDialog.MinimizeBox = $false
+                        
+                        $listBox = New-Object System.Windows.Forms.ListBox
+                        $listBox.Location = New-Object System.Drawing.Point(10, 10)
+                        $listBox.Size = New-Object System.Drawing.Size(460, 200)
+                        
+                        foreach ($backup in $backupFiles) {
+                            $displayText = "$($backup.Name) - $(Get-Date $backup.CreationTime -Format 'yyyy-MM-dd HH:mm:ss')"
+                            $listBox.Items.Add($displayText) | Out-Null
+                        }
+                        
+                        $restoreButton = New-Object System.Windows.Forms.Button
+                        $restoreButton.Location = New-Object System.Drawing.Point(310, 220)
+                        $restoreButton.Size = New-Object System.Drawing.Size(75, 23)
+                        $restoreButton.Text = "Restore"
+                        $restoreButton.DialogResult = [System.Windows.Forms.DialogResult]::OK
+                        
+                        $cancelButton = New-Object System.Windows.Forms.Button
+                        $cancelButton.Location = New-Object System.Drawing.Point(395, 220)
+                        $cancelButton.Size = New-Object System.Drawing.Size(75, 23)
+                        $cancelButton.Text = "Cancel"
+                        $cancelButton.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+                        
+                        $restoreDialog.Controls.Add($listBox)
+                        $restoreDialog.Controls.Add($restoreButton)
+                        $restoreDialog.Controls.Add($cancelButton)
+                        $restoreDialog.AcceptButton = $restoreButton
+                        $restoreDialog.CancelButton = $cancelButton
+                        
+                        Close-PopUp
+                        
+                        if ($restoreDialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK -and $listBox.SelectedIndex -ge 0) {
+                            $selectedBackup = $backupFiles[$listBox.SelectedIndex]
+                            
+                            $confirmRestore = [System.Windows.MessageBox]::Show(
+                                "Are you sure you want to restore from:`n$($selectedBackup.Name)`n`nThis will replace all current files and restart the application.",
+                                "Confirm Restore",
+                                "YesNo",
+                                "Warning",
+                                "No"
+                            )
+                            
+                            if ($confirmRestore -eq 'Yes') {
+                                Start-RestoreFromBackup -backupPath $selectedBackup.FullName -controls $controls -window $window
+                            }
+                        }
+                        
+                        $restoreDialog.Dispose()
+                    }
+                    'Cancel' {
+                        # Do nothing
+                        return
+                    }
                 }
-            }
-            else {
-                [System.Windows.MessageBox]::Show("You are running the latest version ($($updateInfo.CurrentVersion))", "No Updates Available", "OK", "Information")
+            } else {
+                # No backups available, proceed with normal update check
+                Start-PopUp "Checking for updates..."
+                $updateInfo = Test-WAUGUIUpdate
+                Close-PopUp
+                
+                if ($updateInfo.Error) {
+                    [System.Windows.MessageBox]::Show("Failed to check for updates: $($updateInfo.Error)", "Update Check Failed", "OK", "Warning")
+                    return
+                }
+                
+                if ($updateInfo.UpdateAvailable) {
+                    $notesText = Get-CleanReleaseNotes -RawNotes $updateInfo.ReleaseNotes
+                    $message = "Update available!`r`n`r`nCurrent version: $($updateInfo.CurrentVersion)`r`nLatest version: $($updateInfo.LatestVersion)`r`nRelease notes:`r`n$notesText`r`n`r`nDo you want to download the update?"
+                    $result = [System.Windows.MessageBox]::Show($message, "Update Available", "OkCancel", "Question")
+                    
+                    if ($result -eq 'Ok') {
+                        Start-WAUGUIUpdate -updateInfo $updateInfo
+                    }
+                } else {
+                    [System.Windows.MessageBox]::Show("You are running the latest version ($($updateInfo.CurrentVersion))", "No Updates Available", "OK", "Information")
+                }
             }
         }
         catch {
