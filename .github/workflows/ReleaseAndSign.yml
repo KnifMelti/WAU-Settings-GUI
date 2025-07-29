@@ -1,0 +1,59 @@
+name: Create Release
+
+on:
+  release:
+    types: [created]
+
+permissions:
+  contents: write
+  id-token: write  # Required for keyless signing
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Cosign
+      uses: sigstore/cosign-installer@v3.6.0
+      with:
+        cosign-release: 'v2.2.4'
+    
+    - name: Create zip from subdirectory
+      run: |
+        cd "Sources/WAU Settings GUI"
+        zip -r "../../WAU-Settings-GUI-${{ github.event.release.tag_name }}.zip" .
+    
+    - name: Sign files with Cosign
+      run: |
+        # Sign the zip file
+        cosign sign-blob --yes \
+          --output-signature WAU-Settings-GUI-${{ github.event.release.tag_name }}.zip.sig \
+          --output-certificate WAU-Settings-GUI-${{ github.event.release.tag_name }}.zip.pem \
+          WAU-Settings-GUI-${{ github.event.release.tag_name }}.zip
+        
+        # Sign the exe file if it exists
+        if [ -f "Sources/WAU Settings GUI/WAU-Settings-GUI.exe" ]; then
+          cosign sign-blob --yes \
+            --output-signature WAU-Settings-GUI-${{ github.event.release.tag_name }}.exe.sig \
+            --output-certificate WAU-Settings-GUI-${{ github.event.release.tag_name }}.exe.pem \
+            "Sources/WAU Settings GUI/WAU-Settings-GUI.exe"
+        fi
+    
+    - name: Upload Release Assets
+      run: |
+        # Upload zip file
+        gh release upload ${{ github.event.release.tag_name }} \
+          WAU-Settings-GUI-${{ github.event.release.tag_name }}.zip \
+          WAU-Settings-GUI-${{ github.event.release.tag_name }}.zip.sig \
+          WAU-Settings-GUI-${{ github.event.release.tag_name }}.zip.pem
+        
+        # Upload exe file and signatures if they exist
+        if [ -f "Sources/WAU Settings GUI/WAU-Settings-GUI.exe" ]; then
+          gh release upload ${{ github.event.release.tag_name }} \
+            "Sources/WAU Settings GUI/WAU-Settings-GUI.exe" \
+            WAU-Settings-GUI-${{ github.event.release.tag_name }}.exe.sig \
+            WAU-Settings-GUI-${{ github.event.release.tag_name }}.exe.pem
+        fi
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
