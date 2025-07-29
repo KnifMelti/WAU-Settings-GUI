@@ -53,28 +53,35 @@ function Initialize-GUI {
 
     # Set modules path
     $modulesPath = Join-Path -Path $Script:WorkingDir -ChildPath "modules"
+    $missingFiles = @()
 
-    # Verify that modules directory exists
+    # Check for modules directory and required files
     if (-not (Test-Path -Path $modulesPath)) {
-        throw "Modules directory not found at: $modulesPath"
-    }
-
-    # Check if all required modules exist
-    $requiredModules = @("config.psm1")
-    $missingModules = @()
-
-    foreach ($module in $requiredModules) {
-        $modulePath = Join-Path -Path $modulesPath -ChildPath $module
-        if (-not (Test-Path -Path $modulePath)) {
-            $missingModules += $module
+        $missingFiles += "modules"
+    } else {
+        # Check required modules
+        $requiredModules = @("config.psm1")
+        foreach ($module in $requiredModules) {
+            $modulePath = Join-Path -Path $modulesPath -ChildPath $module
+            if (-not (Test-Path -Path $modulePath)) {
+                $missingFiles += "modules\$module"
+            }
         }
     }
-
-    if ($missingModules.Count -gt 0) {
-        throw "Missing required modules: $($missingModules -join ', ')"
+    
+    # If files are missing, attempt repair
+    if ($missingFiles.Count -gt 0) {
+        Write-Host "Missing critical files detected. Attempting repair..." -ForegroundColor Yellow
+        $repairResult = Repair-WAUSettingsFiles -MissingFiles $missingFiles
+        
+        if (-not $repairResult.Success) {
+            throw "Critical files missing and repair failed: $($repairResult.Message)"
+        }
+        
+        Write-Host $repairResult.Message -ForegroundColor Green
     }
 
-    # Import the Config module first
+    # Import the Config module
     Import-Module (Join-Path -Path $modulesPath -ChildPath "config.psm1") -Force
 
     $ModuleInfo = Get-Module "config"
@@ -109,6 +116,176 @@ function Test-Administrator {
     $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent()
     $principal = New-Object Security.Principal.WindowsPrincipal($currentUser)
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+function Repair-WAUSettingsFiles {
+    param(
+        [string[]]$MissingFiles,
+        [switch]$Silent = $false
+    )
+    
+    try {
+        # Ensure ver directory exists
+        $verDir = Join-Path $Script:WorkingDir "ver"
+        if (-not (Test-Path $verDir)) {
+            New-Item -ItemType Directory -Path $verDir -Force | Out-Null
+        }
+        
+        # Find existing ZIP for current version
+        $expectedZipName = "*$Script:WAU_GUI_VERSION*.zip"
+        $existingZip = Get-ChildItem -Path $verDir -Filter $expectedZipName -File | Select-Object -First 1
+        
+        # If no ZIP exists for current version, try to download it
+        if (-not $existingZip) {
+            if (-not $Silent) {
+                Write-Host "Downloading repair files for version $Script:WAU_GUI_VERSION..." -ForegroundColor Yellow
+            }
+            
+            # Fetch release info from GitHub
+            $apiUrl = "https://api.github.com/repos/$Script:WAU_GUI_REPO/releases"
+            $releases = Invoke-RestMethod -Uri $apiUrl -UseBasicParsing
+            $release = $releases | Where-Object { $_.tag_name.TrimStart('v') -eq $Script:WAU_GUI_VERSION } | Select-Object -First 1
+            
+            if (-not $release) {
+                throw "No GitHub release found for version $Script:WAU_GUI_VERSION"
+            }
+            
+            # Look for ZIP asset
+            $asset = $release.assets | Where-Object { $_.name -like "*.zip" } | Select-Object -First 1
+            if (-not $asset) {
+                # Fallback to source code ZIP
+                $asset = [PSCustomObject]@{
+                    name = "$($Script:WAU_GUI_NAME)-Source-$($release.tag_name).zip"
+                    browser_download_url = "https://github.com/$Script:WAU_GUI_REPO/archive/refs/tags/$($release.tag_name).zip"
+                }
+            }
+            
+            $downloadPath = Join-Path $verDir $asset.name
+            $headers = @{ 'User-Agent' = 'WAU-Settings-GUI-Repair/1.0' }
+            Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $downloadPath -UseBasicParsing -Headers $headers
+            
+            # Validate ZIP
+            Add-Type -AssemblyName System.IO.Compression.FileSystem
+            [System.IO.Compression.ZipFile]::OpenRead($downloadPath).Dispose()
+            $existingZip = Get-Item $downloadPath
+        }
+        
+        if (-not $existingZip) {
+            throw "Could not locate or download repair ZIP file"
+        }
+        
+        # Extract and restore missing files
+        $tempExtractDir = Join-Path ([System.IO.Path]::GetTempPath()) "WAU-Settings-GUI-Repair-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+        
+        # Extract ZIP
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        [System.IO.Compression.ZipFile]::ExtractToDirectory($existingZip.FullName, $tempExtractDir)
+        
+        # Find source directory with extensive search
+        $sourceDir = $null
+        $possiblePaths = @()
+        
+        # Search for key indicator files/directories
+        $indicators = @("WAU-Settings-GUI.ps1", "modules", "config")
+        
+        # Check root level first
+        foreach ($indicator in $indicators) {
+            $testPath = Join-Path $tempExtractDir $indicator
+            if (Test-Path $testPath) {
+                $sourceDir = $tempExtractDir
+                break
+            }
+        }
+        
+        # If not found in root, search subdirectories
+        if (-not $sourceDir) {
+            $allDirs = Get-ChildItem -Path $tempExtractDir -Directory -Recurse
+            foreach ($dir in $allDirs) {
+                foreach ($indicator in $indicators) {
+                    $testPath = Join-Path $dir.FullName $indicator
+                    if (Test-Path $testPath) {
+                        $possiblePaths += $dir.FullName
+                    }
+                }
+            }
+            
+            # Prioritize paths that contain "Sources\WAU Settings GUI" or similar
+            $bestPath = $possiblePaths | Where-Object { $_ -like "*WAU*Settings*GUI*" } | Select-Object -First 1
+            if (-not $bestPath) {
+                $bestPath = $possiblePaths | Where-Object { $_ -like "*Sources*" } | Select-Object -First 1
+            }
+            if (-not $bestPath) {
+                $bestPath = $possiblePaths | Select-Object -First 1
+            }
+            
+            $sourceDir = $bestPath
+        }
+        
+        if (-not $sourceDir) {
+            # Last resort: look for any directory containing modules folder
+            $modulesDirs = Get-ChildItem -Path $tempExtractDir -Directory -Recurse | Where-Object { 
+                Test-Path (Join-Path $_.FullName "modules") 
+            }
+            if ($modulesDirs) {
+                $sourceDir = $modulesDirs[0].FullName
+            }
+        }
+        
+        if (-not $sourceDir) {
+            throw "Could not find source files in repair archive"
+        }
+        
+        $repairedFiles = @()
+        $failedFiles = @()
+        
+        # Restore each missing file
+        foreach ($missingFile in $MissingFiles) {
+            $sourcePath = Join-Path $sourceDir $missingFile
+            $destPath = Join-Path $Script:WorkingDir $missingFile
+            
+            if (Test-Path $sourcePath) {
+                # Ensure destination directory exists
+                $destDir = Split-Path $destPath -Parent
+                if (-not (Test-Path $destDir)) {
+                    New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+                }
+                
+                # Copy file
+                Copy-Item -Path $sourcePath -Destination $destPath -Force
+                $repairedFiles += $missingFile
+                
+                if (-not $Silent) {
+                    Write-Host "Restored: $missingFile" -ForegroundColor Green
+                }
+            } else {
+                $failedFiles += $missingFile
+            }
+        }
+        
+        # Clean up temp directory
+        Remove-Item -Path $tempExtractDir -Recurse -Force -ErrorAction SilentlyContinue
+        
+        if ($failedFiles.Count -gt 0) {
+            throw "Could not repair all files. Failed: $($failedFiles -join ', ')"
+        }
+        
+        return @{
+            Success = $true
+            RepairedFiles = $repairedFiles
+            Message = "Successfully repaired $($repairedFiles.Count) files"
+        }
+        
+    } catch {
+        # Clean up on failure
+        if ($tempExtractDir -and (Test-Path $tempExtractDir)) {
+            Remove-Item -Path $tempExtractDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        
+        return @{
+            Success = $false
+            RepairedFiles = @()
+            Message = "Repair failed: $($_.Exception.Message)"
+        }
+    }
 }
 Function Start-PopUp ($Message) {
 
@@ -4425,8 +4602,6 @@ if (Test-Path $exePath) {
     # If neither file exists, keep default "0.0.0.0"
 }
 
-$Script:WAU_GUI_VERSION = "1.8.2.1" # Set default version for testing purposes
-
 # Ensure the original version ZIP exists in \ver
 $verDir = Join-Path $Script:WorkingDir "ver"
 if (-not (Test-Path $verDir)) {
@@ -4478,7 +4653,6 @@ try {
     Initialize-GUI
 } catch {
     [System.Windows.Forms.MessageBox]::Show("Error: $($_.Exception.Message)", "Application Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
-    # No 'modules' or no 'config.psm1' - Repair if possible
     exit 1
 }
 
@@ -4486,38 +4660,50 @@ try {
 $guiIconPath = Join-Path $Script:WorkingDir "config\WAU Settings GUI.ico"
 if (Test-Path $guiIconPath) {
     $Script:GUI_ICON = $guiIconPath
-} else { # elseif
-    # No 'config\WAU Settings GUI.ico' - Repair if possible
-
-    #else
-
-    # If missing, fallback and extract icon from PowerShell.exe and save as icon.ico in SYSTEM TEMP
-    $iconSource = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
-    $systemTemp = [System.Environment]::GetEnvironmentVariable("TEMP", [System.EnvironmentVariableTarget]::Machine)
-    if (-not $systemTemp) { $systemTemp = "$env:SystemRoot\Temp" }
-    $iconDest = Join-Path $systemTemp "icon.ico"
-    # Only extract if the icon doesn't already exist
-    if (-not (Test-Path $iconDest)) {
-        $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($iconSource)
-        $fs = [System.IO.File]::Open($iconDest, [System.IO.FileMode]::Create)
-        $icon.Save($fs)
-        $fs.Close()
+} else {
+    Write-Host "GUI icon missing. Attempting repair..." -ForegroundColor Yellow
+    $repairResult = Repair-WAUSettingsFiles -MissingFiles @("config\WAU Settings GUI.ico") -Silent
+    
+    if ($repairResult.Success -and (Test-Path $guiIconPath)) {
+        $Script:GUI_ICON = $guiIconPath
+        Write-Host "GUI icon repaired successfully." -ForegroundColor Green
+    } else {
+        # Fallback to PowerShell icon
+        $iconSource = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
+        $systemTemp = [System.Environment]::GetEnvironmentVariable("TEMP", [System.EnvironmentVariableTarget]::Machine)
+        if (-not $systemTemp) { $systemTemp = "$env:SystemRoot\Temp" }
+        $iconDest = Join-Path $systemTemp "icon.ico"
+        
+        if (-not (Test-Path $iconDest)) {
+            $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($iconSource)
+            $fs = [System.IO.File]::Open($iconDest, [System.IO.FileMode]::Create)
+            $icon.Save($fs)
+            $fs.Close()
+        }
+        $Script:GUI_ICON = $iconDest
+        Write-Host "Using fallback icon." -ForegroundColor Yellow
     }
-    $Script:GUI_ICON = $iconDest
 }
 
 # Load PopUp XAML from config file and store as constant
 $xamlConfigPath = Join-Path $Script:WorkingDir "config\settings-popup.xaml"
 if (Test-Path $xamlConfigPath) {
     $inputXML = Get-Content $xamlConfigPath -Raw
-    
-    # Replace PowerShell variables with actual values
     $inputXML = $inputXML -replace '\$Script:GUI_TITLE', $Script:GUI_TITLE
     $Script:POPUP_XAML = $inputXML.Trim()
 } else {
-    # No 'config\settings-popup.xaml' - Repair if possible
-    [System.Windows.MessageBox]::Show("PopUp XAML config file not found: $xamlConfigPath", "$Script:GUI_TITLE", "OK", "Warning")
-    exit 1
+    Write-Host "PopUp XAML missing. Attempting repair..." -ForegroundColor Yellow
+    $repairResult = Repair-WAUSettingsFiles -MissingFiles @("config\settings-popup.xaml") -Silent
+    
+    if ($repairResult.Success -and (Test-Path $xamlConfigPath)) {
+        $inputXML = Get-Content $xamlConfigPath -Raw
+        $inputXML = $inputXML -replace '\$Script:GUI_TITLE', $Script:GUI_TITLE
+        $Script:POPUP_XAML = $inputXML.Trim()
+        Write-Host "PopUp XAML repaired successfully." -ForegroundColor Green
+    } else {
+        [System.Windows.MessageBox]::Show("Critical file missing and repair failed: config\settings-popup.xaml`n`n$($repairResult.Message)", "$Script:GUI_TITLE", "OK", "Error")
+        exit 1
+    }
 }
 
 #Pop "Starting..."
@@ -4532,13 +4718,31 @@ if (Test-Path $oldVersionFile) {
 # Load Window XAML from config file and store as constant
 $xamlConfigPath = Join-Path $Script:WorkingDir "config\settings-window.xaml"
 $guiPngPath = Join-Path $Script:WorkingDir "config\WAU Settings GUI.png"
+
+# Check for missing config files
+$missingConfigFiles = @()
+if (-not (Test-Path $xamlConfigPath)) { $missingConfigFiles += "config\settings-window.xaml" }
+if (-not (Test-Path $guiPngPath)) { $missingConfigFiles += "config\WAU Settings GUI.png" }
+
+if ($missingConfigFiles.Count -gt 0) {
+    Write-Host "Config files missing. Attempting repair..." -ForegroundColor Yellow
+    $repairResult = Repair-WAUSettingsFiles -MissingFiles $missingConfigFiles -Silent
+    
+    if (-not $repairResult.Success) {
+        [System.Windows.MessageBox]::Show("Critical files missing and repair failed:`n$($missingConfigFiles -join ', ')`n`n$($repairResult.Message)", "$Script:GUI_TITLE", "OK", "Error")
+        exit 1
+    }
+    Write-Host "Config files repaired successfully." -ForegroundColor Green
+}
+
+# Set PNG path
 if (Test-Path $guiPngPath) {
     $Script:WAU_GUI_PNG = $guiPngPath
 }
+
+# Load and process XAML
 if (Test-Path $xamlConfigPath) {
     $inputXML = Get-Content $xamlConfigPath -Raw
-    
-    # Replace PowerShell variables with actual values
     $inputXML = $inputXML -replace '\$Script:GUI_TITLE', $Script:GUI_TITLE
     $inputXML = $inputXML -replace '\$Script:WAU_GUI_PNG', $Script:WAU_GUI_PNG
     $inputXML = $inputXML -replace '\$Script:COLOR_ENABLED', $Script:COLOR_ENABLED
@@ -4548,8 +4752,7 @@ if (Test-Path $xamlConfigPath) {
     $inputXML = $inputXML -replace '\$Script:STATUS_READY_TEXT', $Script:STATUS_READY_TEXT
     $Script:WINDOW_XAML = $inputXML.Trim()
 } else {
-    # No 'config\settings-window.xaml' - Repair if possible
-    [System.Windows.MessageBox]::Show("Window XAML config file not found: $xamlConfigPath", "$Script:GUI_TITLE", "OK", "Warning")
+    [System.Windows.MessageBox]::Show("Critical error: Window XAML still missing after repair attempt", "$Script:GUI_TITLE", "OK", "Error")
     exit 1
 }
 
