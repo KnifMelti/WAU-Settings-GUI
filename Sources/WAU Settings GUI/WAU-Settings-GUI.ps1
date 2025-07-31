@@ -2,35 +2,40 @@
 
 <#
 .SYNOPSIS
-WAU Settings GUI - Configure Winget-AutoUpdate settings after installation
+Provides a user-friendly portable standalone interface to modify every aspect of Winget-AutoUpdate (**WAU**) settings
 
 .DESCRIPTION
-Provides a user-friendly interface to modify every aspect of WAU settings including:
+Configure **WAU** settings after installation, including:
 - Update intervals and timing
 - Notification levels
 - Configuring list and mods paths
 - Additional options like running at logon, user context, etc.
 - Creating/deleting shortcuts
 - Managing log files
-- Starting WAU manually
-- Screenshot with masking functionality for documentation
-- GPO management integration
-- Real-time status information display showing version details, last run times, and current configuration state
-- Developer tools for advanced troubleshooting:
+- Starting **WAU** manually
+- Screenshot with masking functionality for documentation (**F11**)
+- **GPO** management integration
+- Status information display showing version details, last run times, and current configuration state
+- Dev Tools for advanced troubleshooting (**F12**):
+  - Open **WAU** policies path in registry (if **GPO Managed**)
   - Task scheduler access
   - Registry editor access
-  - GUID path exploration
-  - WinGet system wide installed application list
+  - **GUID** path exploration
+  - Open **WinGet** system wide installed application list (if previously saved by **WAU**)
   - List file management
-  - MSI transform creation (using current showing configuration)
-  - Configuration backup/import (i.e. for sharing settings)
-  - Uninstall/install WAU (with current showing configuration)
-  - Manual check for WAU Settings GUI updates (checks every week as standard, can be managed via config_user.psm1)
-  - Direct access to the **WAU Settings GUI** install folder
+  - Change colors/update schedule for **WAU Settings GUI**
+  - **MSI** transform creation (using current showing configuration)
+  - **Configuration** backup/import (i.e. for sharing settings)
+  - Reinstall **WAU** (with current showing configuration)
+    - Stores source in `[INSTALLDIR]\msi\[VERSION]` (enables **WAU** `Repair` in **Programs and Features**)
+  - Manual/automatic check for updates (checks automatically every week as standard)
+    - If manual via `[ver]` and `ver\backup` exists a restore option is also presented
+  - Direct access to **WAU Settings GUI** `[INSTALLDIR]` 
 
 .NOTES
 Must be run as Administrator
 #>
+
 param(
     [switch]$Portable
  )
@@ -4216,7 +4221,7 @@ function Show-WAUSettingsGUI {
 
                 # Always do reinstall if WAU is installed
                 $result = [System.Windows.MessageBox]::Show(
-                    "WAU is installed ($savedVersion).`n`nDo you want to reinstall WAU with the current settings?",
+                    "WAU is installed ($savedVersion).`n`nDo you want to reinstall WAU with the current showing configuration?",
                     "Reinstall WAU",
                     "OkCancel",
                     "Question"
