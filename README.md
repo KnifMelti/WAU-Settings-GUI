@@ -38,11 +38,12 @@ Configure **WAU** settings after installation, including:
   - List file management
   - Change colors/update schedule for **WAU Settings GUI**
   - **MSI** transform creation (using current showing configuration)
-  - Configuration backup/import (i.e. for sharing settings)
-  - Reinstall (uninstall/install) **WAU** (with current showing configuration)
+  - **Configuration** backup/import (i.e. for sharing settings)
+  - Reinstall **WAU** (with current showing configuration)
     - Stores source in `[INSTALLDIR]\msi\[VERSION]` (enables **WAU** `Repair` in **Programs and Features**)
   - Manual/automatic check for updates (checks automatically every week as standard)
-  - Direct access to the **WAU Settings GUI** install folder
+    - If manual via `[ver]` and `ver\backup` exists a restore option is also presented
+  - Direct access to **WAU Settings GUI** `[INSTALLDIR]` 
 
 NB: Must be run as **Administrator** (exe and shortcuts have the flag set)
 
@@ -55,7 +56,7 @@ NB: Must be run as **Administrator** (exe and shortcuts have the flag set)
 
 This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **WAU-Settings-GUI**) to:
   
-   `%USERPROFILE%\AppData\Local\Microsoft\WinGet\Packages\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe`.
+   `%USERPROFILE%\AppData\Local\Microsoft\WinGet\Packages\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe`
 
 ### Manual Installation
 - Download and extract the latest release: [WAU-Settings-GUI-vX.X.X.X.zip](https://github.com/KnifMelti/WAU-Settings-GUI/releases/latest)
@@ -63,7 +64,7 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
 - Detects if running from **USB** drive, etc.
 - Run `WAU-Settings-GUI.exe`:
   - <img src="Sources/assets//WAU-Settings-GUI.png" alt="Portable/Installer">
-  - Select a base directory for the installation or run directly in portable mode
+  - Select a base directory for the `[INSTALLDIR]` or run directly in portable mode
 
 ### Running
 - After installation, **WAU Settings GUI** starts (if installed by **WinGet** you must start it via an ordinary **Command Prompt** using the `PortableCommandAlias`: **WAU-Settings-GUI**)
@@ -77,6 +78,7 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
 ### Updating
 - Dev Tools (**F12**): Click the button `[ver]`
 - Checks automatically every week as standard (click the button `[usr]` under Dev Tools to change the update schedule)
+    - If manual via `[ver]` and `ver\backup` exists a restore option is also presented
 - If an update exists, **WAU Settings GUI** will ask if you want to download and install the new version
 - Before installing a backup of the current version will be created in `ver\backup` folder
 
@@ -91,15 +93,18 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
   ```bash
   winget upgrade KnifMelti.WAU-Settings-GUI --scope user
   ```
- - The built-in updater is absolutely the best, making a backup of your current installed version first and taking care of locked files
-
+- The built-in updater is absolutely the best, making a backup of your current installed version first and taking care of locked files
+  - A repair is automatically performed if files are corrupted/missing when starting
 
 ### Uninstallation
 - Use **Programs and Features** in **Control Panel** to uninstall **KnifMelti WAU Settings GUI**
-- Uninstall can be done from `CMD` too (`/UNINSTALL` or silent `/UNINSTALL /S` parameter) using `UnInst.exe` in the **WAU Settings GUI** install folder, e.g.:
+- Uninstall can be done from `CMD` too (`/UNINSTALL` or silent `/UNINSTALL /S` parameter) using `UnInst.exe` in the **WAU Settings GUI** `[INSTALLDIR]`:
   
   ```bash
+  e.g.:
   "C:\WAU Settings GUI\UnInst.exe" /UNINSTALL /S
+  i.e.:
+  "%USERPROFILE%\AppData\Local\Microsoft\WinGet\Packages\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe\UnInst.exe" /UNINSTALL /S
   ```
 - This will remove everything, including the **Portable WinGet Package** from the source (it will not show up in the **WinGet** installed list anymore)
 - **WAU** will be automatically reinstalled afterward restoring the current showing configuration
