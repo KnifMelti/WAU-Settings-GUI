@@ -102,7 +102,7 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
   
   ```bash
   e.g.:
-  "C:\WAU Settings GUI\UnInst.exe" /UNINSTALL /S
+  "C:\WAU Settings GUI\UnInst.exe" /UNINSTALL
   i.e.:
   "%USERPROFILE%\AppData\Local\Microsoft\WinGet\Packages\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe\UnInst.exe" /UNINSTALL /S
   ```
