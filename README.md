@@ -59,7 +59,7 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
    `%USERPROFILE%\AppData\Local\Microsoft\WinGet\Packages\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe`
 
 ### Manual Installation
-- Download and extract the latest release: [WAU-Settings-GUI-vX.X.X.X.zip](https://github.com/KnifMelti/WAU-Settings-GUI/releases/latest)
+- Download, unblock and extract the latest release: [WAU-Settings-GUI-vX.X.X.X.zip](https://github.com/KnifMelti/WAU-Settings-GUI/releases/latest)
 - **Standalone** Portable/Installer (i.e. no need to install)
 - Detects if running from **USB** drive, etc.
 - Run `WAU-Settings-GUI.exe`:
