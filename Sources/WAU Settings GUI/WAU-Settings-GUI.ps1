@@ -2150,7 +2150,7 @@ function Uninstall-WAU {
 function New-WAUTransformFile {
     param($controls)
     try {
-        # Get installed WAU version from registry (same as Dev [guid] button)
+        # Get installed WAU version from registry (same as Dev [uid] button)
         $targetVersion = $null
         $isPreRelease = $false
         
