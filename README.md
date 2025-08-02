@@ -73,7 +73,7 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
 - If **WAU** is updated and some shortcut icons goes missing, you'll have to toggle the **☐|☑ Start Menu shortcuts** / **☐|☑ WAU Desktop shortcut** / **☐|☑ App Installer shortcut** options again (and save in between) to create new shortcuts so that they are updated to the new **WAU** version icon
 
 ### Updating
-- Checks automatically every week as standard (click the button `[usr]` under Dev Tools to change the update schedule)
+- Checks automatically every week as standard (click the button `[usr]` under Dev Tools (**F12**) to change the update schedule)
 - Dev Tools (**F12**): Click the button `[ver]`
     - If `ver\backup` exists a restore option is also presented
 - If an update exists, **WAU Settings GUI** will ask if you want to download and install the new version
