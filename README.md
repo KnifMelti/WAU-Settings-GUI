@@ -33,7 +33,7 @@ Configure **WAU** settings after installation, including:
   - `[gpo]` Open **WAU** policies path in registry (if **GPO Managed**)
   - `[tsk]` Task scheduler access
   - `[reg]` Open **WAU** settings path in registry
-  - `[uid]` **GUID** path exploration
+  - `[uid]` **GUID** path exploration (**MSI** installation)
   - `[sys]` Open **WinGet** system wide installed application list (if previously saved by **WAU**)
   - `[lst]` Open the current local list
   - `[usr]` Change colors/update schedule for **WAU Settings GUI**
