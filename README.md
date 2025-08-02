@@ -30,20 +30,20 @@ Configure **WAU** settings after installation, including:
 - **GPO** management integration
 - Status information display showing version details, last run times, and current configuration state
 - Dev Tools for advanced troubleshooting (**F12**):
-  - `[gpo]`Open **WAU** policies path in registry (if **GPO Managed**)
-  - `[tsk]`Task scheduler access
-  - `[reg]`Registry editor access
-  - `[uid]`**GUID** path exploration
-  - `[sys]`Open **WinGet** system wide installed application list (if previously saved by **WAU**)
-  - `[lst]`List file management
-  - `[usr]`Change colors/update schedule for **WAU Settings GUI**
-  - `[msi]`**MSI** transform creation (using current showing configuration)
-  - `[cfg]`**Configuration** backup/import (i.e. for sharing settings)
-  - `[wau]`Reinstall **WAU** (with current showing configuration)
+  - `[gpo]` Open **WAU** policies path in registry (if **GPO Managed**)
+  - `[tsk]` Task scheduler access
+  - `[reg]` Open **WAU** settings path in registry
+  - `[uid]` **GUID** path exploration
+  - `[sys]` Open **WinGet** system wide installed application list (if previously saved by **WAU**)
+  - `[lst]` Open the current local list
+  - `[usr]` Change colors/update schedule for **WAU Settings GUI**
+  - `[msi]` **MSI** transform creation (using current showing configuration)
+  - `[cfg]` **Configuration** backup/import (i.e. for sharing settings)
+  - `[wau]` Reinstall **WAU** (with current showing configuration)
     - Stores source in `[INSTALLDIR]\msi\[VERSION]` (enables **WAU** `Repair` in **Programs and Features**)
-  - `[ver]`Manual check for updates (checks automatically every week as standard)
+  - `[ver]` Manual check for updates (checks automatically every week as standard)
     - If manual and `ver\backup` exists a restore option is also presented
-  - `[src]`Direct access to **WAU Settings GUI** `[INSTALLDIR]` 
+  - `[src]` Direct access to **WAU Settings GUI** `[INSTALLDIR]` 
 
 NB: Must be run as **Administrator** (exe and shortcuts have the flag set)
 
