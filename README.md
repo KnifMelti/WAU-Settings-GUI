@@ -41,7 +41,7 @@ Configure **WAU** settings after installation, including:
   - `[cfg]` **Configuration** backup/import (i.e. for sharing settings)
   - `[wau]` Reinstall **WAU** (with current showing configuration)
     - Stores source in `[INSTALLDIR]\msi\[VERSION]` (enables **WAU** `Repair` in **Programs and Features**)
-  - `[ver]` Manual check for updates (checks automatically every week as standard)
+  - `[ver]` Manual check for **WAU Settings GUI** updates (checks automatically every week as standard)
     - If manual check and `ver\backup` exists a restore option is also presented
   - `[src]` Direct access to **WAU Settings GUI** `[INSTALLDIR]` 
 
