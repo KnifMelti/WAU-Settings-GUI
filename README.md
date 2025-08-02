@@ -42,7 +42,7 @@ Configure **WAU** settings after installation, including:
   - `[wau]` Reinstall **WAU** (with current showing configuration)
     - Stores source in `[INSTALLDIR]\msi\[VERSION]` (enables **WAU** `Repair` in **Programs and Features**)
   - `[ver]` Manual check for updates (checks automatically every week as standard)
-    - If manual and `ver\backup` exists a restore option is also presented
+    - If manual check and `ver\backup` exists a restore option is also presented
   - `[src]` Direct access to **WAU Settings GUI** `[INSTALLDIR]` 
 
 NB: Must be run as **Administrator** (exe and shortcuts have the flag set)
@@ -78,7 +78,7 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
 ### Updating
 - Dev Tools (**F12**): Click the button `[ver]`
 - Checks automatically every week as standard (click the button `[usr]` under Dev Tools to change the update schedule)
-    - If manual via `[ver]` and `ver\backup` exists a restore option is also presented
+    - If manual check via `[ver]` and `ver\backup` exists a restore option is also presented
 - If an update exists, **WAU Settings GUI** will ask if you want to download and install the new version
 - Before installing a backup of the current version will be created in `ver\backup` folder
 
