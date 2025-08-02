@@ -31,7 +31,7 @@ Configure **WAU** settings after installation, including:
 - Status information display showing version details, last run times, and current configuration state
 - Dev Tools for advanced troubleshooting (**F12**):
   - `[gpo]` Open **WAU** policies path in registry (if **GPO Managed**)
-  - `[tsk]` Task scheduler access
+  - `[tsk]` Task scheduler access (look in **WAU** folder)
   - `[reg]` Open **WAU** settings path in registry
   - `[uid]` **GUID** path exploration (**MSI** installation)
   - `[sys]` Open **WinGet** system wide installed application list (if previously saved by **WAU**)
