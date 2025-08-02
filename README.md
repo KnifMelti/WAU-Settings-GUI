@@ -6,7 +6,7 @@ Provides a user-friendly portable standalone interface to modify every aspect of
 
 ### Dependencies
 This project depends on the following repository:
-- [Winget-AutoUpdate](https://github.com/Romanitho/Winget-AutoUpdate): has all the settings this project can handle/modify/save/restore/share and document.
+- [Winget-AutoUpdate](https://github.com/Romanitho/Winget-AutoUpdate): has all the settings this project can handle/modify/save/restore/share and document
 
 If **WAU** is not installed, the **GUI** prompts at startup to download and install it with standard settings.
 
@@ -75,7 +75,7 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
 ### Updating
 - Checks automatically every week as standard (click the button `[usr]` under Dev Tools to change the update schedule)
 - Dev Tools (**F12**): Click the button `[ver]`
-    - If manual check via `[ver]` and `ver\backup` exists a restore option is also presented
+    - If `ver\backup` exists a restore option is also presented
 - If an update exists, **WAU Settings GUI** will ask if you want to download and install the new version
 - Before installing a backup of the current version will be created in `ver\backup` folder
 - **WAU** will also rudimentary update **WAU Settings GUI** in user scope with every new released **WinGet** version 
