@@ -5,7 +5,7 @@
 Provides a user-friendly portable standalone interface to modify every aspect of Winget-AutoUpdate (**WAU**) settings
 
 .DESCRIPTION
-Configure **WAU** settings after installation, including:
+Configure **WAU** settings after installation:
 - Update intervals and timing
 - Notification levels
 - Configuring list and mods paths
@@ -4794,5 +4794,6 @@ try {
 
 # Show the GUI
 Show-WAUSettingsGUI
+
 
 
