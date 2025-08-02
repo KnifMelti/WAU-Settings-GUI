@@ -42,7 +42,7 @@ Configure **WAU** settings after installation, including:
   - `[wau]`Reinstall **WAU** (with current showing configuration)
     - Stores source in `[INSTALLDIR]\msi\[VERSION]` (enables **WAU** `Repair` in **Programs and Features**)
   - `[ver]`Manual/automatic check for updates (checks automatically every week as standard)
-    - If manual via `[ver]` and `ver\backup` exists a restore option is also presented
+    - If manual and `ver\backup` exists a restore option is also presented
   - `[src]`Direct access to **WAU Settings GUI** `[INSTALLDIR]` 
 
 NB: Must be run as **Administrator** (exe and shortcuts have the flag set)
