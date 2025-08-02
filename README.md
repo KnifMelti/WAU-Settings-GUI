@@ -49,13 +49,10 @@ NB: Must be run as **Administrator** (exe and shortcuts have the flag set)
 
 ### Automatic Installation
 - Use **WinGet CLI** from **Command Prompt** to install the latest released **WinGet** version:
-  
   ```bash
   winget install KnifMelti.WAU-Settings-GUI --scope user
   ```
-
 This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **WAU-Settings-GUI**) to:
-  
    `%USERPROFILE%\AppData\Local\Microsoft\WinGet\Packages\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe`
 
 ### Manual Installation
@@ -81,7 +78,6 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
     - If manual check via `[ver]` and `ver\backup` exists a restore option is also presented
 - If an update exists, **WAU Settings GUI** will ask if you want to download and install the new version
 - Before installing a backup of the current version will be created in `ver\backup` folder
-
 - **WAU** will also rudimentary update **WAU Settings GUI** in user scope with every new released **WinGet** version 
   - To avoid failed updates you can create a **KnifMelti.WAU-Settings-GUI-preinstall.ps1** script in the **WAU** `mods` folder to shut down **WAU Settings GUI** before updating (open files) or not run it when updating:
   ```powershell
@@ -89,7 +85,6 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
   ```
   - Disable the **WAU** updating alltogether via your `excluded_apps.txt`:<br>`KnifMelti.WAU-Settings-GUI`
 - Alternatively, you can use **WinGet CLI** from **Command Prompt** to rudimentary update to every new released **WinGet** version of **WAU Settings GUI**:
-  
   ```bash
   winget upgrade KnifMelti.WAU-Settings-GUI --scope user
   ```
@@ -99,7 +94,6 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
 ### Uninstallation
 - Use **Programs and Features** in **Control Panel** to uninstall **KnifMelti WAU Settings GUI**
 - Uninstall can be done from `CMD` too (`/UNINSTALL` or silent `/UNINSTALL /S` parameter) using `UnInst.exe` in the **WAU Settings GUI** `[INSTALLDIR]`:
-  
   ```bash
   ::e.g.:
   "C:\WAU Settings GUI\UnInst.exe" /UNINSTALL
