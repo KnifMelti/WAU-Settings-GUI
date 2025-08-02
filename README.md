@@ -18,7 +18,7 @@ Benefits from not having to manage the settings in several places when testing e
 
 ...a perfect companion for those supporting the community (if the community actually uses it!) - being able to ask for a screenshot of the settings because it comes with all included (even a screenshot function masking potentially sensitive data)!
 
-Configure **WAU** settings after installation, including:
+#### Configure **WAU** settings after installation, including:
 - Update intervals and timing
 - Notification levels
 - Configuring list and mods paths
