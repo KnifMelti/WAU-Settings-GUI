@@ -2787,7 +2787,10 @@ function Update-WAUGUIFromConfig {
         $Controls.RunDate.Text = " WAU Last Run: Unknown!"
     }
 
-    $Controls.InstallLocationText.Text = "WAU Install Location: $($updatedConfig.InstallLocation) | "
+    # Update install location hyperlink
+    $Controls.InstallLocationText.Text = $updatedConfig.InstallLocation
+    $Controls.InstallLocationLink.NavigateUri = $updatedConfig.InstallLocation
+    
     if ($wauGPOListPathEnabled -and ($null -ne $updatedPolicies)) {
         $Controls.LocalListText.Inlines.Clear()
         $Controls.LocalListText.Inlines.Add("Current Local List: ")
@@ -3748,6 +3751,25 @@ function Show-WAUSettingsGUI {
         }
         catch {
             [System.Windows.MessageBox]::Show("Failed to open link: $($_.Exception.Message)", "Error", "OK", "Error")
+        }
+    })
+
+    # Install location hyperlink event handler
+    $controls.InstallLocationLink.Add_RequestNavigate({
+        param($linkSource, $navEventArgs)
+        try {
+            $installPath = $navEventArgs.Uri.ToString()
+            # Handle file:// URIs by converting to local path
+            if ($installPath.StartsWith("file:///")) {
+                $installPath = $installPath.Replace("file:///", "").Replace("/", "\")
+            } elseif ($installPath.StartsWith("file://")) {
+                $installPath = $installPath.Replace("file://", "").Replace("/", "\")
+            }
+            Start-Process "explorer.exe" -ArgumentList "`"$installPath`""
+            $navEventArgs.Handled = $true
+        }
+        catch {
+            [System.Windows.MessageBox]::Show("Failed to open install location: $($_.Exception.Message)", "Error", "OK", "Error")
         }
     })
 
