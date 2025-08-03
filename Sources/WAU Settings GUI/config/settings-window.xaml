@@ -87,7 +87,7 @@
                     <Button x:Name="GUIPng" 
                             Width="48" Height="48" 
                             Margin="10,0,0,0"
-                            ToolTip="WAU Settings GUI - Click or F12 for developer tools"
+                            ToolTip="Click or F12 for developer tools, double-click to open WAU Settings GUI on GitHub"
                             Cursor="Hand"
                             Background="Transparent"
                             BorderThickness="0"
