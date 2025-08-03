@@ -34,7 +34,8 @@
 ## Critical Development Patterns
 
 ### Code Standards
-- **All comments must be in English** - Ensure consistency across the codebase
+- **All code comments must be in English** - Ensure consistency across the codebase
+- **All chat messages must be in Swedish, but code snippets must be in English**
 - Use descriptive variable names and clear function documentation
 - Follow PowerShell best practices for error handling and parameter validation
 
