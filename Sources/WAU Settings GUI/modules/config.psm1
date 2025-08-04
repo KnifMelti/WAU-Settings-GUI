@@ -27,7 +27,31 @@ $ConfigVariables = @{
 $Global:Config = $ConfigVariables
 
 # Create combined variables after basic ones exist
-$Global:DESKTOP_WAU_SETTINGS = [System.IO.Path]::Combine([Environment]::GetFolderPath('Desktop'), "$($Config.GUI_TITLE).lnk")
+
+# Get the currently logged-in user's desktop by finding the Explorer process
+$LoggedInUserDesktop = try {
+    # Find Explorer process to get the interactive user
+    $ExplorerProcess = Get-CimInstance -ClassName Win32_Process -Filter "Name='explorer.exe'" |
+                      Where-Object { $_.SessionId -ne 0 } |
+                      Select-Object -First 1
+    
+    if ($ExplorerProcess) {
+        # Get the owner of the Explorer process
+        $ProcessOwner = Invoke-CimMethod -InputObject $ExplorerProcess -MethodName GetOwner
+        if ($ProcessOwner.User) {
+            Join-Path $env:SystemDrive "Users\$($ProcessOwner.User)\Desktop"
+        } else {
+            [Environment]::GetFolderPath('Desktop')
+        }
+    } else {
+        [Environment]::GetFolderPath('Desktop')
+    }
+} catch {
+    # Fallback to current user
+    [Environment]::GetFolderPath('Desktop')
+}
+
+$Global:DESKTOP_WAU_SETTINGS = [System.IO.Path]::Combine($LoggedInUserDesktop, "$($Config.GUI_TITLE).lnk")
 
 # Create individual global variables from hashtable for backward compatibility
 $ConfigVariables.GetEnumerator() | ForEach-Object {
