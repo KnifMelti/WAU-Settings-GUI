@@ -28,7 +28,7 @@ $Global:Config = $ConfigVariables
 
 # Create combined variables after basic ones exist
 
-# Get the currently logged-in user's desktop by finding the Explorer process
+# Get the currently logged-in user's actual desktop path (handles OneDrive redirection)
 $LoggedInUserDesktop = try {
     # Find Explorer process to get the interactive user
     $ExplorerProcess = Get-CimInstance -ClassName Win32_Process -Filter "Name='explorer.exe'" |
@@ -39,7 +39,24 @@ $LoggedInUserDesktop = try {
         # Get the owner of the Explorer process
         $ProcessOwner = Invoke-CimMethod -InputObject $ExplorerProcess -MethodName GetOwner
         if ($ProcessOwner.User) {
-            Join-Path $env:SystemDrive "Users\$($ProcessOwner.User)\Desktop"
+            $UserName = $ProcessOwner.User
+            
+            # Try to get the actual desktop path from the user's registry hive
+            $UserSid = (Get-CimInstance -ClassName Win32_UserAccount -Filter "Name='$UserName'").SID
+            if ($UserSid) {
+                # Check for desktop folder redirection in the user's registry
+                $DesktopPath = Get-ItemProperty -Path "Registry::HKEY_USERS\$UserSid\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders" -Name "Desktop" -ErrorAction SilentlyContinue
+                if ($DesktopPath -and $DesktopPath.Desktop) {
+                    # Expand environment variables in the path (like %USERPROFILE%, %OneDrive%, etc.)
+                    [System.Environment]::ExpandEnvironmentVariables($DesktopPath.Desktop)
+                } else {
+                    # Fallback to default user desktop path
+                    Join-Path $env:SystemDrive "Users\$UserName\Desktop"
+                }
+            } else {
+                # Fallback to default user desktop path
+                Join-Path $env:SystemDrive "Users\$UserName\Desktop"
+            }
         } else {
             [Environment]::GetFolderPath('Desktop')
         }
@@ -47,7 +64,7 @@ $LoggedInUserDesktop = try {
         [Environment]::GetFolderPath('Desktop')
     }
 } catch {
-    # Fallback to current user
+    # Final fallback to current user
     [Environment]::GetFolderPath('Desktop')
 }
 
