@@ -87,7 +87,7 @@
                     <Button x:Name="GUIPng" 
                             Width="48" Height="48" 
                             Margin="10,0,0,0"
-                            ToolTip="WAU Settings GUI - Click or F12 for developer tools"
+                            ToolTip="Click or F12 for developer tools, double-click for WAU Settings GUI on GitHub"
                             Cursor="Hand"
                             Background="Transparent"
                             BorderThickness="0"
@@ -316,7 +316,13 @@
                     <TextBlock x:Name="RunDate" Text=" WAU Last Run: " FontSize="9"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock x:Name="InstallLocationText" Text="WAU Install Location: " FontSize="9"/>
+                    <TextBlock FontSize="9">
+                        <Run Text="WAU Install Location: "/>
+                        <Hyperlink x:Name="InstallLocationLink" TextDecorations="None">
+                            <Run x:Name="InstallLocationText" Text=""/>
+                        </Hyperlink>
+                        <Run Text=" | "/>
+                    </TextBlock>
                     <TextBlock x:Name="LocalListText" Text="Current Local List: " FontSize="9"/>
                 </StackPanel>
                 

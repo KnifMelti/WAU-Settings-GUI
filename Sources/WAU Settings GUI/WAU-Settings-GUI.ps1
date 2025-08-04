@@ -2787,7 +2787,10 @@ function Update-WAUGUIFromConfig {
         $Controls.RunDate.Text = " WAU Last Run: Unknown!"
     }
 
-    $Controls.InstallLocationText.Text = "WAU Install Location: $($updatedConfig.InstallLocation) | "
+    # Update install location hyperlink
+    $Controls.InstallLocationText.Text = $updatedConfig.InstallLocation
+    $Controls.InstallLocationLink.NavigateUri = $updatedConfig.InstallLocation
+    
     if ($wauGPOListPathEnabled -and ($null -ne $updatedPolicies)) {
         $Controls.LocalListText.Inlines.Clear()
         $Controls.LocalListText.Inlines.Add("Current Local List: ")
@@ -3751,11 +3754,64 @@ function Show-WAUSettingsGUI {
         }
     })
 
-    # Dev button event handlers
-    $controls.GUIPng.Add_Click({
-        Set-DevToolsVisibility -controls $controls -window $window
+    # Install location hyperlink event handler
+    $controls.InstallLocationLink.Add_RequestNavigate({
+        param($linkSource, $navEventArgs)
+        try {
+            $installPath = $navEventArgs.Uri.ToString()
+            # Handle file:// URIs by converting to local path
+            if ($installPath.StartsWith("file:///")) {
+                $installPath = $installPath.Replace("file:///", "").Replace("/", "\")
+            } elseif ($installPath.StartsWith("file://")) {
+                $installPath = $installPath.Replace("file://", "").Replace("/", "\")
+            }
+            Start-Process "explorer.exe" -ArgumentList "`"$installPath`""
+            $navEventArgs.Handled = $true
+        }
+        catch {
+            [System.Windows.MessageBox]::Show("Failed to open install location: $($_.Exception.Message)", "Error", "OK", "Error")
+        }
     })
 
+    # Variable to hold click timer
+    $Script:ClickTimer = $null
+    
+    # Single-click event with delay (to toggle Dev Tools)
+    $controls.GUIPng.Add_Click({
+        # Cancel existing timer if double-click occurs
+        if ($Script:ClickTimer) {
+            $Script:ClickTimer.Stop()
+            $Script:ClickTimer = $null
+            return
+        }
+        
+        # Create timer for delayed single-click
+        $Script:ClickTimer = New-Object System.Windows.Threading.DispatcherTimer
+        $Script:ClickTimer.Interval = [TimeSpan]::FromMilliseconds(200)
+        $Script:ClickTimer.Add_Tick({
+            $Script:ClickTimer.Stop()
+            $Script:ClickTimer = $null
+            Set-DevToolsVisibility -controls $controls -window $window
+        })
+        $Script:ClickTimer.Start()
+    })
+    
+    # Double-click event (open GitHub repo)
+    $controls.GUIPng.Add_MouseDoubleClick({
+        # Stop single-click timer
+        if ($Script:ClickTimer) {
+            $Script:ClickTimer.Stop()
+            $Script:ClickTimer = $null
+        }
+        
+        try {
+            $repoUrl = "https://github.com/$($Script:WAU_GUI_REPO)"
+            Start-Process $repoUrl
+        } catch {
+            [System.Windows.MessageBox]::Show("Failed to open GitHub repo: $($_.Exception.Message)", "Error", "OK", "Error")
+        }
+    })
+    
     $controls.DevGPOButton.Add_Click({
         try {
             Start-PopUp "WAU Policies registry opening..."
