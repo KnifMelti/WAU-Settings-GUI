@@ -50,7 +50,7 @@ NB: Must be run as **Administrator** (exe and shortcuts have the flag set)
 ### Automatic Installation
 - Use **WinGet CLI** from **Command Prompt** to install the latest released **WinGet** version:
   ```bash
-  winget install KnifMelti.WAU-Settings-GUI (--scope user if it fails)
+  winget install KnifMelti.WAU-Settings-GUI #(--scope user if it fails)
   ```
 This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **WAU-Settings-GUI**) to:
    `%USERPROFILE%\AppData\Local\Microsoft\WinGet\Packages\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe`
@@ -95,9 +95,9 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
 - Use **Programs and Features** in **Control Panel** to uninstall **KnifMelti WAU Settings GUI**
 - Uninstall can be done from `CMD` too (`/UNINSTALL` or silent `/UNINSTALL /S` parameter) using `UnInst.exe` in the **WAU Settings GUI** `[INSTALLDIR]`:
   ```bash
-  ::e.g.:
+  #e.g.:
   "C:\WAU Settings GUI\UnInst.exe" /UNINSTALL
-  ::i.e.:
+  #i.e.:
   "%USERPROFILE%\AppData\Local\Microsoft\WinGet\Packages\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe\UnInst.exe" /UNINSTALL /S
   ```
 - This will remove everything, including the **Portable WinGet Package** from the source (it will not show up in the **WinGet** installed list anymore)
