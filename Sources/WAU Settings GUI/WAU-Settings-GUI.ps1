@@ -3155,7 +3155,7 @@ function Test-WAULists {
                 # Update the controls to reflect the new path
                 Invoke-SettingsLoad -controls $controls
                 # Open excluded_apps.txt for editing
-                Start-Process "explorer.exe" $appsExcluded
+                Open-TextFile -FilePath $appsExcluded
             }
         }
     }
@@ -4067,7 +4067,7 @@ function Show-WAUSettingsGUI {
             $systemFile = Join-Path $installdir 'config\winget_system_apps.txt'
             if (Test-Path $systemFile) {
                 Start-PopUp "WinGet current list of system wide installed apps opening..."
-                Start-Process "explorer.exe" -ArgumentList $systemFile
+                Open-TextFile -FilePath $systemFile
             } else {
                 [System.Windows.MessageBox]::Show("No current list of WinGet system wide installed apps found", "File Not Found", "OK", "Warning")
                 return
@@ -4118,7 +4118,7 @@ function Show-WAUSettingsGUI {
                     $whiteListFile = Join-Path $listPath 'included_apps.txt'
                     if (Test-Path $whiteListFile) {
                         Start-PopUp "WAU included apps list opening..."
-                        Start-Process "explorer.exe" -ArgumentList $whiteListFile
+                        Open-TextFile -FilePath $whiteListFile
                     } else {
                         [System.Windows.MessageBox]::Show("No included apps list found in external path ('$listPath\included_apps.txt')", "File Not Found", "OK", "Warning")
                         return
@@ -4128,7 +4128,7 @@ function Show-WAUSettingsGUI {
                     $whiteListFile = Join-Path $installdir 'included_apps.txt'
                     if (Test-Path $whiteListFile) {
                         Start-PopUp "WAU included apps list opening..."
-                        Start-Process "explorer.exe" -ArgumentList $whiteListFile
+                        Open-TextFile -FilePath $whiteListFile
                     } else {
                         [System.Windows.MessageBox]::Show("No included apps list found ('included_apps.txt')", "File Not Found", "OK", "Warning")
                         return
@@ -4145,7 +4145,7 @@ function Show-WAUSettingsGUI {
                     $excludedFile = Join-Path $listPath 'excluded_apps.txt'
                     if (Test-Path $excludedFile) {
                         Start-PopUp "WAU excluded apps list opening..."
-                        Start-Process "explorer.exe" -ArgumentList $excludedFile
+                        Open-TextFile -FilePath $excludedFile
                     } else {
                         [System.Windows.MessageBox]::Show("No excluded apps list found in external path ('$listPath\excluded_apps.txt')", "File Not Found", "OK", "Warning")
                         return
@@ -4156,10 +4156,10 @@ function Show-WAUSettingsGUI {
                     $defaultExcludedFile = Join-Path $installdir 'config\default_excluded_apps.txt'
                     if (Test-Path $excludedFile) {
                         Start-PopUp "WAU excluded apps list opening..."
-                        Start-Process "explorer.exe" -ArgumentList $excludedFile
+                        Open-TextFile -FilePath $excludedFile
                     } elseif (Test-Path $defaultExcludedFile) {
                         Start-PopUp "WAU default excluded apps List opening..."
-                        Start-Process "explorer.exe" -ArgumentList $defaultExcludedFile
+                        Open-TextFile -FilePath $defaultExcludedFile
                     } else {
                         [System.Windows.MessageBox]::Show("No excluded apps list found (neither 'excluded_apps.txt' nor 'config\default_excluded_apps.txt').", "File Not Found", "OK", "Warning")
                         return
@@ -4194,7 +4194,7 @@ function Show-WAUSettingsGUI {
             # Check if config_user.psm1 exists in modules folder
             if (Test-Path $configUserModulePath) {
                 Start-PopUp "'config_user.psm1' opening from modules folder..."
-                Start-Process "explorer.exe" -ArgumentList $configUserModulePath
+                Open-TextFile -FilePath $configUserModulePath
             }
             # If not in modules, check if it exists in working directory
             elseif (Test-Path $workingDirConfigUserPath) {
@@ -4209,7 +4209,7 @@ function Show-WAUSettingsGUI {
                 Copy-Item -Path $workingDirConfigUserPath -Destination $configUserModulePath -Force
                 
                 # Open the copied file
-                Start-Process "explorer.exe" -ArgumentList $configUserModulePath
+                Open-TextFile -FilePath $configUserModulePath
             }
             else {
                 Close-PopUp
