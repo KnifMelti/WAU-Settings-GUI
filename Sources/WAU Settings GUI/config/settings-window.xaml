@@ -87,11 +87,17 @@
                     <Button x:Name="GUIPng" 
                             Width="48" Height="48" 
                             Margin="10,0,0,0"
-                            ToolTip="Click or F12 for developer tools, double-click for WAU Settings GUI on GitHub"
                             Cursor="Hand"
                             Background="Transparent"
                             BorderThickness="0"
                             Padding="0">
+                        <Button.ToolTip>
+                            <TextBlock>
+                                Click or F12 for developer tools.
+                                <LineBreak/>
+                                Double-click for WAU Settings GUI on GitHub.
+                            </TextBlock>
+                        </Button.ToolTip>
                         <Image Source="$Script:WAU_GUI_PNG" 
                                Width="48" Height="48"/>
                     </Button>
@@ -173,7 +179,9 @@
             <TextBox x:Name="ListPathTextBox" Width="372" Height="25" VerticalContentAlignment="Center">
             <TextBox.ToolTip>
                 <TextBlock>
-                Path for external list files. Can be URL, UNC path, local path or 'GPO'. If set to 'GPO', ensure you also configure the list/lists in GPO!
+                    Path for external list files. Can be URL, UNC path, local path or 'GPO'.
+                    <LineBreak/>
+                    If set to 'GPO', ensure you also configure the list/lists in GPO!
                 </TextBlock>
             </TextBox.ToolTip>
             </TextBox>
@@ -183,7 +191,9 @@
             <TextBox x:Name="ModsPathTextBox" Width="372" Height="25" VerticalContentAlignment="Center">
             <TextBox.ToolTip>
                 <TextBlock>
-                Path for external mods. Can be URL, UNC path, local path or 'AzureBlob'. If set to 'AzureBlob', ensure you also configure 'Azure Blob SAS URL' below!
+                    Path for external mods. Can be URL, UNC path, local path or 'AzureBlob'.
+                    <LineBreak/>
+                    If set to 'AzureBlob', ensure you also configure 'Azure Blob SAS URL' below!
                 </TextBlock>
             </TextBox.ToolTip>
             </TextBox>
@@ -193,7 +203,9 @@
             <TextBox x:Name="AzureBlobSASURLTextBox" Width="372" Height="25" VerticalContentAlignment="Center">
             <TextBox.ToolTip>
                 <TextBlock>
-                Azure Storage Blob URL with SAS token for use with the 'Mods' feature. The URL must include the SAS token and have 'read' and 'list' permissions.
+                    Azure Storage Blob URL with SAS token for use with the 'Mods' feature.
+                    <LineBreak/>
+                    The URL must include the SAS token and have 'read' and 'list' permissions.
                 </TextBlock>
             </TextBox.ToolTip>
             </TextBox>
@@ -258,7 +270,9 @@
             <ComboBox x:Name="MaxLogFilesComboBox" Width="60" Height="25" SelectedIndex="3" VerticalContentAlignment="Center">
                 <ComboBox.ToolTip>
                     <TextBlock>
-                        Set to '0' to never delete old logs, '1' to keep only the original and let it grow
+                        Set to '0' for never deleting old logs.
+                        <LineBreak/>
+                        Set to '1' for keeping only the original and let it grow.
                     </TextBlock>
                 </ComboBox.ToolTip>
             </ComboBox>
@@ -272,7 +286,9 @@
             <ComboBox x:Name="MaxLogSizeComboBox" Width="70" Height="25" SelectedIndex="0" VerticalContentAlignment="Center" IsEditable="True">
                 <ComboBox.ToolTip>
                     <TextBlock>
-                        Maximum size of each log file before rotation occurs (Bytes if manually entered!)
+                        Maximum size of each log file before rotation occurs.
+                        <LineBreak/>
+                        Size in bytes if manually entered.
                     </TextBlock>
                 </ComboBox.ToolTip>
                 <ComboBoxItem Content="1 MB" Tag="1048576"/>
