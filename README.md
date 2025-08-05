@@ -50,7 +50,7 @@ NB: Must be run as **Administrator** (exe and shortcuts have the flag set)
 ### Automatic Installation
 - Use **WinGet CLI** from **Command Prompt** to install the latest released **WinGet** version:
   ```bash
-  winget install KnifMelti.WAU-Settings-GUI --scope user
+  winget install KnifMelti.WAU-Settings-GUI (--scope user if it fails)
   ```
 This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **WAU-Settings-GUI**) to:
    `%USERPROFILE%\AppData\Local\Microsoft\WinGet\Packages\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe`
