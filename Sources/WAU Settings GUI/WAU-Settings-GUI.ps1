@@ -122,6 +122,75 @@ function Test-Administrator {
     $principal = New-Object Security.Principal.WindowsPrincipal($currentUser)
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
+function Open-TextFile {
+    param([string]$FilePath)
+    
+    if (-not (Test-Path $FilePath)) {
+        [System.Windows.MessageBox]::Show("File not found: $FilePath", "File Not Found", "OK", "Warning")
+        return $false
+    }
+    
+    $extension = [System.IO.Path]::GetExtension($FilePath).ToLower()
+    $isTextFile = $extension -in @('.txt', '.log', '.cfg', '.conf', '.ini', '.psm1')
+    
+    # Check if running as the logged-in user (not "Run as different user")
+    $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+    $loggedInUser = "$env:USERDOMAIN\$env:USERNAME"
+    $isOriginalUser = ($currentUser -eq $loggedInUser)
+    
+    # If original user, try user's preferred associations first
+    if ($isOriginalUser) {
+        try {
+            # Try user's association first, then system default
+            Start-Process -FilePath $FilePath -ErrorAction Stop
+            return $true
+        }
+        catch {
+            # User's association failed, continue to fallbacks
+        }
+    }
+    
+    # If "Run as different user", use safer approach
+    # For text files, prefer notepad (more reliable under different user context)
+    if (-not $isOriginalUser -and $isTextFile) {
+        try {
+            Start-Process "notepad.exe" -ArgumentList "`"$FilePath`"" -ErrorAction Stop
+            return $true
+        }
+        catch {
+            # Notepad failed, try default association anyway
+            try {
+                Start-Process -FilePath $FilePath -ErrorAction Stop
+                return $true
+            }
+            catch {
+                # Both failed, go to explorer fallback
+            }
+        }
+    }
+    # For non-text files under different user, try default association
+    elseif (-not $isOriginalUser) {
+        try {
+            Start-Process -FilePath $FilePath -ErrorAction Stop
+            return $true
+        }
+        catch {
+            # Default association failed
+        }
+    }
+    
+    # Final fallbacks - explorer select then open directory
+    try {
+        Start-Process "explorer.exe" -ArgumentList "/select,`"$FilePath`"" -ErrorAction Stop
+        return $true
+    }
+    catch {
+        # Ultimate fallback - open containing directory
+        $directory = [System.IO.Path]::GetDirectoryName($FilePath)
+        Start-Process "explorer.exe" -ArgumentList "`"$directory`""
+        return $false
+    }
+}
 function Repair-WAUSettingsFiles {
     param(
         [string[]]$MissingFiles,
@@ -3086,7 +3155,7 @@ function Test-WAULists {
                 # Update the controls to reflect the new path
                 Invoke-SettingsLoad -controls $controls
                 # Open excluded_apps.txt for editing
-                Start-Process "explorer.exe" $appsExcluded
+                Open-TextFile -FilePath $appsExcluded
             }
         }
     }
@@ -3773,32 +3842,43 @@ function Show-WAUSettingsGUI {
         }
     })
 
-    # Variable to hold click timer
+    # Variable to hold click timer and double-click flag
     $Script:ClickTimer = $null
+    $Script:DoubleClickInProgress = $false
     
     # Single-click event with delay (to toggle Dev Tools)
     $controls.GUIPng.Add_Click({
-        # Cancel existing timer if double-click occurs
-        if ($Script:ClickTimer) {
-            $Script:ClickTimer.Stop()
-            $Script:ClickTimer = $null
+        # If double-click is in progress, ignore single-click
+        if ($Script:DoubleClickInProgress) {
             return
         }
         
-        # Create timer for delayed single-click
-        $Script:ClickTimer = New-Object System.Windows.Threading.DispatcherTimer
-        $Script:ClickTimer.Interval = [TimeSpan]::FromMilliseconds(200)
-        $Script:ClickTimer.Add_Tick({
+        # Cancel existing timer if it exists
+        if ($Script:ClickTimer) {
             $Script:ClickTimer.Stop()
             $Script:ClickTimer = $null
-            Set-DevToolsVisibility -controls $controls -window $window
+        }
+        
+        # Create timer for delayed single-click with longer delay
+        $Script:ClickTimer = New-Object System.Windows.Threading.DispatcherTimer
+        $Script:ClickTimer.Interval = [TimeSpan]::FromMilliseconds(300)  # Increased from 200ms
+        $Script:ClickTimer.Add_Tick({
+            # Double-check that double-click hasn't started
+            if (-not $Script:DoubleClickInProgress) {
+                Set-DevToolsVisibility -controls $controls -window $window
+            }
+            $Script:ClickTimer.Stop()
+            $Script:ClickTimer = $null
         })
         $Script:ClickTimer.Start()
     })
     
     # Double-click event (open GitHub repo)
     $controls.GUIPng.Add_MouseDoubleClick({
-        # Stop single-click timer
+        # Set flag to indicate double-click is in progress
+        $Script:DoubleClickInProgress = $true
+        
+        # Stop single-click timer immediately
         if ($Script:ClickTimer) {
             $Script:ClickTimer.Stop()
             $Script:ClickTimer = $null
@@ -3810,8 +3890,17 @@ function Show-WAUSettingsGUI {
         } catch {
             [System.Windows.MessageBox]::Show("Failed to open GitHub repo: $($_.Exception.Message)", "Error", "OK", "Error")
         }
+        
+        # Reset double-click flag after a short delay
+        $resetTimer = New-Object System.Windows.Threading.DispatcherTimer
+        $resetTimer.Interval = [TimeSpan]::FromMilliseconds(500)
+        $resetTimer.Add_Tick({
+            $Script:DoubleClickInProgress = $false
+            $resetTimer.Stop()
+        })
+        $resetTimer.Start()
     })
-    
+
     $controls.DevGPOButton.Add_Click({
         try {
             Start-PopUp "WAU Policies registry opening..."
@@ -3978,7 +4067,7 @@ function Show-WAUSettingsGUI {
             $systemFile = Join-Path $installdir 'config\winget_system_apps.txt'
             if (Test-Path $systemFile) {
                 Start-PopUp "WinGet current list of system wide installed apps opening..."
-                Start-Process "explorer.exe" -ArgumentList $systemFile
+                Open-TextFile -FilePath $systemFile
             } else {
                 [System.Windows.MessageBox]::Show("No current list of WinGet system wide installed apps found", "File Not Found", "OK", "Warning")
                 return
@@ -4029,7 +4118,7 @@ function Show-WAUSettingsGUI {
                     $whiteListFile = Join-Path $listPath 'included_apps.txt'
                     if (Test-Path $whiteListFile) {
                         Start-PopUp "WAU included apps list opening..."
-                        Start-Process "explorer.exe" -ArgumentList $whiteListFile
+                        Open-TextFile -FilePath $whiteListFile
                     } else {
                         [System.Windows.MessageBox]::Show("No included apps list found in external path ('$listPath\included_apps.txt')", "File Not Found", "OK", "Warning")
                         return
@@ -4039,7 +4128,7 @@ function Show-WAUSettingsGUI {
                     $whiteListFile = Join-Path $installdir 'included_apps.txt'
                     if (Test-Path $whiteListFile) {
                         Start-PopUp "WAU included apps list opening..."
-                        Start-Process "explorer.exe" -ArgumentList $whiteListFile
+                        Open-TextFile -FilePath $whiteListFile
                     } else {
                         [System.Windows.MessageBox]::Show("No included apps list found ('included_apps.txt')", "File Not Found", "OK", "Warning")
                         return
@@ -4056,7 +4145,7 @@ function Show-WAUSettingsGUI {
                     $excludedFile = Join-Path $listPath 'excluded_apps.txt'
                     if (Test-Path $excludedFile) {
                         Start-PopUp "WAU excluded apps list opening..."
-                        Start-Process "explorer.exe" -ArgumentList $excludedFile
+                        Open-TextFile -FilePath $excludedFile
                     } else {
                         [System.Windows.MessageBox]::Show("No excluded apps list found in external path ('$listPath\excluded_apps.txt')", "File Not Found", "OK", "Warning")
                         return
@@ -4067,10 +4156,10 @@ function Show-WAUSettingsGUI {
                     $defaultExcludedFile = Join-Path $installdir 'config\default_excluded_apps.txt'
                     if (Test-Path $excludedFile) {
                         Start-PopUp "WAU excluded apps list opening..."
-                        Start-Process "explorer.exe" -ArgumentList $excludedFile
+                        Open-TextFile -FilePath $excludedFile
                     } elseif (Test-Path $defaultExcludedFile) {
                         Start-PopUp "WAU default excluded apps List opening..."
-                        Start-Process "explorer.exe" -ArgumentList $defaultExcludedFile
+                        Open-TextFile -FilePath $defaultExcludedFile
                     } else {
                         [System.Windows.MessageBox]::Show("No excluded apps list found (neither 'excluded_apps.txt' nor 'config\default_excluded_apps.txt').", "File Not Found", "OK", "Warning")
                         return
@@ -4105,7 +4194,7 @@ function Show-WAUSettingsGUI {
             # Check if config_user.psm1 exists in modules folder
             if (Test-Path $configUserModulePath) {
                 Start-PopUp "'config_user.psm1' opening from modules folder..."
-                Start-Process "explorer.exe" -ArgumentList $configUserModulePath
+                Open-TextFile -FilePath $configUserModulePath
             }
             # If not in modules, check if it exists in working directory
             elseif (Test-Path $workingDirConfigUserPath) {
@@ -4120,7 +4209,7 @@ function Show-WAUSettingsGUI {
                 Copy-Item -Path $workingDirConfigUserPath -Destination $configUserModulePath -Force
                 
                 # Open the copied file
-                Start-Process "explorer.exe" -ArgumentList $configUserModulePath
+                Open-TextFile -FilePath $configUserModulePath
             }
             else {
                 Close-PopUp
