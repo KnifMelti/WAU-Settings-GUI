@@ -122,6 +122,75 @@ function Test-Administrator {
     $principal = New-Object Security.Principal.WindowsPrincipal($currentUser)
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
+function Open-TextFile {
+    param([string]$FilePath)
+    
+    if (-not (Test-Path $FilePath)) {
+        [System.Windows.MessageBox]::Show("File not found: $FilePath", "File Not Found", "OK", "Warning")
+        return $false
+    }
+    
+    $extension = [System.IO.Path]::GetExtension($FilePath).ToLower()
+    $isTextFile = $extension -in @('.txt', '.log', '.cfg', '.conf', '.ini', '.psm1')
+    
+    # Check if running as the logged-in user (not "Run as different user")
+    $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+    $loggedInUser = "$env:USERDOMAIN\$env:USERNAME"
+    $isOriginalUser = ($currentUser -eq $loggedInUser)
+    
+    # If original user, try user's preferred associations first
+    if ($isOriginalUser) {
+        try {
+            # Try user's association first, then system default
+            Start-Process -FilePath $FilePath -ErrorAction Stop
+            return $true
+        }
+        catch {
+            # User's association failed, continue to fallbacks
+        }
+    }
+    
+    # If "Run as different user", use safer approach
+    # For text files, prefer notepad (more reliable under different user context)
+    if (-not $isOriginalUser -and $isTextFile) {
+        try {
+            Start-Process "notepad.exe" -ArgumentList "`"$FilePath`"" -ErrorAction Stop
+            return $true
+        }
+        catch {
+            # Notepad failed, try default association anyway
+            try {
+                Start-Process -FilePath $FilePath -ErrorAction Stop
+                return $true
+            }
+            catch {
+                # Both failed, go to explorer fallback
+            }
+        }
+    }
+    # For non-text files under different user, try default association
+    elseif (-not $isOriginalUser) {
+        try {
+            Start-Process -FilePath $FilePath -ErrorAction Stop
+            return $true
+        }
+        catch {
+            # Default association failed
+        }
+    }
+    
+    # Final fallbacks - explorer select then open directory
+    try {
+        Start-Process "explorer.exe" -ArgumentList "/select,`"$FilePath`"" -ErrorAction Stop
+        return $true
+    }
+    catch {
+        # Ultimate fallback - open containing directory
+        $directory = [System.IO.Path]::GetDirectoryName($FilePath)
+        Start-Process "explorer.exe" -ArgumentList "`"$directory`""
+        return $false
+    }
+}
 function Repair-WAUSettingsFiles {
     param(
         [string[]]$MissingFiles,
