@@ -3773,32 +3773,43 @@ function Show-WAUSettingsGUI {
         }
     })
 
-    # Variable to hold click timer
+    # Variable to hold click timer and double-click flag
     $Script:ClickTimer = $null
+    $Script:DoubleClickInProgress = $false
     
     # Single-click event with delay (to toggle Dev Tools)
     $controls.GUIPng.Add_Click({
-        # Cancel existing timer if double-click occurs
-        if ($Script:ClickTimer) {
-            $Script:ClickTimer.Stop()
-            $Script:ClickTimer = $null
+        # If double-click is in progress, ignore single-click
+        if ($Script:DoubleClickInProgress) {
             return
         }
         
-        # Create timer for delayed single-click
-        $Script:ClickTimer = New-Object System.Windows.Threading.DispatcherTimer
-        $Script:ClickTimer.Interval = [TimeSpan]::FromMilliseconds(200)
-        $Script:ClickTimer.Add_Tick({
+        # Cancel existing timer if it exists
+        if ($Script:ClickTimer) {
             $Script:ClickTimer.Stop()
             $Script:ClickTimer = $null
-            Set-DevToolsVisibility -controls $controls -window $window
+        }
+        
+        # Create timer for delayed single-click with longer delay
+        $Script:ClickTimer = New-Object System.Windows.Threading.DispatcherTimer
+        $Script:ClickTimer.Interval = [TimeSpan]::FromMilliseconds(300)  # Increased from 200ms
+        $Script:ClickTimer.Add_Tick({
+            # Double-check that double-click hasn't started
+            if (-not $Script:DoubleClickInProgress) {
+                Set-DevToolsVisibility -controls $controls -window $window
+            }
+            $Script:ClickTimer.Stop()
+            $Script:ClickTimer = $null
         })
         $Script:ClickTimer.Start()
     })
     
     # Double-click event (open GitHub repo)
     $controls.GUIPng.Add_MouseDoubleClick({
-        # Stop single-click timer
+        # Set flag to indicate double-click is in progress
+        $Script:DoubleClickInProgress = $true
+        
+        # Stop single-click timer immediately
         if ($Script:ClickTimer) {
             $Script:ClickTimer.Stop()
             $Script:ClickTimer = $null
@@ -3810,8 +3821,17 @@ function Show-WAUSettingsGUI {
         } catch {
             [System.Windows.MessageBox]::Show("Failed to open GitHub repo: $($_.Exception.Message)", "Error", "OK", "Error")
         }
+        
+        # Reset double-click flag after a short delay
+        $resetTimer = New-Object System.Windows.Threading.DispatcherTimer
+        $resetTimer.Interval = [TimeSpan]::FromMilliseconds(500)
+        $resetTimer.Add_Tick({
+            $Script:DoubleClickInProgress = $false
+            $resetTimer.Stop()
+        })
+        $resetTimer.Start()
     })
-    
+
     $controls.DevGPOButton.Add_Click({
         try {
             Start-PopUp "WAU Policies registry opening..."
