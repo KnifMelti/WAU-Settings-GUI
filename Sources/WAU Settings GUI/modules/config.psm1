@@ -45,7 +45,7 @@ $LoggedInUserDesktop = try {
             $UserSid = (Get-CimInstance -ClassName Win32_UserAccount -Filter "Name='$UserName'").SID
             if ($UserSid) {
                 # Check for desktop folder redirection in the user's registry
-                $DesktopPath = Get-ItemProperty -Path "Registry::HKEY_USERS\$UserSid\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders" -Name "Desktop" -ErrorAction SilentlyContinue
+                $DesktopPath = Get-ItemProperty -Path "Registry::HKEY_USERS\$UserSid\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders" -Name "Desktop" -ErrorAction SilentlyContinue
                 if ($DesktopPath -and $DesktopPath.Desktop) {
                     # Expand environment variables in the path (like %USERPROFILE%, %OneDrive%, etc.)
                     [System.Environment]::ExpandEnvironmentVariables($DesktopPath.Desktop)
