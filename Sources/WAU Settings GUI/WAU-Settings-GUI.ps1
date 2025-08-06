@@ -2,7 +2,7 @@
 
 <#
 .SYNOPSIS
-Provides a user-friendly portable standalone interface to modify every aspect of Winget-AutoUpdate (**WAU**) settings
+Provides a user-friendly portable standalone interface to modify every aspect of Winget-AutoUpdate (**WAU**)
 
 .DESCRIPTION
 Configure **WAU** settings after installation:
@@ -30,7 +30,7 @@ Configure **WAU** settings after installation:
     - Stores source in `[INSTALLDIR]\msi\[VERSION]` (enables **WAU** `Repair` in **Programs and Features**)
   - `[ver]` Manual check for **WAU Settings GUI** updates (checks automatically every week as standard)
     - If manual check and `ver\backup` exists a restore option is also presented
-  - `[src]` Direct access to **WAU Settings GUI** `[INSTALLDIR]` 
+  - `[src]` Direct access to **WAU Settings GUI** `[INSTALLDIR]`
 
 .NOTES
 Must be run as Administrator
