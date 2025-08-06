@@ -2,7 +2,7 @@
 #SingleInstance
 ;@Ahk2Exe-Set CompanyName, KnifMelti
 ;@Ahk2Exe-Set ProductName, WAU Settings GUI
-;@Ahk2Exe-Set FileDescription, WAU Settings GUI
+;@Ahk2Exe-Set FileDescription, Modify every aspect of Winget-AutoUpdate (WAU)
 ;@Ahk2Exe-Set FileVersion, 1.8.3.0
 ;@Ahk2Exe-Set ProductVersion, 1.8.3.0
 ;@Ahk2Exe-Set LegalCopyright, Copyright © 2025 KnifMelti
