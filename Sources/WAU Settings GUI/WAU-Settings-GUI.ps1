@@ -8,15 +8,15 @@ Provides a user-friendly portable standalone interface to modify every aspect of
 Configure **WAU** settings after installation:
 - Update intervals and timing
 - Notification levels
-- Configuring list and mods paths
+- Set list and mods paths
 - Additional options like running at logon, user context, etc.
 - Creating/deleting shortcuts
 - Managing log files
 - Starting **WAU** manually
-- Screenshot with masking functionality for documentation (**F11**)
+- **Screenshot** with masking functionality for documentation (**F11**)
 - **GPO** management integration
 - Status information display showing version details, last run times, and current configuration state
-- Dev Tools for advanced troubleshooting (**F12**):
+- **Dev Tools** for advanced troubleshooting (**F12**/**click on logo**, **double-click** for **WAU Settings GUI** on **GitHub**):
   - `[gpo]` Open **WAU** policies path in registry (if **GPO Managed**)
   - `[tsk]` Task scheduler access (look in **WAU** folder)
   - `[reg]` Open **WAU** settings path in registry
@@ -30,7 +30,7 @@ Configure **WAU** settings after installation:
     - Stores source in `[INSTALLDIR]\msi\[VERSION]` (enables **WAU** `Repair` in **Programs and Features**)
   - `[ver]` Manual check for **WAU Settings GUI** updates (checks automatically every week as standard)
     - If manual check and `ver\backup` exists a restore option is also presented
-  - `[src]` Direct access to **WAU Settings GUI** `[INSTALLDIR]`
+  - `[src]` Direct access to **WAU Settings GUI** `[INSTALLDIR]` 
 
 .NOTES
 Must be run as Administrator
