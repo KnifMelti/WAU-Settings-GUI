@@ -3116,7 +3116,6 @@ function Update-WAUGUIFromConfig {
         }
     }) | Out-Null
 }
-
 function Test-WAULists {
     param($controls, $updatedConfig)
 
