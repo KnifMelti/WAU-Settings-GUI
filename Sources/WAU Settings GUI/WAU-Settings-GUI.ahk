@@ -190,6 +190,28 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
         }
     }
 
+    ; Current user - handle desktop shortcut directly (fallback for non-WinGet installations)
+    if FileExist(shortcutDesktop) {
+        try {
+            FileDelete(shortcutDesktop)
+        } catch {
+        }
+    }
+    
+    ; Remove current user registry entries directly (fallback for non-WinGet installations)
+    try {
+        RegDeleteKey("HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\KnifMelti.WAU-Settings-GUI__DefaultSource")
+    } catch {
+    }
+    try {
+        RegDeleteKey("HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe")
+    } catch {
+    }
+    try {
+        RegDeleteKey("HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\WAU-Settings-GUI")
+    } catch {
+    }
+
     ; MSI uninstall/install to restore WAU from current showing shortcut settings in the GUI
     try {
         ; Use PowerShell to find the product code (GUID) for Winget-AutoUpdate
