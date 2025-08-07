@@ -1067,6 +1067,57 @@ function Start-RestoreFromBackup {
 }
 
 # 2. Configuration functions
+function Get-WAUPoliciesStatus {
+    # Check main policies registry
+    $mainPolicies = Get-ItemProperty -Path $Script:WAU_POLICIES_PATH -ErrorAction SilentlyContinue
+    
+    # Check BlackList and WhiteList subkeys
+    $blackListPath = Join-Path $Script:WAU_POLICIES_PATH "BlackList"
+    $whiteListPath = Join-Path $Script:WAU_POLICIES_PATH "WhiteList"
+    
+    $blackListItems = $null
+    $whiteListItems = $null
+    
+    try {
+        if (Test-Path $blackListPath) {
+            $blackListItems = Get-ItemProperty -Path $blackListPath -ErrorAction SilentlyContinue
+            if ($blackListItems) {
+                # Filter out default PowerShell properties to check if there are actual GPO values
+                $blackListProps = $blackListItems.PSObject.Properties | Where-Object { 
+                    $_.Name -notin @('PSPath', 'PSParentPath', 'PSChildName', 'PSDrive', 'PSProvider') 
+                }
+                if ($blackListProps.Count -eq 0) {
+                    $blackListItems = $null
+                }
+            }
+        }
+    } catch {
+        $blackListItems = $null
+    }
+    
+    try {
+        if (Test-Path $whiteListPath) {
+            $whiteListItems = Get-ItemProperty -Path $whiteListPath -ErrorAction SilentlyContinue
+            if ($whiteListItems) {
+                # Filter out default PowerShell properties to check if there are actual GPO values
+                $whiteListProps = $whiteListItems.PSObject.Properties | Where-Object { 
+                    $_.Name -notin @('PSPath', 'PSParentPath', 'PSChildName', 'PSDrive', 'PSProvider') 
+                }
+                if ($whiteListProps.Count -eq 0) {
+                    $whiteListItems = $null
+                }
+            }
+        }
+    } catch {
+        $whiteListItems = $null
+    }
+    
+    # Return true if any of these conditions are met:
+    # 1. Main policies exist and have actual values
+    # 2. BlackList subkey has values
+    # 3. WhiteList subkey has values
+    return ($null -ne $mainPolicies) -or ($null -ne $blackListItems) -or ($null -ne $whiteListItems)
+}
 function Get-DisplayValue {
     param (
         [string]$PropertyName,
@@ -2639,17 +2690,8 @@ function Update-PreReleaseCheckBoxState {
 function Update-GPOManagementState {
     param($controls, $skipPopup = $false)
     
-    # Get updated policies
-    $updatedPolicies = $null
-    try {
-        $updatedPolicies = Get-ItemProperty -Path $Script:WAU_POLICIES_PATH -ErrorAction SilentlyContinue
-    }
-    catch {
-        # GPO registry key doesn't exist or can't be read
-    }
-
-    #  Check if GPO management is active
-    $gpoControlsActive = ($null -ne $updatedPolicies)
+    # Check if GPO management is active using the new function
+    $gpoControlsActive = Get-WAUPoliciesStatus
     
     if ($gpoControlsActive) {
          # Show popup only if not skipped (i.e., when window first opens)
@@ -2713,14 +2755,19 @@ function Update-WAUGUIFromConfig {
     $updatedConfig = Get-WAUCurrentConfig
     $updatedPolicies = $null
     try {
-        $updatedPolicies = Get-ItemProperty -Path $Script:WAU_POLICIES_PATH -ErrorAction SilentlyContinue
+        $updatedPolicies = if (Get-WAUPoliciesStatus) {
+            Get-ItemProperty -Path $Script:WAU_POLICIES_PATH -ErrorAction SilentlyContinue
+        } else {
+            $null
+        }
     }
     catch {
         # GPO registry key doesn't exist or can't be read
+        $updatedPolicies = $null
     }
 
     #$wauGPOListPathEnabled = ($updatedPolicies.WAU_ListPath -eq "GPO")
-    $gpoControlsActive = ($null -ne $updatedPolicies)
+    $gpoControlsActive = Get-WAUPoliciesStatus
 
     # Update Notification Level
     $notifLevel = Get-DisplayValue -PropertyName "WAU_NotificationLevel" -Config $updatedConfig -Policies $updatedPolicies
@@ -2944,7 +2991,7 @@ function Update-WAUGUIFromConfig {
     Update-PreReleaseCheckBoxState -Controls $controls
 
     # Check if we're being called from a save operation by checking if we're in GPO mode
-    $gpoControlsActive = ($null -ne $updatedPolicies)
+    $gpoControlsActive = Get-WAUPoliciesStatus
 
     # Only show popup when window first opens, not when updating after save
     $skipPopupForInitialLoad = $false
@@ -3058,16 +3105,12 @@ function Update-WAUGUIFromConfig {
         }
     }) | Out-Null
 }
+
 function Test-WAULists {
     param($controls, $updatedConfig)
 
     # Only run if main window is started and not in GPO mode
-    $updatedPolicies = $null
-    try {
-        $updatedPolicies = Get-ItemProperty -Path $Script:WAU_POLICIES_PATH -ErrorAction SilentlyContinue
-    } catch {}
-
-    $gpoControlsActive = ($null -ne $updatedPolicies)
+    $gpoControlsActive = Get-WAUPoliciesStatus
 
     if (-not $gpoControlsActive -and $Script:MainWindowStarted) {
         $currentListPath = (Get-DisplayValue -PropertyName "WAU_ListPath" -Config $updatedConfig)
@@ -3223,12 +3266,14 @@ function Test-SettingsChanged {
         # Get current saved configuration and policies
         $currentConfig = Get-WAUCurrentConfig
         $policies = $null
-        try {
-            $policies = Get-ItemProperty -Path $Script:WAU_POLICIES_PATH -ErrorAction SilentlyContinue
-        } catch { }
+        if (Get-WAUPoliciesStatus) {
+            try {
+                $policies = Get-ItemProperty -Path $Script:WAU_POLICIES_PATH -ErrorAction SilentlyContinue
+            } catch { }
+        }
         
         # Check if GPO management is active
-        $isGPOManaged = ($null -ne $policies)
+        $isGPOManaged = Get-WAUPoliciesStatus
         
         $changes = @()
         
@@ -3384,15 +3429,9 @@ function Save-WAUSettings {
         }
 
         # Check if settings are controlled by GPO
-        $updatedPolicies = $null
-        try {
-            $updatedPolicies = Get-ItemProperty -Path $Script:WAU_POLICIES_PATH -ErrorAction SilentlyContinue
-        }
-        catch {
-            # GPO registry key doesn't exist or can't be read
-        }
+        $isGPOManaged = Get-WAUPoliciesStatus
 
-        if ($null -ne $updatedPolicies) {
+        if ($isGPOManaged) {
             # For GPO mode - show popup immediately without delay
             Start-PopUp "Saving WAU Settings..."
             # Update status to "Saving..."
