@@ -83,8 +83,34 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
             username := match[1]
         }
         
-        if (username != "") {
-            ; Find SID for this specific user
+        ; Get current username for comparison
+        currentUser := A_UserName
+        
+        ; If the extracted username matches current user, handle directly
+        if (username != "" && username = currentUser) {
+            ; Current user - handle desktop shortcut directly
+            if FileExist(shortcutDesktop) {
+                try {
+                    FileDelete(shortcutDesktop)
+                } catch {
+                }
+            }
+            
+            ; Remove current user registry entries directly
+            try {
+                RegDeleteKey("HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\KnifMelti.WAU-Settings-GUI__DefaultSource")
+            } catch {
+            }
+            try {
+                RegDeleteKey("HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe")
+            } catch {
+            }
+            try {
+                RegDeleteKey("HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\WAU-Settings-GUI")
+            } catch {
+            }
+        } else if (username != "" && username != currentUser) {
+            ; Different user - need to load their registry hive
             userSID := GetUserSID(username)
             
             if (userSID != "") {
@@ -162,28 +188,6 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
                 }
             }
         }
-    }
-
-    ; Remove current user desktop shortcut (fallback)
-    if FileExist(shortcutDesktop) {
-        try {
-            FileDelete(shortcutDesktop)
-        } catch {
-        }
-    }
-
-    ; Remove current user registry entries (fallback)
-    try {
-        RegDeleteKey("HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\KnifMelti.WAU-Settings-GUI__DefaultSource")
-    } catch {
-    }
-    try {
-        RegDeleteKey("HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe")
-    } catch {
-    }
-    try {
-        RegDeleteKey("HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\WAU-Settings-GUI")
-    } catch {
     }
 
     ; MSI uninstall/install to restore WAU from current showing shortcut settings in the GUI
