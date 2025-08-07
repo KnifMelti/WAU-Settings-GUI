@@ -76,49 +76,43 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
 
     ; Check if working dir is under '\WinGet\Packages\'
     if InStr(A_WorkingDir, "\WinGet\Packages\", false) > 0 {
-        ; Get all user SIDs
-        userSIDs := GetAllUserSIDs()
+        ; Extract username from WinGet path
+        ; Pattern: C:\Users\{username}\AppData\Local\Microsoft\WinGet\Packages\...
+        username := ""
+        if RegExMatch(A_WorkingDir, "\\Users\\([^\\]+)\\AppData\\Local\\Microsoft\\WinGet\\Packages\\", &match) {
+            username := match[1]
+        }
         
-        ; Process each user
-        for sid in userSIDs {
-            ; Try to load the user's registry hive if not already loaded
-            try {
-                RegRead("HKU\" . sid, "")  ; Test if hive is loaded
-            } catch {
-                ; Try to load the hive
+        if (username != "") {
+            ; Find SID for this specific user
+            userSID := GetUserSID(username)
+            
+            if (userSID != "") {
+                ; Test if user's registry hive is already loaded
+                hiveLoaded := false
                 try {
-                    profilePath := RegRead("HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\" . sid, "ProfileImagePath")
-                    ntUserDat := profilePath . "\NTUSER.DAT"
-                    if FileExist(ntUserDat) {
-                        RunWait('reg load "HKU\' . sid . '" "' . ntUserDat . '"', , "Hide")
-                    }
+                    ; Try to read a standard key that should always exist
+                    RegRead("HKU\" . userSID . "\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer", "")
+                    hiveLoaded := true
                 } catch {
-                    continue ; Skip this user if we can't load their hive
-                }
-            }
-
-            ; Remove shortcuts using registry-based desktop path
-            try {
-                userDesktopPath := RegRead("HKU\" . sid . "\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders", "Desktop")
-                if (userDesktopPath != "") {
-                    userShortcut := userDesktopPath . "\WAU Settings (Administrator).lnk"
-                    if FileExist(userShortcut) {
-                        try {
-                            FileDelete(userShortcut)
-                        } catch {
+                    ; Hive not loaded, try to load it
+                    try {
+                        profilePath := RegRead("HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\" . userSID, "ProfileImagePath")
+                        ntUserDat := profilePath . "\NTUSER.DAT"
+                        if FileExist(ntUserDat) {
+                            RunWait('reg load "HKU\' . userSID . '" "' . ntUserDat . '"', , "Hide")
+                            hiveLoaded := true
                         }
+                    } catch {
+                        ; Skip if we can't load the hive
                     }
                 }
-            } catch {
-                ; Try User Shell Folders if Shell Folders fails
-                try {
-                    userDesktopPath := RegRead("HKU\" . sid . "\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders", "Desktop")
-                    if (userDesktopPath != "") {
-                        ; Expand environment variables in the path
-                        try {
-                            profilePath := RegRead("HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\" . sid, "ProfileImagePath")
-                            userDesktopPath := StrReplace(userDesktopPath, "%USERPROFILE%", profilePath)
-                            ; Add more environment variable expansions if needed
+            
+                if (hiveLoaded) {
+                    ; Remove desktop shortcut using registry-based desktop path
+                    try {
+                        userDesktopPath := RegRead("HKU\" . userSID . "\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders", "Desktop")
+                        if (userDesktopPath != "") {
                             userShortcut := userDesktopPath . "\WAU Settings (Administrator).lnk"
                             if FileExist(userShortcut) {
                                 try {
@@ -126,25 +120,46 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
                                 } catch {
                                 }
                             }
+                        }
+                    } catch {
+                        ; Try User Shell Folders if Shell Folders fails
+                        try {
+                            userDesktopPath := RegRead("HKU\" . userSID . "\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders", "Desktop")
+                            if (userDesktopPath != "") {
+                                ; Expand environment variables in the path
+                                try {
+                                    profilePath := RegRead("HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\" . userSID, "ProfileImagePath")
+                                    userDesktopPath := StrReplace(userDesktopPath, "%USERPROFILE%", profilePath)
+                                    userDesktopPath := StrReplace(userDesktopPath, "%USERNAME%", username)
+                                    
+                                    userShortcut := userDesktopPath . "\WAU Settings (Administrator).lnk"
+                                    if FileExist(userShortcut) {
+                                        try {
+                                            FileDelete(userShortcut)
+                                        } catch {
+                                        }
+                                    }
+                                } catch {
+                                }
+                            }
                         } catch {
                         }
                     }
-                } catch {
+            
+                    ; Remove WinGet and WAU Settings GUI uninstall entries for this specific user
+                    try {
+                        RegDeleteKey("HKU\" . userSID . "\Software\Microsoft\Windows\CurrentVersion\Uninstall\KnifMelti.WAU-Settings-GUI__DefaultSource")
+                    } catch {
+                    }
+                    try {
+                        RegDeleteKey("HKU\" . userSID . "\Software\Microsoft\Windows\CurrentVersion\Uninstall\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe")
+                    } catch {
+                    }
+                    try {
+                        RegDeleteKey("HKU\" . userSID . "\Software\Microsoft\Windows\CurrentVersion\Uninstall\WAU-Settings-GUI")
+                    } catch {
+                    }
                 }
-            }
-
-            ; Remove WinGet and WAU Settings GUI uninstall entries
-            try {
-                RegDeleteKey("HKU\" . sid . "\Software\Microsoft\Windows\CurrentVersion\Uninstall\KnifMelti.WAU-Settings-GUI__DefaultSource")
-            } catch {
-            }
-            try {
-                RegDeleteKey("HKU\" . sid . "\Software\Microsoft\Windows\CurrentVersion\Uninstall\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe")
-            } catch {
-            }
-            try {
-                RegDeleteKey("HKU\" . sid . "\Software\Microsoft\Windows\CurrentVersion\Uninstall\WAU-Settings-GUI")
-            } catch {
             }
         }
     }
@@ -643,19 +658,28 @@ GetMSIParams() {
     return msiParams
 }
 
-; Helper function to get all user SIDs from registry
-GetAllUserSIDs() {
-    userSIDs := []
+; Helper function to get SID for a specific username
+GetUserSID(username) {
     try {
         Loop Reg, "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList", "K" {
             sid := A_LoopRegName
-            ; Skip system SIDs (they start with S-1-5- and are system accounts)
+            ; Skip system SIDs and only check user SIDs
             if (RegExMatch(sid, "^S-1-5-\d{2,}$") && !RegExMatch(sid, "^S-1-5-(18|19|20)$")) {
-                userSIDs.Push(sid)
+                try {
+                    profilePath := RegRead("HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\" . sid, "ProfileImagePath")
+                    ; Extract username from profile path (e.g., C:\Users\username)
+                    if RegExMatch(profilePath, "\\Users\\([^\\]+)$", &match) {
+                        if (match[1] = username) {
+                            return sid
+                        }
+                    }
+                } catch {
+                    continue
+                }
             }
         }
     } catch {
         ; Ignore errors
     }
-    return userSIDs
+    return ""
 }
