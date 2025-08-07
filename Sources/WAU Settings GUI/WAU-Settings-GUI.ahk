@@ -2,7 +2,7 @@
 #SingleInstance
 ;@Ahk2Exe-Set CompanyName, KnifMelti
 ;@Ahk2Exe-Set ProductName, WAU Settings GUI
-;@Ahk2Exe-Set FileDescription, WAU Settings GUI
+;@Ahk2Exe-Set FileDescription, Modify every aspect of Winget-AutoUpdate (WAU)
 ;@Ahk2Exe-Set FileVersion, 1.8.3.0
 ;@Ahk2Exe-Set ProductVersion, 1.8.3.0
 ;@Ahk2Exe-Set LegalCopyright, Copyright © 2025 KnifMelti
@@ -60,11 +60,9 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
         ; Ignore errors if no matching processes found
     }
 
-    ; Remove WAU Settings (Administrator) shortcuts if they exist
-    if FileExist(shortcutDesktop) || FileExist(shortcutStartMenu) {
+    ; Remove WAU Settings (Administrator) Start Menu shortcuts if they exist
+    if FileExist(shortcutStartMenu) {
         try {
-            if FileExist(shortcutDesktop)
-            FileDelete(shortcutDesktop)
             if FileExist(shortcutStartMenu)
             FileDelete(shortcutStartMenu)
             if FileExist(shortcutOpenLogs)
@@ -78,25 +76,140 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
 
     ; Check if working dir is under '\WinGet\Packages\'
     if InStr(A_WorkingDir, "\WinGet\Packages\", false) > 0 {
-         ; Remove registry key for WinGet uninstall local manifest entry (SandboxTest.ps1)
-        try {
-            RegDeleteKey("HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\KnifMelti.WAU-Settings-GUI__DefaultSource")
-        } catch {
-            ; Ignore errors if registry key can't be deleted
+        ; Extract username from WinGet path
+        ; Pattern: C:\Users\{username}\AppData\Local\Microsoft\WinGet\Packages\...
+        username := ""
+        if RegExMatch(A_WorkingDir, "\\Users\\([^\\]+)\\AppData\\Local\\Microsoft\\WinGet\\Packages\\", &match) {
+            username := match[1]
         }
-        ; Remove registry key for WinGet uninstall entry
-        try {
-            RegDeleteKey("HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe")
-        } catch {
-            ; Ignore errors if registry key can't be deleted
+        
+        ; Get current username for comparison
+        currentUser := A_UserName
+        
+        ; If the extracted username matches current user, handle directly
+        if (username != "" && username = currentUser) {
+            ; Current user - handle desktop shortcut directly
+            if FileExist(shortcutDesktop) {
+                try {
+                    FileDelete(shortcutDesktop)
+                } catch {
+                }
+            }
+            
+            ; Remove current user registry entries directly
+            try {
+                RegDeleteKey("HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\KnifMelti.WAU-Settings-GUI__DefaultSource")
+            } catch {
+            }
+            try {
+                RegDeleteKey("HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe")
+            } catch {
+            }
+            try {
+                RegDeleteKey("HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\WAU-Settings-GUI")
+            } catch {
+            }
+        } else if (username != "" && username != currentUser) {
+            ; Different user - need to load their registry hive
+            userSID := GetUserSID(username)
+            
+            if (userSID != "") {
+                ; Test if user's registry hive is already loaded
+                hiveLoaded := false
+                try {
+                    ; Try to read a standard key that should always exist
+                    RegRead("HKU\" . userSID . "\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer", "")
+                    hiveLoaded := true
+                } catch {
+                    ; Hive not loaded, try to load it
+                    try {
+                        profilePath := RegRead("HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\" . userSID, "ProfileImagePath")
+                        ntUserDat := profilePath . "\NTUSER.DAT"
+                        if FileExist(ntUserDat) {
+                            RunWait('reg load "HKU\' . userSID . '" "' . ntUserDat . '"', , "Hide")
+                            hiveLoaded := true
+                        }
+                    } catch {
+                        ; Skip if we can't load the hive
+                    }
+                }
+            
+                if (hiveLoaded) {
+                    ; Remove desktop shortcut using registry-based desktop path
+                    try {
+                        userDesktopPath := RegRead("HKU\" . userSID . "\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders", "Desktop")
+                        if (userDesktopPath != "") {
+                            userShortcut := userDesktopPath . "\WAU Settings (Administrator).lnk"
+                            if FileExist(userShortcut) {
+                                try {
+                                    FileDelete(userShortcut)
+                                } catch {
+                                }
+                            }
+                        }
+                    } catch {
+                        ; Try User Shell Folders if Shell Folders fails
+                        try {
+                            userDesktopPath := RegRead("HKU\" . userSID . "\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders", "Desktop")
+                            if (userDesktopPath != "") {
+                                ; Expand environment variables in the path
+                                try {
+                                    profilePath := RegRead("HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\" . userSID, "ProfileImagePath")
+                                    userDesktopPath := StrReplace(userDesktopPath, "%USERPROFILE%", profilePath)
+                                    userDesktopPath := StrReplace(userDesktopPath, "%USERNAME%", username)
+                                    
+                                    userShortcut := userDesktopPath . "\WAU Settings (Administrator).lnk"
+                                    if FileExist(userShortcut) {
+                                        try {
+                                            FileDelete(userShortcut)
+                                        } catch {
+                                        }
+                                    }
+                                } catch {
+                                }
+                            }
+                        } catch {
+                        }
+                    }
+            
+                    ; Remove WinGet and WAU Settings GUI uninstall entries for this specific user
+                    try {
+                        RegDeleteKey("HKU\" . userSID . "\Software\Microsoft\Windows\CurrentVersion\Uninstall\KnifMelti.WAU-Settings-GUI__DefaultSource")
+                    } catch {
+                    }
+                    try {
+                        RegDeleteKey("HKU\" . userSID . "\Software\Microsoft\Windows\CurrentVersion\Uninstall\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe")
+                    } catch {
+                    }
+                    try {
+                        RegDeleteKey("HKU\" . userSID . "\Software\Microsoft\Windows\CurrentVersion\Uninstall\WAU-Settings-GUI")
+                    } catch {
+                    }
+                }
+            }
         }
     }
 
-    ; Remove registry key for WAU Settings GUI uninstall entry
+    ; Current user - handle desktop shortcut directly (fallback for non-WinGet installations)
+    if FileExist(shortcutDesktop) {
+        try {
+            FileDelete(shortcutDesktop)
+        } catch {
+        }
+    }
+    
+    ; Remove current user registry entries directly (fallback for non-WinGet installations)
+    try {
+        RegDeleteKey("HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\KnifMelti.WAU-Settings-GUI__DefaultSource")
+    } catch {
+    }
+    try {
+        RegDeleteKey("HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe")
+    } catch {
+    }
     try {
         RegDeleteKey("HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\WAU-Settings-GUI")
     } catch {
-        ; Ignore errors if registry key can't be deleted
     }
 
     ; MSI uninstall/install to restore WAU from current showing shortcut settings in the GUI
@@ -569,4 +682,30 @@ GetMSIParams() {
     msiParams .= "REBOOT=R"
     
     return msiParams
+}
+
+; Helper function to get SID for a specific username
+GetUserSID(username) {
+    try {
+        Loop Reg, "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList", "K" {
+            sid := A_LoopRegName
+            ; Skip system SIDs and only check user SIDs
+            if (RegExMatch(sid, "^S-1-5-\d{2,}$") && !RegExMatch(sid, "^S-1-5-(18|19|20)$")) {
+                try {
+                    profilePath := RegRead("HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\" . sid, "ProfileImagePath")
+                    ; Extract username from profile path (e.g., C:\Users\username)
+                    if RegExMatch(profilePath, "\\Users\\([^\\]+)$", &match) {
+                        if (match[1] = username) {
+                            return sid
+                        }
+                    }
+                } catch {
+                    continue
+                }
+            }
+        }
+    } catch {
+        ; Ignore errors
+    }
+    return ""
 }

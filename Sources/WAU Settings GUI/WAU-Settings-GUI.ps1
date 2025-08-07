@@ -2,21 +2,21 @@
 
 <#
 .SYNOPSIS
-Provides a user-friendly portable standalone interface to modify every aspect of Winget-AutoUpdate (**WAU**) settings
+Provides a user-friendly portable standalone interface to modify every aspect of Winget-AutoUpdate (**WAU**)
 
 .DESCRIPTION
 Configure **WAU** settings after installation:
 - Update intervals and timing
 - Notification levels
-- Configuring list and mods paths
+- Set list and mods paths
 - Additional options like running at logon, user context, etc.
 - Creating/deleting shortcuts
 - Managing log files
 - Starting **WAU** manually
-- Screenshot with masking functionality for documentation (**F11**)
+- **Screenshot** with masking functionality for documentation (**F11**)
 - **GPO** management integration
 - Status information display showing version details, last run times, and current configuration state
-- Dev Tools for advanced troubleshooting (**F12**):
+- **Dev Tools** for advanced troubleshooting (**F12**/**click on logo**, **double-click** for **WAU Settings GUI** on **GitHub**):
   - `[gpo]` Open **WAU** policies path in registry (if **GPO Managed**)
   - `[tsk]` Task scheduler access (look in **WAU** folder)
   - `[reg]` Open **WAU** settings path in registry
@@ -1067,6 +1067,57 @@ function Start-RestoreFromBackup {
 }
 
 # 2. Configuration functions
+function Get-WAUPoliciesStatus {
+    # Check main policies registry
+    $mainPolicies = Get-ItemProperty -Path $Script:WAU_POLICIES_PATH -ErrorAction SilentlyContinue
+    
+    # Check BlackList and WhiteList subkeys
+    $blackListPath = Join-Path $Script:WAU_POLICIES_PATH "BlackList"
+    $whiteListPath = Join-Path $Script:WAU_POLICIES_PATH "WhiteList"
+    
+    $blackListItems = $null
+    $whiteListItems = $null
+    
+    try {
+        if (Test-Path $blackListPath) {
+            $blackListItems = Get-ItemProperty -Path $blackListPath -ErrorAction SilentlyContinue
+            if ($blackListItems) {
+                # Filter out default PowerShell properties to check if there are actual GPO values
+                $blackListProps = $blackListItems.PSObject.Properties | Where-Object { 
+                    $_.Name -notin @('PSPath', 'PSParentPath', 'PSChildName', 'PSDrive', 'PSProvider') 
+                }
+                if ($blackListProps.Count -eq 0) {
+                    $blackListItems = $null
+                }
+            }
+        }
+    } catch {
+        $blackListItems = $null
+    }
+    
+    try {
+        if (Test-Path $whiteListPath) {
+            $whiteListItems = Get-ItemProperty -Path $whiteListPath -ErrorAction SilentlyContinue
+            if ($whiteListItems) {
+                # Filter out default PowerShell properties to check if there are actual GPO values
+                $whiteListProps = $whiteListItems.PSObject.Properties | Where-Object { 
+                    $_.Name -notin @('PSPath', 'PSParentPath', 'PSChildName', 'PSDrive', 'PSProvider') 
+                }
+                if ($whiteListProps.Count -eq 0) {
+                    $whiteListItems = $null
+                }
+            }
+        }
+    } catch {
+        $whiteListItems = $null
+    }
+    
+    # Return true if any of these conditions are met:
+    # 1. Main policies exist and have actual values
+    # 2. BlackList subkey has values
+    # 3. WhiteList subkey has values
+    return ($null -ne $mainPolicies) -or ($null -ne $blackListItems) -or ($null -ne $whiteListItems)
+}
 function Get-DisplayValue {
     param (
         [string]$PropertyName,
@@ -2334,7 +2385,7 @@ function Get-ColoredStatusText {
 function Test-ValidPathCharacter {
     param([string]$text, [string]$currentTextBoxValue = "")
     
-    # Allow characters for paths and URLs: letters, digits, :, \, /, -, _, ., space, $, 'GPO', 'AzureBlob', and SAS URL characters (?, &, =, %)
+    # Allow characters for paths and URLs: letters, digits, :, \, /, -, _, ., space, $, 'AzureBlob', and SAS URL characters (?, &, =, %)
     $isValidChar = $text -match '^[a-zA-Z0-9:\\/_.\s\-\$?&=%]*$'
     
     if (-not $isValidChar) {
@@ -2395,8 +2446,8 @@ function Test-PathTextBox_TextChanged {
             return
         }
 
-        # Only allow "GPO" or "AzureBlob" as special values
-        if ($source.Text -eq "GPO" -or $source.Text -eq "AzureBlob") {
+        # Only allow "AzureBlob" as special values
+        if ($source.Text -eq "AzureBlob") {
             $source.ClearValue([System.Windows.Controls.TextBox]::BorderBrushProperty)
             $source.ToolTip = $source.Tag
             return
@@ -2411,7 +2462,7 @@ function Test-PathTextBox_TextChanged {
             )
         ) {
             $source.BorderBrush = [System.Windows.Media.Brushes]::Red
-            $source.ToolTip = "Only local paths, UNC paths, URLs, or the special values 'GPO' and 'AzureBlob' are allowed."
+            $source.ToolTip = "Only local paths, UNC paths, URLs, or the special value 'AzureBlob' is allowed."
             return
         }
 
@@ -2475,8 +2526,8 @@ function Test-PathValue {
         return $true  # Empty paths are allowed
     }
 
-    # Allow special values "GPO" and "AzureBlob"
-    if ($path -eq "GPO" -or $path -eq "AzureBlob") {
+    # Allow special value "AzureBlob"
+    if ($path -eq "AzureBlob") {
         return $true
     }
 
@@ -2639,17 +2690,8 @@ function Update-PreReleaseCheckBoxState {
 function Update-GPOManagementState {
     param($controls, $skipPopup = $false)
     
-    # Get updated policies
-    $updatedPolicies = $null
-    try {
-        $updatedPolicies = Get-ItemProperty -Path $Script:WAU_POLICIES_PATH -ErrorAction SilentlyContinue
-    }
-    catch {
-        # GPO registry key doesn't exist or can't be read
-    }
-
-    #  Check if GPO management is active
-    $gpoControlsActive = ($null -ne $updatedPolicies)
+    # Check if GPO management is active using the new function
+    $gpoControlsActive = Get-WAUPoliciesStatus
     
     if ($gpoControlsActive) {
          # Show popup only if not skipped (i.e., when window first opens)
@@ -2713,14 +2755,19 @@ function Update-WAUGUIFromConfig {
     $updatedConfig = Get-WAUCurrentConfig
     $updatedPolicies = $null
     try {
-        $updatedPolicies = Get-ItemProperty -Path $Script:WAU_POLICIES_PATH -ErrorAction SilentlyContinue
+        $updatedPolicies = if (Get-WAUPoliciesStatus) {
+            Get-ItemProperty -Path $Script:WAU_POLICIES_PATH -ErrorAction SilentlyContinue
+        } else {
+            $null
+        }
     }
     catch {
         # GPO registry key doesn't exist or can't be read
+        $updatedPolicies = $null
     }
 
-    $wauGPOListPathEnabled = ($updatedPolicies.WAU_ListPath -eq "GPO")
-    $gpoControlsActive = ($null -ne $updatedPolicies)
+    #$wauGPOListPathEnabled = ($updatedPolicies.WAU_ListPath -eq "GPO")
+    $gpoControlsActive = Get-WAUPoliciesStatus
 
     # Update Notification Level
     $notifLevel = Get-DisplayValue -PropertyName "WAU_NotificationLevel" -Config $updatedConfig -Policies $updatedPolicies
@@ -2860,21 +2907,32 @@ function Update-WAUGUIFromConfig {
     $Controls.InstallLocationText.Text = $updatedConfig.InstallLocation
     $Controls.InstallLocationLink.NavigateUri = $updatedConfig.InstallLocation
     
-    if ($wauGPOListPathEnabled -and ($null -ne $updatedPolicies)) {
+    # Check if GPO is managing the list
+    $wauGPOListPathEnabled = Get-WAUPoliciesStatus
+    
+    if ($wauGPOListPathEnabled) {
         $Controls.LocalListText.Inlines.Clear()
-        $Controls.LocalListText.Inlines.Add("Current Local List: ")
-        if ($updatedPolicies.WAU_UseWhiteList -eq 1) {
+        $Controls.LocalListText.Inlines.Add("GPO Managed List: ")
+        
+        # Check if it's whitelist mode - ONLY based on WAU_UseWhiteList setting
+        $isWhitelistMode = $false
+        
+        # Only check WAU_UseWhiteList policy setting, ignore existence of entries
+        if ($updatedPolicies -and $updatedPolicies.WAU_UseWhiteList -eq 1) {
+            $isWhitelistMode = $true
+        }
+        
+        if ($isWhitelistMode) {
             $run = New-Object System.Windows.Documents.Run("'GPO (Included Apps)'")
         } else {
             $run = New-Object System.Windows.Documents.Run("'GPO (Excluded Apps)'")
-        }   
+        }
         $run.Foreground = $Script:COLOR_ENABLED
         $Controls.LocalListText.Inlines.Add($run)
-    }    
-    else {
+    } else {
         try {
             $installdir = $updatedConfig.InstallLocation
-            if ($updatedConfig.WAU_UseWhiteList -eq 1 -or ($updatedPolicies.WAU_UseWhiteList -eq 1 -and ($null -ne $updatedPolicies))) {
+            if ($updatedConfig.WAU_UseWhiteList -eq 1) {
                 $whiteListFile = Join-Path $installdir 'included_apps.txt'
                 if (Test-Path $whiteListFile) {
                     $Controls.LocalListText.Inlines.Clear()
@@ -2922,10 +2980,10 @@ function Update-WAUGUIFromConfig {
         }
     }
 
-    # Update WAU AutoUpdate status
+    # Update WAU AutoUpdate status using Get-WAUPoliciesStatus
     $wauAutoUpdateDisabled = [bool](Get-DisplayValue -PropertyName "WAU_DisableAutoUpdate" -Config $updatedConfig -Policies $updatedPolicies)
     $wauPreReleaseEnabled = [bool](Get-DisplayValue -PropertyName "WAU_UpdatePrerelease" -Config $updatedConfig -Policies $updatedPolicies)
-    $gpoManagementEnabled = ($null -ne $updatedPolicies)
+    $gpoManagementEnabled = Get-WAUPoliciesStatus  # Use the new function instead of ($null -ne $updatedPolicies)
 
     # Compose colored status text using Inlines (for TextBlock with Inlines)
     $statusText = @(
@@ -2944,7 +3002,7 @@ function Update-WAUGUIFromConfig {
     Update-PreReleaseCheckBoxState -Controls $controls
 
     # Check if we're being called from a save operation by checking if we're in GPO mode
-    $gpoControlsActive = ($null -ne $updatedPolicies)
+    $gpoControlsActive = Get-WAUPoliciesStatus
 
     # Only show popup when window first opens, not when updating after save
     $skipPopupForInitialLoad = $false
@@ -3062,12 +3120,7 @@ function Test-WAULists {
     param($controls, $updatedConfig)
 
     # Only run if main window is started and not in GPO mode
-    $updatedPolicies = $null
-    try {
-        $updatedPolicies = Get-ItemProperty -Path $Script:WAU_POLICIES_PATH -ErrorAction SilentlyContinue
-    } catch {}
-
-    $gpoControlsActive = ($null -ne $updatedPolicies)
+    $gpoControlsActive = Get-WAUPoliciesStatus
 
     if (-not $gpoControlsActive -and $Script:MainWindowStarted) {
         $currentListPath = (Get-DisplayValue -PropertyName "WAU_ListPath" -Config $updatedConfig)
@@ -3223,12 +3276,14 @@ function Test-SettingsChanged {
         # Get current saved configuration and policies
         $currentConfig = Get-WAUCurrentConfig
         $policies = $null
-        try {
-            $policies = Get-ItemProperty -Path $Script:WAU_POLICIES_PATH -ErrorAction SilentlyContinue
-        } catch { }
+        if (Get-WAUPoliciesStatus) {
+            try {
+                $policies = Get-ItemProperty -Path $Script:WAU_POLICIES_PATH -ErrorAction SilentlyContinue
+            } catch { }
+        }
         
         # Check if GPO management is active
-        $isGPOManaged = ($null -ne $policies)
+        $isGPOManaged = Get-WAUPoliciesStatus
         
         $changes = @()
         
@@ -3384,15 +3439,9 @@ function Save-WAUSettings {
         }
 
         # Check if settings are controlled by GPO
-        $updatedPolicies = $null
-        try {
-            $updatedPolicies = Get-ItemProperty -Path $Script:WAU_POLICIES_PATH -ErrorAction SilentlyContinue
-        }
-        catch {
-            # GPO registry key doesn't exist or can't be read
-        }
+        $isGPOManaged = Get-WAUPoliciesStatus
 
-        if ($null -ne $updatedPolicies) {
+        if ($isGPOManaged) {
             # For GPO mode - show popup immediately without delay
             Start-PopUp "Saving WAU Settings..."
             # Update status to "Saving..."
@@ -4110,7 +4159,6 @@ function Show-WAUSettingsGUI {
             if ($updatedConfig.WAU_UseWhiteList -eq 1 -or $updatedPolicies.WAU_UseWhiteList -eq 1) {
                 # Check if ListPath is set to a local or UNC path for whitelist
                 if (-not [string]::IsNullOrWhiteSpace($listPath) -and 
-                    $listPath -ne "GPO" -and 
                     $listPath -ne "AzureBlob" -and
                     ($listPath -match '^[a-zA-Z]:\\' -or $listPath -match '^\\\\')) {
                     
@@ -4137,7 +4185,6 @@ function Show-WAUSettingsGUI {
             } else {
                 # Check if ListPath is set to a local or UNC path for excluded list
                 if (-not [string]::IsNullOrWhiteSpace($listPath) -and 
-                    $listPath -ne "GPO" -and 
                     $listPath -ne "AzureBlob" -and
                     ($listPath -match '^[a-zA-Z]:\\' -or $listPath -match '^\\\\')) {
                     

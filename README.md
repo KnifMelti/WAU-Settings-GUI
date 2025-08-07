@@ -2,7 +2,7 @@
 
 # WAU Settings GUI (for Winget-AutoUpdate)
 
-Provides a user-friendly portable standalone interface to modify every aspect of Winget-AutoUpdate (**WAU**) settings
+Provides a user-friendly portable standalone interface to modify every aspect of Winget-AutoUpdate (**WAU**)
 
 ### Dependencies
 This project depends on the following repository:
@@ -50,7 +50,7 @@ NB: Must be run as **Administrator** (exe and shortcuts have the flag set)
 ### Automatic Installation
 - Use **WinGet CLI** from **Command Prompt** to install the latest released **WinGet** version:
   ```bash
-  winget install KnifMelti.WAU-Settings-GUI #(--scope user if failing)
+  winget install KnifMelti.WAU-Settings-GUI #(--scope user, if failing)
   ```
 This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **WAU-Settings-GUI**) to:
    `%USERPROFILE%\AppData\Local\Microsoft\WinGet\Packages\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe`
@@ -86,7 +86,7 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
   - Disable the **WAU** updating alltogether via your `excluded_apps.txt`:<br>`KnifMelti.WAU-Settings-GUI`
 - Alternatively, you can use **WinGet CLI** from **Command Prompt** to rudimentary update to every new released **WinGet** version of **WAU Settings GUI**:
   ```bash
-  winget upgrade KnifMelti.WAU-Settings-GUI --scope user
+  winget upgrade KnifMelti.WAU-Settings-GUI #(--scope user, if failing)
   ```
 - The built-in updater is absolutely the preferred option, making a backup of your current installed version first and taking care of locked/open files
   - A repair is automatically performed if files are corrupted/missing when starting
