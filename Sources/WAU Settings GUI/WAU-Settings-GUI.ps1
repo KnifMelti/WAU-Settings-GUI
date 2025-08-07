@@ -2334,7 +2334,7 @@ function Get-ColoredStatusText {
 function Test-ValidPathCharacter {
     param([string]$text, [string]$currentTextBoxValue = "")
     
-    # Allow characters for paths and URLs: letters, digits, :, \, /, -, _, ., space, $, 'GPO', 'AzureBlob', and SAS URL characters (?, &, =, %)
+    # Allow characters for paths and URLs: letters, digits, :, \, /, -, _, ., space, $, 'AzureBlob', and SAS URL characters (?, &, =, %)
     $isValidChar = $text -match '^[a-zA-Z0-9:\\/_.\s\-\$?&=%]*$'
     
     if (-not $isValidChar) {
@@ -2395,8 +2395,8 @@ function Test-PathTextBox_TextChanged {
             return
         }
 
-        # Only allow "GPO" or "AzureBlob" as special values
-        if ($source.Text -eq "GPO" -or $source.Text -eq "AzureBlob") {
+        # Only allow "AzureBlob" as special values
+        if ($source.Text -eq "AzureBlob") {
             $source.ClearValue([System.Windows.Controls.TextBox]::BorderBrushProperty)
             $source.ToolTip = $source.Tag
             return
@@ -2411,7 +2411,7 @@ function Test-PathTextBox_TextChanged {
             )
         ) {
             $source.BorderBrush = [System.Windows.Media.Brushes]::Red
-            $source.ToolTip = "Only local paths, UNC paths, URLs, or the special values 'GPO' and 'AzureBlob' are allowed."
+            $source.ToolTip = "Only local paths, UNC paths, URLs, or the special value 'AzureBlob' is allowed."
             return
         }
 
@@ -2475,8 +2475,8 @@ function Test-PathValue {
         return $true  # Empty paths are allowed
     }
 
-    # Allow special values "GPO" and "AzureBlob"
-    if ($path -eq "GPO" -or $path -eq "AzureBlob") {
+    # Allow special value "AzureBlob"
+    if ($path -eq "AzureBlob") {
         return $true
     }
 
@@ -2719,7 +2719,7 @@ function Update-WAUGUIFromConfig {
         # GPO registry key doesn't exist or can't be read
     }
 
-    $wauGPOListPathEnabled = ($updatedPolicies.WAU_ListPath -eq "GPO")
+    #$wauGPOListPathEnabled = ($updatedPolicies.WAU_ListPath -eq "GPO")
     $gpoControlsActive = ($null -ne $updatedPolicies)
 
     # Update Notification Level
