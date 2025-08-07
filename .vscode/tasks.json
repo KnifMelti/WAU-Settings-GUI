@@ -1,0 +1,27 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Compile and Sign WAU Settings GUI",
+            "type": "shell",
+            "command": "powershell.exe",
+            "args": [
+                "-ExecutionPolicy", "Bypass",
+                "-File", "${fileDirname}\\compile_and_sign.ps1",
+                "-InputFile", "${file}"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true
+            },
+            "options": {
+                "cwd": "${fileDirname}"
+            }
+        }
+    ]
+}
