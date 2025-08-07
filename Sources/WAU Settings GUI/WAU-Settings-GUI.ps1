@@ -2907,21 +2907,32 @@ function Update-WAUGUIFromConfig {
     $Controls.InstallLocationText.Text = $updatedConfig.InstallLocation
     $Controls.InstallLocationLink.NavigateUri = $updatedConfig.InstallLocation
     
-    if ($wauGPOListPathEnabled -and ($null -ne $updatedPolicies)) {
+    # Check if GPO is managing the list
+    $wauGPOListPathEnabled = Get-WAUPoliciesStatus
+    
+    if ($wauGPOListPathEnabled) {
         $Controls.LocalListText.Inlines.Clear()
-        $Controls.LocalListText.Inlines.Add("Current Local List: ")
-        if ($updatedPolicies.WAU_UseWhiteList -eq 1) {
+        $Controls.LocalListText.Inlines.Add("GPO Managed List: ")
+        
+        # Check if it's whitelist mode - ONLY based on WAU_UseWhiteList setting
+        $isWhitelistMode = $false
+        
+        # Only check WAU_UseWhiteList policy setting, ignore existence of entries
+        if ($updatedPolicies -and $updatedPolicies.WAU_UseWhiteList -eq 1) {
+            $isWhitelistMode = $true
+        }
+        
+        if ($isWhitelistMode) {
             $run = New-Object System.Windows.Documents.Run("'GPO (Included Apps)'")
         } else {
             $run = New-Object System.Windows.Documents.Run("'GPO (Excluded Apps)'")
-        }   
+        }
         $run.Foreground = $Script:COLOR_ENABLED
         $Controls.LocalListText.Inlines.Add($run)
-    }    
-    else {
+    } else {
         try {
             $installdir = $updatedConfig.InstallLocation
-            if ($updatedConfig.WAU_UseWhiteList -eq 1 -or ($updatedPolicies.WAU_UseWhiteList -eq 1 -and ($null -ne $updatedPolicies))) {
+            if ($updatedConfig.WAU_UseWhiteList -eq 1) {
                 $whiteListFile = Join-Path $installdir 'included_apps.txt'
                 if (Test-Path $whiteListFile) {
                     $Controls.LocalListText.Inlines.Clear()
@@ -2969,10 +2980,10 @@ function Update-WAUGUIFromConfig {
         }
     }
 
-    # Update WAU AutoUpdate status
+    # Update WAU AutoUpdate status using Get-WAUPoliciesStatus
     $wauAutoUpdateDisabled = [bool](Get-DisplayValue -PropertyName "WAU_DisableAutoUpdate" -Config $updatedConfig -Policies $updatedPolicies)
     $wauPreReleaseEnabled = [bool](Get-DisplayValue -PropertyName "WAU_UpdatePrerelease" -Config $updatedConfig -Policies $updatedPolicies)
-    $gpoManagementEnabled = ($null -ne $updatedPolicies)
+    $gpoManagementEnabled = Get-WAUPoliciesStatus  # Use the new function instead of ($null -ne $updatedPolicies)
 
     # Compose colored status text using Inlines (for TextBlock with Inlines)
     $statusText = @(
@@ -4149,7 +4160,6 @@ function Show-WAUSettingsGUI {
             if ($updatedConfig.WAU_UseWhiteList -eq 1 -or $updatedPolicies.WAU_UseWhiteList -eq 1) {
                 # Check if ListPath is set to a local or UNC path for whitelist
                 if (-not [string]::IsNullOrWhiteSpace($listPath) -and 
-                    $listPath -ne "GPO" -and 
                     $listPath -ne "AzureBlob" -and
                     ($listPath -match '^[a-zA-Z]:\\' -or $listPath -match '^\\\\')) {
                     
@@ -4176,7 +4186,6 @@ function Show-WAUSettingsGUI {
             } else {
                 # Check if ListPath is set to a local or UNC path for excluded list
                 if (-not [string]::IsNullOrWhiteSpace($listPath) -and 
-                    $listPath -ne "GPO" -and 
                     $listPath -ne "AzureBlob" -and
                     ($listPath -match '^[a-zA-Z]:\\' -or $listPath -match '^\\\\')) {
                     
