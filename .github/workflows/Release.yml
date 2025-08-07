@@ -16,7 +16,7 @@ jobs:
     - name: Create zip from subdirectory
       run: |
         cd "Sources/WAU Settings GUI"
-        zip -r "../../WAU-Settings-GUI-${{ github.event.release.tag_name }}.zip" .
+        zip -r "../../WAU-Settings-GUI-${{ github.event.release.tag_name }}.zip" . -x "compile_and_sign.ps1" "sign_exe.ps1"
         
     - name: Upload Release Asset
       uses: actions/upload-release-asset@v1
@@ -27,3 +27,4 @@ jobs:
         asset_path: ./WAU-Settings-GUI-${{ github.event.release.tag_name }}.zip
         asset_name: WAU-Settings-GUI-${{ github.event.release.tag_name }}.zip
         asset_content_type: application/zip
+        
