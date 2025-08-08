@@ -4463,31 +4463,65 @@ function Show-WAUSettingsGUI {
 
     $controls.DevVerButton.Add_Click({
         try {
-            # Check for existing backups first
+            # Ensure popup is closed first
+            if ($Script:PopUpWindow) {
+                Close-PopUp
+            }
+
+            # Check for existing backups with extra null-checks
             $backupDir = Join-Path $Script:WorkingDir "ver\backup"
             $hasBackups = $false
             $backupFiles = @()
             
             if (Test-Path $backupDir) {
-                $backupFiles = Get-ChildItem -Path $backupDir -Filter "*.zip" | Sort-Object CreationTime -Descending
-                $hasBackups = $backupFiles.Count -gt 0
+                try {
+                    $backupFiles = @(Get-ChildItem -Path $backupDir -Filter "*.zip" -ErrorAction Stop | Sort-Object CreationTime -Descending)
+                    $hasBackups = ($null -ne $backupFiles -and $backupFiles.Count -gt 0)
+                }
+                catch {
+                    Write-Host "Warning: Could not read backup files: $($_.Exception.Message)" -ForegroundColor Yellow
+                    $backupFiles = @()
+                    $hasBackups = $false
+                }
             }
             
             if ($hasBackups) {
-                # Show dialog with update/restore options
-                $backupList = ($backupFiles | Select-Object -First 5 | ForEach-Object { 
-                    "- $($_.Name) ($(Get-Date $_.CreationTime -Format 'yyyy-MM-dd HH:mm'))"
-                }) -join "`n"
+                # Extra null-checks for backup list
+                $backupList = ""
+                try {
+                    $validBackups = $backupFiles | Where-Object { $null -ne $_ -and $null -ne $_.Name } | Select-Object -First 5
+                    if ($validBackups) {
+                        $backupList = ($validBackups | ForEach-Object { 
+                            $name = if ($_.Name) { $_.Name } else { "Unknown" }
+                            $time = if ($_.CreationTime) { Get-Date $_.CreationTime -Format 'yyyy-MM-dd HH:mm' } else { "Unknown" }
+                            "- $name ($time)"
+                        }) -join "`n"
+                    }
+                }
+                catch {
+                    $backupList = "Error reading backup information"
+                }
                 
-                $message = "Available backup versions:`n$backupList`n`nWhat would you like to do?`n`nChoose Yes to update, No to restore, or Cancel to exit."
+                # Ensure message is not null
+                $message = if ([string]::IsNullOrEmpty($backupList)) {
+                    "Backup files found but could not read details.`n`nWhat would you like to do?`n`nChoose Yes to update, No to restore, or Cancel to exit."
+                } else {
+                    "Available backup versions:`n$backupList`n`nWhat would you like to do?`n`nChoose Yes to update, No to restore, or Cancel to exit."
+                }
+                
+                # Extra null-check before MessageBox.Show
+                if ([string]::IsNullOrEmpty($message)) {
+                    throw "Message is null or empty"
+                }
+                
                 $result = [System.Windows.MessageBox]::Show(
                     $message,
                     "Update or Restore?",
-                    "YesNoCancel",
-                    "Question",
-                    "Yes"
+                    [System.Windows.MessageBoxButton]::YesNoCancel,
+                    [System.Windows.MessageBoxImage]::Question,
+                    [System.Windows.MessageBoxResult]::Yes
                 )
-                                
+                
                 switch ($result) {
                     'Yes' {
                         # Continue with update check
@@ -4560,12 +4594,12 @@ function Show-WAUSettingsGUI {
                             $confirmRestore = [System.Windows.MessageBox]::Show(
                                 "Are you sure you want to restore from:`n$($selectedBackup.Name)`n`nThis will replace all current files and restart the application.",
                                 "Confirm Restore",
-                                "YesNo",
+                                "OkCancel",
                                 "Warning",
-                                "No"
+                                "Cancel"
                             )
                             
-                            if ($confirmRestore -eq 'Yes') {
+                            if ($confirmRestore -eq 'Ok') {
                                 Start-RestoreFromBackup -backupPath $selectedBackup.FullName -controls $controls -window $window
                             }
                         }
@@ -4573,7 +4607,6 @@ function Show-WAUSettingsGUI {
                         $restoreDialog.Dispose()
                     }
                     'Cancel' {
-                        # Do nothing
                         return
                     }
                 }
@@ -4603,6 +4636,8 @@ function Show-WAUSettingsGUI {
         }
         catch {
             Close-PopUp
+            Write-Host "DevVerButton error: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "Stack trace: $($_.ScriptStackTrace)" -ForegroundColor Red
             [System.Windows.MessageBox]::Show("Failed to check for updates: $($_.Exception.Message)", "Error", "OK", "Error")
         }
     })
