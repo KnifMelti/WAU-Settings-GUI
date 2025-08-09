@@ -47,7 +47,7 @@ Benefits from not having to manage the settings in several places when testing e
 
 #### Nota bene
 - Must be executed as **Administrator** (**EXE** and shortcuts have the flag set)
-- **EXE** signed with **[KnifMelti Certificate](#-knifmelti-certificate)**
+- **EXE** is signed with **[KnifMelti Certificate](#-knifmelti-certificate)**
 
 ### Manual installation
 - Download, unblock and extract the latest release: [WAU-Settings-GUI-vX.X.X.X.zip](https://github.com/KnifMelti/WAU-Settings-GUI/releases/latest)
