@@ -52,7 +52,7 @@ Benefits from not having to manage the settings in several places when testing e
 ### Manual installation
 - Download, unblock and extract the latest release: [WAU-Settings-GUI-vX.X.X.X.zip](https://github.com/KnifMelti/WAU-Settings-GUI/releases/latest)
 - Run **[WAU-Settings-GUI.exe](#manual-installation-portableinstaller)** (Portable/Installer):
-  - Detects if running from **USB** drive, etc.
+  - Detects if running from **USB** drive (then executes as **Portable**)
   - Select a base directory for the `[INSTALLDIR]` or run directly in portable mode
 
 ### Automatic installation
