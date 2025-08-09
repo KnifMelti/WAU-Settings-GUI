@@ -35,8 +35,8 @@ Benefits from not having to manage the settings in several places when testing e
   - `[reg]` Open **WAU settings path** in registry
   - `[uid]` **GUID** path exploration (regarding **WAU MSI** installation)
   - `[sys]` Open **WinGet** system wide installed application list (if previously saved by **WAU**)
-  - `[lst]` Open the current **local list**
-  - `[usr]` Change colors/update schedule for **WAU Settings GUI**
+  - `[lst]` Open the **current local list**
+  - `[usr]` **Change colors/update schedule** for **WAU Settings GUI**
   - `[msi]` **MSI** transform creation (using current showing configuration)
   - `[cfg]` **Configuration** backup/import (i.e. for sharing settings)
   - `[wau]` Reinstall **WAU** (with current showing configuration)
@@ -49,6 +49,13 @@ Benefits from not having to manage the settings in several places when testing e
 - Must be run as **Administrator** (**EXE** and shortcuts have the flag set)
 - **EXE** signed with **[KnifMelti Certificate](#-knifmelti-certificate)**
 
+### Manual Installation
+- Download, unblock and extract the latest release: [WAU-Settings-GUI-vX.X.X.X.zip](https://github.com/KnifMelti/WAU-Settings-GUI/releases/latest)
+- **Standalone** Portable/Installer (i.e. no need to install)
+- Detects if running from **USB** drive, etc.
+- Run **[WAU-Settings-GUI.exe](#wau-settings-gui-portableinstaller)**:
+  - Select a base directory for the `[INSTALLDIR]` or run directly in portable mode
+
 ### Automatic Installation
 - Use **WinGet CLI** from **Command Prompt** to install the latest released **WinGet** version:
   ```bash
@@ -56,13 +63,6 @@ Benefits from not having to manage the settings in several places when testing e
   ```
 This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **WAU-Settings-GUI**) to:
    `%USERPROFILE%\AppData\Local\Microsoft\WinGet\Packages\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe`
-
-### Manual Installation
-- Download, unblock and extract the latest release: [WAU-Settings-GUI-vX.X.X.X.zip](https://github.com/KnifMelti/WAU-Settings-GUI/releases/latest)
-- **Standalone** Portable/Installer (i.e. no need to install)
-- Detects if running from **USB** drive, etc.
-- Run **[WAU-Settings-GUI.exe](#-knifmelti-certificate)**:
-  - Select a base directory for the `[INSTALLDIR]` or run directly in portable mode
 
 ### Running
 - After installation, **WAU Settings GUI** starts (if installed by **WinGet** you must start it via an ordinary **Command Prompt** using the `PortableCommandAlias`: **WAU-Settings-GUI**)
