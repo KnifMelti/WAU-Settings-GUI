@@ -45,7 +45,9 @@ Benefits from not having to manage the settings in several places when testing e
     - If manual check and `ver\backup` exists a restore option is also presented
   - `[src]` Direct access to **WAU Settings GUI** `[INSTALLDIR]` 
 
-NB: Must be run as **Administrator** (exe and shortcuts have the flag set)
+#### NB:
+- Must be run as **Administrator** (exe and shortcuts have the flag set
+- **EXE** signed with **[KnifMelti Certificate](#-knifmelti-certificate)**
 
 ### Automatic Installation
 - Use **WinGet CLI** from **Command Prompt** to install the latest released **WinGet** version:
@@ -105,17 +107,16 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
   - Stores source in `%ProgramData%\Package Cache\[GUID][LONGVERSION]` (enables **WAU** `Repair` in **Programs and Features**)
 
 ### Screenshots
-Managed by Registry (local):  
+#### Managed by Registry (local):  
 ![image](Sources/assets/Screenshot_Local.png)
-
-Dev Tools (F12):  
+#### Dev Tools (F12):  
 ![image](Sources/assets/Screenshot_F12.png)
-
-Managed by GPO (central/local):  
+#### Managed by GPO (central/local):  
 ![image](Sources/assets/Screenshot_GPO.png)
-
-Uninstall:  
+#### Uninstall:  
 ![image](Sources/assets/Screenshot_Uninstall.png)
+#### 🔒 KnifMelti Certificate:  
+![image](Sources/assets/KnifMelti_Certificate.png)
 
 ---
 
