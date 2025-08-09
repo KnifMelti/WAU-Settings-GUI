@@ -1,127 +1,58 @@
-# Copilot Instructions for WAU Settings GUI
+## Copilot instructions for WAU Settings GUI
 
-## Project Overview
-**WAU Settings GUI** is a portable Windows application that provides a user-friendly interface for configuring [Winget-AutoUpdate (WAU)](https://github.com/Romanitho/Winget-AutoUpdate). It's built using **PowerShell 5.1** with **WPF (XAML)** UI and **AutoHotkey v2** for the executable wrapper.
+Purpose: Help AI agents ship correct changes fast in this PowerShell + WPF + AutoHotkey repo by following our concrete patterns and workflows only.
 
-## Architecture Components
+What this is
+- Portable Windows app to configure Winget-AutoUpdate (WAU). Core is PowerShell 5.1 with WPF XAML; an AutoHotkey v2 wrapper compiles to an elevated EXE.
+- Key files: `Sources/WAU Settings GUI/WAU-Settings-GUI.ps1` (main), `.../WAU-Settings-GUI.ahk` (wrapper), `.../config/*.xaml` (UI), `.../modules/config.psm1` (globals), `.../config_user.psm1` (overrides).
 
-### Core Structure
-- **`WAU-Settings-GUI.ps1`** (4800+ lines) - Main PowerShell script with all business logic
-- **`WAU-Settings-GUI.ahk`** - AutoHotkey v2 wrapper that compiles to `.exe` and launches PowerShell
-- **`config/settings-window.xaml`** - WPF window definition with all UI controls
-- **`config/settings-popup.xaml`** - WPF popup window for status messages and operations
-- **`modules/config.psm1`** - Global configuration constants (registry paths, colors, etc.)
-- **`config_user.psm1`** - User-customizable settings (colors, update schedule)
+Must-know integration points
+- Registry: settings `HKLM:\SOFTWARE\Romanitho\Winget-AutoUpdate`, policies `HKLM:\SOFTWARE\Policies\Romanitho\Winget-AutoUpdate` (see `modules/config.psm1`). Always read with policy precedence via `Get-DisplayValue`.
+- WAU repo and updates: `$Script:WAU_GUI_REPO = "KnifMelti/WAU-Settings-GUI"`. GitHub API calls drive update/repair and backups in `ver\...`.
+- Modes: GPO-managed disables all but shortcut settings; portable mode via `-Portable` avoids desktop/start menu artifacts.
 
-### Key Integration Points
-
-#### Registry Management
-- **WAU Settings:** `HKLM:\SOFTWARE\Romanitho\Winget-AutoUpdate`
-- **GPO Policies:** `HKLM:\SOFTWARE\Policies\Romanitho\Winget-AutoUpdate`
-- Configuration changes are written directly to registry and trigger WAU scheduled task updates
-
-#### Dual-Mode Operation
-1. **Normal Mode:** Full configuration access
-2. **GPO Mode:** Only shortcut settings modifiable when Group Policy is active
-   - Detected via `$Script:WAU_POLICIES_PATH` registry existence
-   - UI automatically disables non-shortcut controls
-
-#### Portable vs Installed Modes
-- **Portable:** `-Portable` parameter, no desktop shortcuts created
-- **Installed:** Creates desktop shortcut, manages Start Menu shortcuts
-- Detection: USB/CD drive type or WinGet package path patterns
-
-## Critical Development Patterns
-
-### Code Standards
+Code Standards
 - **All code comments must be in English** - Ensure consistency across the codebase
 - **All chat messages must be in Swedish, but code snippets must be in English**
 - Use descriptive variable names and clear function documentation
 - Follow PowerShell best practices for error handling and parameter validation
 
-### Configuration Management
-```powershell
-# Always use Get-DisplayValue for configuration reads - handles GPO precedence
-$value = Get-DisplayValue -PropertyName "WAU_ListPath" -Config $config -Policies $policies
+Core patterns to follow (with examples)
+- Read config with precedence and write atomically:
+   ```powershell
+   $val = Get-DisplayValue -PropertyName "WAU_ListPath" -Config $updatedConfig -Policies $updatedPolicies
+   Set-WAUConfig -Settings @{ WAU_StartMenuShortcut = 1 }
+   ```
+- Validate inputs and keep UI responsive:
+   ```powershell
+   if (-not (Test-PathValue -path $controls.ListPathTextBox.Text)) { return }
+   $window.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Background,[Action]{ $controls.StatusBarText.Text = "Saving..." })
+   Start-PopUp "Saving WAU Settings..."; Close-PopUp
+   ```
+- Respect GPO mode and bulk toggle controls:
+   ```powershell
+   Set-ControlsState -parentControl $window -enabled:$false -excludePattern "*Shortcut*"
+   ```
 
-# Configuration saves use Set-WAUConfig function
-$settings = @{ WAU_StartMenuShortcut = 1 }
-Set-WAUConfig -Settings $settings
-```
+Build, run, sign
+- Editing/debug: run the script directly as admin from `Sources/WAU Settings GUI`:
+   ```powershell
+   .\WAU-Settings-GUI.ps1 -Verbose
+   .\WAU-Settings-GUI.ps1 -Portable
+   ```
+- Compile EXE: open `WAU-Settings-GUI.ahk` and run the VS Code task “Compile and Sign WAU Settings GUI” (uses `compile_and_sign.ps1`). Requires AutoHotkey v2 compiler and signtool (Windows 10 SDK). The AHK sets ProductVersion; PowerShell reads version from the compiled EXE at runtime.
+- Signing: `sign_exe.ps1` signs with the KnifMelti certificate thumbprint; update signtool path if SDK version differs.
 
-### UI State Management
-- **Status Updates:** Use `$controls.StatusBarText` for user feedback
-- **Popup Management:** `Start-PopUp "message"` / `Close-PopUp` for operations
-- **Control States:** `Set-ControlsState` for bulk enable/disable
-- **Color Coding:** `$Script:COLOR_ENABLED`, `COLOR_DISABLED`, `COLOR_ACTIVE`, `COLOR_INACTIVE`
+UI and assets
+- XAML files in `config/` define layout; attributes reference `$Script:*` variables (colors, title, icon). Keep colors in `modules/config.psm1` or `config_user.psm1`.
+- Dev Tools (F12/click logo) are wired to open registry paths, Task Scheduler, MSI transform, lists, logs, and self-update; replicate the `[tag]` button pattern from `settings-window.xaml` if adding tools.
 
-### Dev Tools Integration (F12)
-Buttons format: `[xxx]` for registry/tool access
-- `[gpo]` - GPO registry path
-- `[reg]` - WAU settings registry
-- `[uid]` - GUID-based paths (MSI installs)
-- `[msi]` - MSI transform creation
-- `[cfg]` - Configuration backup/import
+Gotchas that break things
+- File locking during self-update: when relaunching EXE from PowerShell, pass "/FROMPS" to the AHK wrapper to avoid recursion/locks (see `Start-Process ... -ArgumentList "/FROMPS"`).
+- Shortcut/registry drift: after changing install/list paths, sync Start Menu/Desktop/App Installer shortcuts to match registry flags.
+- Paths: support local, UNC, HTTP/HTTPS, and special values like `AzureBlob`; always `Test-PathValue` before saving.
 
-## Build & Deployment
+References in repo
+- Examples of all patterns live in `WAU-Settings-GUI.ps1`: `Get-DisplayValue`, `Set-WAUConfig`, `Start-PopUp`/`Close-PopUp`, `Set-ControlsState`, `Dispatcher.BeginInvoke`.
 
-### AutoHotkey Compilation
-```ahk2
-;@Ahk2Exe-Set FileVersion, 1.8.2.6
-;@Ahk2Exe-SetMainIcon ..\assets\WAU Settings GUI.ico
-;@Ahk2Exe-UpdateManifest 1  ; Enables "Run as Administrator"
-```
-
-### Version Management
-- Version defined in AHK header AND PowerShell script
-- Auto-update checks GitHub releases weekly via `$Script:WAU_GUI_REPO`
-- Backup mechanism: `ver\backup` folder for rollbacks
-
-### Deployment Patterns
-- **GitHub Releases:** ZIP with portable files
-- **WinGet Package:** Installs to user scope with `PortableCommandAlias`
-- **MSI Transforms:** Generated for enterprise deployment via Dev Tools
-
-## Testing & Debugging
-
-### Key Test Scenarios
-1. **WAU Installation States:** Not installed, installed via MSI, portable
-2. **GPO vs Local Config:** Registry precedence handling
-3. **Shortcut Management:** Start Menu, Desktop, App Installer combinations
-4. **Path Validation:** ListPath, ModsPath - local/UNC/special values (GPO, AzureBlob)
-
-### Debug Commands
-```powershell
-# Run with verbose output
-.\WAU-Settings-GUI.ps1 -Verbose
-
-# Portable mode testing
-.\WAU-Settings-GUI.ps1 -Portable
-
-# Check registry state
-Get-ItemProperty -Path "HKLM:\SOFTWARE\Romanitho\Winget-AutoUpdate"
-```
-
-## Common Gotchas
-
-### File Locking
-- AHK wrapper may lock PowerShell script during updates
-- Use `Get-Process` checks before file operations
-- `FromPS` parameter prevents infinite loops during updates
-
-### Registry Synchronization
-- Always sync actual shortcut existence with registry values
-- GPO policies override local settings except shortcuts
-- Schedule task updates required when interval settings change
-
-### Path Handling
-- Support local paths (`C:\folder`), UNC (`\\server\share`), HTTP/HTTPS URLs (`https://example.com`), and special values (`GPO`, `AzureBlob`)
-- Validate paths before saving using `Test-PathValue`
-- Install location changes require shortcut recreation
-
-### UI Threading
-- Use `Dispatcher.BeginInvoke` for async status updates
-- `$Script:WAIT_TIME` (1000ms) for consistent UI timing
-- Popup management prevents UI blocking during operations
-
-When making changes, always test both GPO and non-GPO modes, verify shortcut creation/deletion, and ensure registry changes trigger appropriate WAU task updates.
+Questions or gaps? Tell us which step is unclear (build task, signing, GPO handling, or update flow) and we’ll clarify or add a snippet.
