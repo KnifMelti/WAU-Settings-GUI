@@ -49,14 +49,14 @@ Benefits from not having to manage the settings in several places when testing e
 - Must be run as **Administrator** (**EXE** and shortcuts have the flag set)
 - **EXE** signed with **[KnifMelti Certificate](#-knifmelti-certificate)**
 
-### Manual Installation
+### Manual installation
 - Download, unblock and extract the latest release: [WAU-Settings-GUI-vX.X.X.X.zip](https://github.com/KnifMelti/WAU-Settings-GUI/releases/latest)
 - **Standalone** Portable/Installer (i.e. no need to install)
 - Detects if running from **USB** drive, etc.
-- Run **[WAU-Settings-GUI.exe](#wau-settings-gui-portableinstaller)**:
+- Run **[WAU-Settings-GUI.exe](#installation-portableinstaller)**:
   - Select a base directory for the `[INSTALLDIR]` or run directly in portable mode
 
-### Automatic Installation
+### Automatic installation
 - Use **WinGet CLI** from **Command Prompt** to install the latest released **WinGet** version:
   ```bash
   winget install KnifMelti.WAU-Settings-GUI #(--scope user, if failing)
@@ -108,7 +108,7 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
 ### Screenshots
 #### 🔒 KnifMelti Certificate
 ![image](Sources/assets/KnifMelti_Certificate.png)
-#### WAU-Settings-GUI (Portable/Installer)
+#### Manual installation (Portable/Installer)
 ![image](Sources/assets//WAU-Settings-GUI.png)
 #### Managed by Registry (local)
 ![image](Sources/assets/Screenshot_Local.png)
@@ -116,7 +116,7 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
 ![image](Sources/assets/Screenshot_F12.png)
 #### Managed by GPO (central/local)
 ![image](Sources/assets/Screenshot_GPO.png)
-#### Uninstall
+#### Uninstallation
 ![image](Sources/assets/Screenshot_Uninstall.png)
 
 ---
