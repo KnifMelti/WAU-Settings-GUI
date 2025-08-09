@@ -46,7 +46,7 @@ Benefits from not having to manage the settings in several places when testing e
   - `[src]` Direct access to **WAU Settings GUI** `[INSTALLDIR]` 
 
 #### NB:
-- Must be run as **Administrator** (exe and shortcuts have the flag set
+- Must be run as **Administrator** (exe and shortcuts have the flag set)
 - **EXE** signed with **[KnifMelti Certificate](#-knifmelti-certificate)**
 
 ### Automatic Installation
