@@ -92,7 +92,7 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
   - A repair is automatically performed if files are corrupted/missing when starting
 
 ### Uninstallation
-- Use **Programs and Features** in **Control Panel** to uninstall **[KnifMelti WAU Settings GUI](#uninstallation-1)**
+- Use **[Programs and Features](#uninstallation-1)** in **Control Panel** to uninstall **KnifMelti WAU Settings GUI**
 - Uninstall can be done from `CMD` too (`/UNINSTALL` or silent `/UNINSTALL /S` parameter) using `UnInst.exe` in the **WAU Settings GUI** `[INSTALLDIR]`:
   ```bash
   #e.g.:
