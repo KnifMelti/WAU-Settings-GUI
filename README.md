@@ -8,7 +8,7 @@ Provides a user-friendly portable standalone interface to modify every aspect of
 This project depends on the following repository:
 - [Winget-AutoUpdate](https://github.com/Romanitho/Winget-AutoUpdate): has all the settings this project can handle/modify/save/restore/share and document
 
-If **WAU** is not installed, the **GUI** prompts at startup to download and install it with standard settings.
+If **WAU** is not installed, it will prompt to download and install with standard settings.
 
 ---
 
@@ -28,21 +28,21 @@ Benefits from not having to manage the settings in several places when testing e
 - Starting **WAU** manually
 - **Screenshot** with masking functionality for documentation (**F11**)
 - **GPO** management integration
-- Status information display showing version details, last run times, and current configuration state
+- **Status** information display showing version details, last run times, and current configuration state
 - **Dev Tools** for advanced troubleshooting (**F12**/**click on logo**, **double-click** for **WAU Settings GUI** on **GitHub**):
-  - `[gpo]` Open **WAU** policies path in registry (if **GPO Managed**)
-  - `[tsk]` Task scheduler access (look in **WAU** folder)
-  - `[reg]` Open **WAU** settings path in registry
-  - `[uid]` **GUID** path exploration (**MSI** installation)
+  - `[gpo]` Open **WAU policies path** in registry (if **GPO Managed**)
+  - `[tsk]` **Task scheduler** access (look in **WAU** subfolder)
+  - `[reg]` Open **WAU settings path** in registry
+  - `[uid]` **GUID** path exploration (regarding **WAU MSI** installation)
   - `[sys]` Open **WinGet** system wide installed application list (if previously saved by **WAU**)
-  - `[lst]` Open the current local list
+  - `[lst]` Open the current **local list**
   - `[usr]` Change colors/update schedule for **WAU Settings GUI**
   - `[msi]` **MSI** transform creation (using current showing configuration)
   - `[cfg]` **Configuration** backup/import (i.e. for sharing settings)
   - `[wau]` Reinstall **WAU** (with current showing configuration)
     - Stores source in `[INSTALLDIR]\msi\[VERSION]` (enables **WAU** `Repair` in **Programs and Features**)
-  - `[ver]` Manual check for **WAU Settings GUI** updates (checks automatically every week as standard)
-    - If manual check and `ver\backup` exists a restore option is also presented
+  - `[ver]` Manual check for **WAU Settings GUI updates** (checks automatically every week as standard)
+    - If manual check and `ver\backup` exists a **restore** option is also presented
   - `[src]` Direct access to **WAU Settings GUI** `[INSTALLDIR]` 
 
 #### Nota bene
@@ -61,8 +61,7 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
 - Download, unblock and extract the latest release: [WAU-Settings-GUI-vX.X.X.X.zip](https://github.com/KnifMelti/WAU-Settings-GUI/releases/latest)
 - **Standalone** Portable/Installer (i.e. no need to install)
 - Detects if running from **USB** drive, etc.
-- Run `WAU-Settings-GUI.exe`:
-  - <img src="Sources/assets//WAU-Settings-GUI.png" alt="Portable/Installer">
+- Run **[WAU-Settings-GUI.exe](#-knifmelti-certificate)**:
   - Select a base directory for the `[INSTALLDIR]` or run directly in portable mode
 
 ### Running
@@ -107,6 +106,10 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
   - Stores source in `%ProgramData%\Package Cache\[GUID][LONGVERSION]` (enables **WAU** `Repair` in **Programs and Features**)
 
 ### Screenshots
+#### 🔒 KnifMelti Certificate
+![image](Sources/assets/KnifMelti_Certificate.png)
+#### WAU-Settings-GUI (Portable/Installer)
+![image](Sources/assets//WAU-Settings-GUI.png)
 #### Managed by Registry (local)
 ![image](Sources/assets/Screenshot_Local.png)
 #### Dev Tools (F12)
@@ -115,8 +118,6 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
 ![image](Sources/assets/Screenshot_GPO.png)
 #### Uninstall
 ![image](Sources/assets/Screenshot_Uninstall.png)
-#### 🔒 KnifMelti Certificate
-![image](Sources/assets/KnifMelti_Certificate.png)
 
 ---
 
