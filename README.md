@@ -18,7 +18,7 @@ Benefits from not having to manage the settings in several places when testing e
 
 ...a perfect companion for those supporting the community (if the community actually uses it!) - being able to ask for a screenshot of the settings because it comes with all included (even a screenshot function masking potentially sensitive data)!
 
-#### Configure **WAU** settings after installation
+#### Configure **[WAU settings](#managed-by-gpo-centrallocal)** installation
 - Update intervals and timing
 - Notification levels
 - Set list and mods paths
@@ -30,7 +30,7 @@ Benefits from not having to manage the settings in several places when testing e
 - **GPO** management integration
 - **Status** information display showing version details, last run times, and current configuration state
 - **Dev Tools** for advanced troubleshooting (**[F12/click on logo](#dev-tools-f12)**, **double-click** for **WAU Settings GUI** on **GitHub**):
-  - `[gpo]` Open **WAU policies path** in registry (if **GPO Managed**)
+  - `[gpo]` Open **WAU policies path** in registry (if **[GPO Managed](#managed-by-gpo-centrallocal)**)
   - `[tsk]` **Task scheduler** access (look in **WAU** subfolder)
   - `[reg]` Open **WAU settings path** in registry
   - `[uid]` **GUID** path exploration (regarding **WAU MSI** installation)
