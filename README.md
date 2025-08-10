@@ -67,7 +67,7 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
 - After installation, **WAU Settings GUI** starts (if installed by **WinGet** you must start it via an ordinary **Command Prompt** using the `PortableCommandAlias`: **WAU-Settings-GUI**)
 - If **WAU** is not installed, it will prompt to download and install with standard settings
 - If a local list is not found, it will prompt to create a new one
-- In the **GUI** you now have **☐|☑ Start Menu shortcuts** / **☐|☑ WAU Desktop shortcut** / **☐|☑ App Installer shortcut** options showing the current installed **WAU** configuration
+- In the **[GUI](#managed-by-registry-local)** you now have **☐|☑ Start Menu shortcuts** / **☐|☑ WAU Desktop shortcut** / **☐|☑ App Installer shortcut** options showing the current installed **WAU** configuration
 - Configure every setting to your preferences and `Save Settings`
 - The **WAU Settings (Administrator)** shortcut has now been created under **Start Menu\Programs\Winget-AutoUpdate** folder (along with the other **WAU** shortcuts) or on your own **Desktop** (pin to taskbar when running maybe?) depending on your choice
 - If **WAU** is updated and some shortcut icons goes missing, you'll have to toggle the **☐|☑ Start Menu shortcuts** / **☐|☑ WAU Desktop shortcut** / **☐|☑ App Installer shortcut** options again (and save in between) to create new shortcuts so that they are updated to the new **WAU** version icon
