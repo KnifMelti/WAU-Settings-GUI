@@ -1599,6 +1599,15 @@ function Set-WAUConfig {
                     }
                     if (-not (Test-Path $updatesLogPath)) {
                         New-Item -Path $updatesLogPath -ItemType File -Force | Out-Null
+                        #Set ACL for users on logfile
+                        $NewAcl = Get-Acl -Path $updatesLogPath
+                        $identity = New-Object System.Security.Principal.SecurityIdentifier S-1-5-11
+                        $fileSystemRights = "Modify"
+                        $type = "Allow"
+                        $fileSystemAccessRuleArgumentList = $identity, $fileSystemRights, $type
+                        $fileSystemAccessRule = New-Object -TypeName System.Security.AccessControl.FileSystemAccessRule -ArgumentList $fileSystemAccessRuleArgumentList
+                        $NewAcl.SetAccessRule($fileSystemAccessRule)
+                        Set-Acl -Path $updatesLogPath -AclObject $NewAcl
                     }
                     Add-Shortcut "$Script:STARTMENU_WAU_DIR\Open log.lnk" $updatesLogPath "" "" "" "Open WAU log" "Normal"
                     Add-Shortcut "$Script:STARTMENU_WAU_DIR\Open Logs.lnk" $logsDir "" "" "" "Open WAU Logs Directory" "Normal"
