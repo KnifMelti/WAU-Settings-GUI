@@ -42,7 +42,7 @@ Benefits from not having to manage the settings in several places when testing e
   - `[wau]` Reinstall **WAU** (with current showing configuration)
     - Stores source in `[INSTALLDIR]\msi\[VERSION]` (enables **WAU** `Repair` in **Programs and Features**)
   - `[ver]` Manual check for **WAU Settings GUI updates** (checks automatically every week as standard)
-    - If manual check and `ver\backup` exists a **restore** option is also presented
+    - If manual check and `[INSTALLDIR]\ver\backup` exists a **restore** option is also presented
   - `[src]` Direct access to **WAU Settings GUI** `[INSTALLDIR]` 
 
 #### Nota bene
@@ -75,9 +75,9 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
 ### Updating
 - Checks automatically every week as standard (click the button `[usr]` under Dev Tools (**F12**) to change the update schedule)
 - Dev Tools (**F12**): Click the button `[ver]`
-    - If `ver\backup` exists a restore option is also presented
+    - If `[INSTALLDIR]\ver\backup` exists a restore option is also presented
 - If an update exists, **WAU Settings GUI** will ask if you want to download and install the new version
-- Before installing a backup of the current version will be created in `ver\backup` folder
+- Before installing a backup of the current version will be created in `[INSTALLDIR]\ver\backup` folder
 - **WAU** will also rudimentary update **WAU Settings GUI** in user scope with every new released **WinGet** version
   - To avoid failed updates you can:
     - Create a `KnifMelti.WAU-Settings-GUI-preinstall.ps1` script in the **WAU** `mods` folder to shut down **WAU Settings GUI** before updating (open files) or not run it when updating:
