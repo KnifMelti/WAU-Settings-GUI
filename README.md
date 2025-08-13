@@ -109,6 +109,7 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
 #### 🔒 KnifMelti Certificate
 ![image](Sources/assets/KnifMelti_Certificate.png)
 #### Manual installation (Portable/Installer)
+![image](Sources/assets/GUI.exe.png)<br>
 ![image](Sources/assets//WAU-Settings-GUI.png)
 #### Managed by Registry (local)
 ![image](Sources/assets/Screenshot_Local.png)
