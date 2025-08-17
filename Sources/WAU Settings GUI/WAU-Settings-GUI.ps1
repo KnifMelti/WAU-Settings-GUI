@@ -2430,7 +2430,7 @@ function Start-WAUTaskMonitoring {
                     $controls.StatusBarText.Text = "All done..."
                     $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED
                 } else {
-                    $controls.StatusBarText.Text = "Done with warnings..."
+                    $controls.StatusBarText.Text = "Done with warnings..." # In WSB it returns 267011!
                     $controls.StatusBarText.Foreground = $Script:COLOR_ACTIVE
                 }
                 
