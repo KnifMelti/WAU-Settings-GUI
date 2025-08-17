@@ -2369,19 +2369,8 @@ function Start-WAUTaskMonitoring {
     
     # Close popup immediately and update status
     Close-PopUp
-    $controls.StatusBarText.Text = "Starting..."
+    $controls.StatusBarText.Text = "WAU starting..."
     $controls.StatusBarText.Foreground = $Script:COLOR_ACTIVE
-    
-    # Check if user context is enabled
-    $currentConfig = Get-WAUCurrentConfig
-    $policies = $null
-    if (Get-WAUPoliciesStatus) {
-        try {
-            $policies = Get-ItemProperty -Path $Script:WAU_POLICIES_PATH -ErrorAction SilentlyContinue
-        } catch { }
-    }
-    $script:userContextEnabled = [bool](Get-DisplayValue -PropertyName "WAU_UserContext" -Config $currentConfig -Policies $policies)
-    $script:mainTaskCompleted = $false
     
     # Store timer in script scope for cleanup
     $Script:WAUTaskTimer = New-Object System.Windows.Threading.DispatcherTimer
@@ -2393,99 +2382,83 @@ function Start-WAUTaskMonitoring {
         try {
             $Script:taskCheckCount++
             
-            # Check main WAU task
             $mainTaskRunning = $false
-            $mainTaskState = $null
+            $userTaskRunning = $false
             
             try {
                 $mainTask = Get-ScheduledTask -TaskName 'Winget-AutoUpdate' -ErrorAction Stop
                 $mainTaskRunning = ($mainTask.State -eq 'Running')
-                
-                if (-not $mainTaskRunning) {
-                    $mainTaskInfo = $mainTask | Get-ScheduledTaskInfo -ErrorAction Stop
-                    $mainTaskState = $mainTaskInfo.LastTaskResult
-                    $script:mainTaskCompleted = $true
-                }
             } catch {
-                Stop-WAUTaskMonitoring -controls $controls
-                return
+                $mainTaskRunning = $false
             }
             
-            # If main task is still running, show status and continue
-            if ($mainTaskRunning) {
-                if ($Script:taskCheckCount % 2 -eq 0) {
-                    $dots = "." * ((($Script:taskCheckCount / 2) % 4) + 1)
-                    $controls.StatusBarText.Text = "Running (system)$dots"
-                }
-                return
-            }
-            
-            # Main task completed - check if we need to wait for user context task
-            if ($script:userContextEnabled -and $script:mainTaskCompleted) {
-                
-                # Check user context task
+            try {
+                $userTask = Get-ScheduledTask -TaskName 'Winget-AutoUpdate-UserContext' -ErrorAction Stop
+                $userTaskRunning = ($userTask.State -eq 'Running')
+            } catch {
                 $userTaskRunning = $false
+            }
+            
+            # WAU is running if EITHER task is running
+            $isWAURunning = $mainTaskRunning -or $userTaskRunning
+            
+            # If WAU completed, stop monitoring and refresh
+            if (-not $isWAURunning) {
+                Stop-WAUTaskMonitoring -controls $controls
+                
+                # Get task results for status
+                $mainTaskState = $null
                 $userTaskState = $null
                 
                 try {
-                    $userTask = Get-ScheduledTask -TaskName 'Winget-AutoUpdate-UserContext' -ErrorAction Stop
-                    $userTaskRunning = ($userTask.State -eq 'Running')
-                    
-                    if (-not $userTaskRunning) {
-                        $userTaskInfo = $userTask | Get-ScheduledTaskInfo -ErrorAction Stop
-                        $userTaskState = $userTaskInfo.LastTaskResult
-                    }
-                } catch {
-                    # User task doesn't exist or error - treat as completed
-                    $userTaskRunning = $false
-                    $userTaskState = 0
-                }
+                    $mainTaskInfo = Get-ScheduledTask -TaskName 'Winget-AutoUpdate' | Get-ScheduledTaskInfo
+                    $mainTaskState = $mainTaskInfo.LastTaskResult
+                } catch { }
                 
-                # If user task is still running, show status and continue
-                if ($userTaskRunning) {
-                    if ($Script:taskCheckCount % 2 -eq 0) {
-                        $dots = "." * ((($Script:taskCheckCount / 2) % 4) + 1)
-                        $controls.StatusBarText.Text = "Running (user)$dots"
-                    }
-                    return
-                }
+                try {
+                    $userTaskInfo = Get-ScheduledTask -TaskName 'Winget-AutoUpdate-UserContext' | Get-ScheduledTaskInfo
+                    $userTaskState = $userTaskInfo.LastTaskResult
+                } catch { }
                 
-                # Both tasks completed - determine overall status
-                $overallSuccess = ($mainTaskState -eq 0) -and ($userTaskState -eq 0)
+                # Determine overall success
+                $overallSuccess = $true
+                if ($null -ne $mainTaskState -and $mainTaskState -ne 0) { $overallSuccess = $false }
+                if ($null -ne $userTaskState -and $userTaskState -ne 0) { $overallSuccess = $false }
                 
-                Stop-WAUTaskMonitoring -controls $controls
-                
+                # Show completion status
                 if ($overallSuccess) {
-                    $controls.StatusBarText.Text = "Done and loading..."
+                    $controls.StatusBarText.Text = "All done..."
                     $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED
                 } else {
-                    $controls.StatusBarText.Text = "Warnings and loading..."
+                    $controls.StatusBarText.Text = "Done with warnings..."
                     $controls.StatusBarText.Foreground = $Script:COLOR_ACTIVE
                 }
                 
-            } else {
-                # Only main task needed - we're done
-                Stop-WAUTaskMonitoring -controls $controls
+                # Refresh GUI after completion
+                $window.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Background, [Action]{
+                    Start-Sleep -Milliseconds 2000
+                    Invoke-SettingsLoad -controls $controls
+                }) | Out-Null
                 
-                if ($mainTaskState -eq 0) {
-                    $controls.StatusBarText.Text = "Done and loading..."
-                    $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED
-                } else {
-                    $controls.StatusBarText.Text = "Warnings and loading..."
-                    $controls.StatusBarText.Foreground = $Script:COLOR_ACTIVE
-                }
+                return
             }
             
-            # Refresh GUI after completion
-            $window.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Background, [Action]{
-                Start-Sleep -Milliseconds 2000
-                Invoke-SettingsLoad -controls $controls
-            }) | Out-Null
+            # Update status with animation
+            if ($Script:taskCheckCount % 2 -eq 0) {  # Update every 6 seconds
+                $dots = "." * ((($Script:taskCheckCount / 2) % 4) + 1)
+                
+                # Show which tasks are running
+                if ($mainTaskRunning) {
+                    $controls.StatusBarText.Text = "Running (sys)$dots"
+                } elseif ($userTaskRunning) {
+                    $controls.StatusBarText.Text = "Running (usr)$dots"
+                }
+            }
             
             # Timeout check
             if ($Script:taskCheckCount -ge $Script:maxTaskChecks) {
                 Stop-WAUTaskMonitoring -controls $controls
-                $controls.StatusBarText.Text = "Timeout..."
+                $controls.StatusBarText.Text = "WAU timeout"
                 $controls.StatusBarText.Foreground = $Script:COLOR_DISABLED
                 
                 $window.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Background, [Action]{
@@ -2497,7 +2470,7 @@ function Start-WAUTaskMonitoring {
             
         } catch {
             Stop-WAUTaskMonitoring -controls $controls
-            $controls.StatusBarText.Text = "Error..."
+            $controls.StatusBarText.Text = "WAU error"
             $controls.StatusBarText.Foreground = $Script:COLOR_DISABLED
         }
     })
