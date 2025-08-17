@@ -3332,8 +3332,17 @@ function Test-WAULists {
                 if (-not (Test-Path $appsExcluded)) {
                     if (Test-Path $defaultExcluded) {
                         Copy-Item $defaultExcluded $appsExcluded -Force
+                        
+                        # Check if KnifMelti.WAU-Settings-GUI exists in the copied file
+                        $content = Get-Content $appsExcluded -ErrorAction SilentlyContinue
+                        if ($content -notcontains "KnifMelti.WAU-Settings-GUI") {
+                            Add-Content $appsExcluded "KnifMelti.WAU-Settings-GUI"
+                        }
                     } else {
-                        Set-Content $appsExcluded "# Add apps to exclude, one per line."
+                        Set-Content $appsExcluded @(
+                            "# Add apps to exclude, one per line.",
+                            "KnifMelti.WAU-Settings-GUI"
+                        )
                     }
                 }
 
