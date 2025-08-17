@@ -893,9 +893,9 @@ function Start-WAUGUIUpdate {
                 Start-Process "explorer.exe" "$Script:WorkingDir"
                 Start-Process "explorer.exe" "$downloadPath"
                 
-                # Only call Close-WindowGracefully if we still have a valid window
+                # Close window (triggers Add_Closing automatically for cleanup)
                 if ($Script:MainWindowStarted -and $window -and -not $window.IsClosed) {
-                    Close-WindowGracefully -controls $controls -window $window
+                    $window.Close()
                 }
                 exit
             }
@@ -1058,9 +1058,9 @@ function Start-RestoreFromBackup {
         Start-Process "explorer.exe" "$Script:WorkingDir"
         Start-Process "explorer.exe" "$backupPath"
         
-        # Only call Close-WindowGracefully if we still have a valid window
+        # Close window (triggers Add_Closing automatically for cleanup)
         if ($Script:MainWindowStarted -and $window -and -not $window.IsClosed) {
-            Close-WindowGracefully -controls $controls -window $window
+            $window.Close()
         }
         exit
     }
@@ -3700,7 +3700,7 @@ function Test-WindowKeyPress {
             }
         }
         'Escape' { 
-            Close-WindowGracefully -controls $controls -window $window
+            $window.Close()  # Triggers Add_Closing automatically
             $keyEventArgs.Handled = $true
         }
     }
@@ -3799,71 +3799,6 @@ function Set-DevToolsVisibility {
         $controls.StatusBarText.Text = $Script:STATUS_READY_TEXT
         $controls.StatusBarText.Foreground = $Script:COLOR_INACTIVE
     }) | Out-Null
-}
-function Close-WindowGracefully {
-    param($controls, $window)
-    
-    try {
-        # Check if settings have changed
-        $changeResult = Test-SettingsChanged -controls $controls
-        
-        if ($changeResult.HasChanges) {
-            $message = if ($changeResult.IsGPOManaged) {
-                "You have unsaved shortcut changes. Do you want to save them before closing?"
-            } else {
-                "You have unsaved changes. Do you want to save them before closing?"
-            }
-            
-            $result = [System.Windows.MessageBox]::Show(
-                $message,
-                "Unsaved Changes",
-                "YesNoCancel",
-                "Question",
-                "Yes"
-            )
-            
-            switch ($result) {
-                'Yes' {
-                    # Save and then close
-                    Save-WAUSettings -controls $controls
-                    # Close window after a short delay to let save operation complete
-                    $window.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Background, [Action]{
-                        Start-Sleep -Milliseconds 500  # Short delay for save to complete
-                        $window.Close()
-                    }) | Out-Null
-                }
-                'No' {
-                    # Close without saving
-                    $window.Close()
-                }
-                'Cancel' {
-                    # Don't close, return to window
-                    return
-                }
-            }
-        } else {
-            # No changes, close directly
-            $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
-            $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED
-            
-            # Create timer to reset status and close window after half standard wait time
-            $timer = New-Object System.Windows.Threading.DispatcherTimer
-            $timer.Interval = [TimeSpan]::FromMilliseconds($Script:WAIT_TIME / 2)
-            $timer.Add_Tick({
-                $controls.StatusBarText.Text = "$Script:STATUS_READY_TEXT"
-                $controls.StatusBarText.Foreground = "$Script:COLOR_INACTIVE"
-                if ($null -ne $timer) {
-                    $timer.Stop()
-                }
-                $window.Close()
-            })
-            $timer.Start()
-        }
-    }
-    catch {
-        # Fallback force close
-        $window.DialogResult = $false
-    }
 }
 
 # 6. Main GUI function (depends on all above)
@@ -4811,7 +4746,7 @@ function Show-WAUSettingsGUI {
 
     # Cancel button handler to close window
     $controls.CancelButton.Add_Click({
-        Close-WindowGracefully -controls $controls -window $window
+        $window.Close()  # Triggers Add_Closing automatically
     })
     
     $controls.RunNowButton.Add_Click({
@@ -4896,9 +4831,57 @@ function Show-WAUSettingsGUI {
 
     # Window closing handler
     $window.Add_Closing({
-        # Stop any running WAU monitoring
-        if ($Script:WAUTaskTimer) {
-            Stop-WAUTaskMonitoring -controls $controls
+        $e = $args[1]  # Get the CancelEventArgs from $args
+        
+        try {
+            # Stop any running WAU monitoring
+            if ($Script:WAUTaskTimer) {
+                Stop-WAUTaskMonitoring -controls $controls
+            }
+            
+            # Check if settings have changed
+            $changeResult = Test-SettingsChanged -controls $controls
+            
+            if ($changeResult.HasChanges) {
+                $message = if ($changeResult.IsGPOManaged) {
+                    "You have unsaved shortcut changes. Do you want to save them before closing?"
+                } else {
+                    "You have unsaved changes. Do you want to save them before closing?"
+                }
+                
+                $result = [System.Windows.MessageBox]::Show(
+                    $message,
+                    "Unsaved Changes",
+                    "YesNoCancel",
+                    "Question",
+                    "Yes"
+                )
+                
+                switch ($result) {
+                    'Yes' {
+                        # Save settings and allow close
+                        Save-WAUSettings -controls $controls
+                        # Small delay to let save complete
+                        Start-Sleep -Milliseconds 200
+                    }
+                    'No' {
+                        # Close without saving - do nothing, let close proceed
+                    }
+                    'Cancel' {
+                        # Cancel the close operation
+                        $e.Cancel = $true
+                        return
+                    }
+                }
+            }
+            
+            # If we get here, closing is allowed
+            $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
+            $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED
+            
+        } catch {
+            # On error, allow close anyway to prevent hanging
+            Write-Host "Error in window closing handler: $($_.Exception.Message)" -ForegroundColor Red
         }
     })
 
