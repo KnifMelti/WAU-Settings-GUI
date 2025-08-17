@@ -3336,11 +3336,13 @@ function Test-WAULists {
                         # Check if KnifMelti.WAU-Settings-GUI exists in the copied file
                         $content = Get-Content $appsExcluded -ErrorAction SilentlyContinue
                         if ($content -notcontains "KnifMelti.WAU-Settings-GUI") {
+                            Add-Content $appsExcluded ""
                             Add-Content $appsExcluded "KnifMelti.WAU-Settings-GUI"
                         }
                     } else {
                         Set-Content $appsExcluded @(
                             "# Add apps to exclude, one per line.",
+                            "Romanitho.Winget-AutoUpdate",
                             "KnifMelti.WAU-Settings-GUI"
                         )
                     }
