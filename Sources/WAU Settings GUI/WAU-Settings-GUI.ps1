@@ -43,6 +43,9 @@ param(
 # Set portable mode flag
 $Script:PORTABLE_MODE = $Portable.IsPresent
 
+# Flag for update/restore mode
+$Script:UPDATE_RESTORE_MODE = $false
+
 # Set essential variables, used already in <# MAIN #>
 $Script:WorkingDir = $PSScriptRoot
 $Script:WAU_GUI_NAME = "WAU-Settings-GUI"  # Default name for WAU Settings GUI executable
@@ -668,6 +671,9 @@ function Start-WAUGUIUpdate {
         
         if ($result -eq 'Ok') {
             Start-PopUp "Installing update..."
+
+            # Set the update/restore mode flag
+            $Script:UPDATE_RESTORE_MODE = $true
             
             try {
                 # Extract the ZIP file
@@ -773,7 +779,7 @@ function Start-WAUGUIUpdate {
                 [System.GC]::Collect()
                 [System.GC]::WaitForPendingFinalizers()
 
-                # Close the current window BEFORE copying files to release file locks
+                # Close the current window BEFORE copying files to release file locks - triggers Add_Closing automatically
                 if ($Script:MainWindowStarted -and $window) { $window.Close() }
 
                 # Add a small delay to ensure window is closed and files are released
@@ -918,6 +924,9 @@ function Start-RestoreFromBackup {
     try {
         Start-PopUp "Restoring from backup..."
         
+        # Set the update/restore mode flag
+        $Script:UPDATE_RESTORE_MODE = $true
+
         # Extract backup to temp location
         $tempExtractDir = Join-Path ([System.IO.Path]::GetTempPath()) "WAU-Settings-GUI-Restore-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
         
@@ -932,7 +941,7 @@ function Start-RestoreFromBackup {
         [System.GC]::Collect()
         [System.GC]::WaitForPendingFinalizers()
 
-        # Close the current window BEFORE copying files to release file locks
+        # Close the current window BEFORE copying files to release file locks - triggers Add_Closing automatically
         if ($Script:MainWindowStarted -and $window) { $window.Close() }
 
         # Add a small delay to ensure window is closed and files are released
@@ -4831,7 +4840,7 @@ function Show-WAUSettingsGUI {
 
     # Window closing handler
     $window.Add_Closing({
-        $e = $args[1]  # Get the CancelEventArgs from $args
+        $e = $args[1]  # Get the CancelEventArgs
         
         try {
             # Stop any running WAU monitoring
@@ -4839,48 +4848,46 @@ function Show-WAUSettingsGUI {
                 Stop-WAUTaskMonitoring -controls $controls
             }
             
-            # Check if settings have changed
-            $changeResult = Test-SettingsChanged -controls $controls
-            
-            if ($changeResult.HasChanges) {
-                $message = if ($changeResult.IsGPOManaged) {
-                    "You have unsaved shortcut changes. Do you want to save them before closing?"
-                } else {
-                    "You have unsaved changes. Do you want to save them before closing?"
-                }
+            # Skip change detection during update/restore
+            if (-not $Script:UPDATE_RESTORE_MODE) {
+                # Check if settings have changed
+                $changeResult = Test-SettingsChanged -controls $controls
                 
-                $result = [System.Windows.MessageBox]::Show(
-                    $message,
-                    "Unsaved Changes",
-                    "YesNoCancel",
-                    "Question",
-                    "Yes"
-                )
-                
-                switch ($result) {
-                    'Yes' {
-                        # Save settings and allow close
-                        Save-WAUSettings -controls $controls
-                        # Small delay to let save complete
-                        Start-Sleep -Milliseconds 200
+                if ($changeResult.HasChanges) {
+                    $message = if ($changeResult.IsGPOManaged) {
+                        "You have unsaved shortcut changes. Do you want to save them before closing?"
+                    } else {
+                        "You have unsaved changes. Do you want to save them before closing?"
                     }
-                    'No' {
-                        # Close without saving - do nothing, let close proceed
-                    }
-                    'Cancel' {
-                        # Cancel the close operation
-                        $e.Cancel = $true
-                        return
+                    
+                    $result = [System.Windows.MessageBox]::Show(
+                        $message,
+                        "Unsaved Changes",
+                        "YesNoCancel",
+                        "Question",
+                        "Yes"
+                    )
+                    
+                    switch ($result) {
+                        'Yes' {
+                            Save-WAUSettings -controls $controls
+                            Start-Sleep -Milliseconds 200
+                        }
+                        'No' {
+                            # Close without saving
+                        }
+                        'Cancel' {
+                            $e.Cancel = $true
+                            return
+                        }
                     }
                 }
             }
             
-            # If we get here, closing is allowed
             $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
             $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED
             
         } catch {
-            # On error, allow close anyway to prevent hanging
             Write-Host "Error in window closing handler: $($_.Exception.Message)" -ForegroundColor Red
         }
     })
