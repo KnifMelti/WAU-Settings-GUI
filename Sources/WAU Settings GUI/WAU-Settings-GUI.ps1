@@ -43,6 +43,9 @@ param(
 # Set portable mode flag
 $Script:PORTABLE_MODE = $Portable.IsPresent
 
+# Flag for update/restore mode
+$Script:UPDATE_RESTORE_MODE = $false
+
 # Set essential variables, used already in <# MAIN #>
 $Script:WorkingDir = $PSScriptRoot
 $Script:WAU_GUI_NAME = "WAU-Settings-GUI"  # Default name for WAU Settings GUI executable
@@ -668,6 +671,9 @@ function Start-WAUGUIUpdate {
         
         if ($result -eq 'Ok') {
             Start-PopUp "Installing update..."
+
+            # Set the update/restore mode flag
+            $Script:UPDATE_RESTORE_MODE = $true
             
             try {
                 # Extract the ZIP file
@@ -773,7 +779,7 @@ function Start-WAUGUIUpdate {
                 [System.GC]::Collect()
                 [System.GC]::WaitForPendingFinalizers()
 
-                # Close the current window BEFORE copying files to release file locks
+                # Close the current window BEFORE copying files to release file locks - triggers Add_Closing automatically
                 if ($Script:MainWindowStarted -and $window) { $window.Close() }
 
                 # Add a small delay to ensure window is closed and files are released
@@ -871,12 +877,12 @@ function Start-WAUGUIUpdate {
                 # Close popup and show success message AFTER everything is completed successfully
                 Close-PopUp
                 
-                [System.Windows.MessageBox]::Show(
-                    "Update installed successfully!`n`nThe application will now restart with the new version.",
-                    "Update Complete",
-                    "OK",
-                    "Information"
-                )
+                # [System.Windows.MessageBox]::Show(
+                #     "Update installed successfully!`n`nThe application will now restart with the new version.",
+                #     "Update Complete",
+                #     "OK",
+                #     "Information"
+                # )
                 
                 # Restart the application with the new version
                 if (-not $Script:PORTABLE_MODE) {
@@ -893,9 +899,9 @@ function Start-WAUGUIUpdate {
                 Start-Process "explorer.exe" "$Script:WorkingDir"
                 Start-Process "explorer.exe" "$downloadPath"
                 
-                # Only call Close-WindowGracefully if we still have a valid window
+                # Close window (triggers Add_Closing automatically for cleanup)
                 if ($Script:MainWindowStarted -and $window -and -not $window.IsClosed) {
-                    Close-WindowGracefully -controls $controls -window $window
+                    $window.Close()
                 }
                 exit
             }
@@ -918,6 +924,9 @@ function Start-RestoreFromBackup {
     try {
         Start-PopUp "Restoring from backup..."
         
+        # Set the update/restore mode flag
+        $Script:UPDATE_RESTORE_MODE = $true
+
         # Extract backup to temp location
         $tempExtractDir = Join-Path ([System.IO.Path]::GetTempPath()) "WAU-Settings-GUI-Restore-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
         
@@ -932,7 +941,7 @@ function Start-RestoreFromBackup {
         [System.GC]::Collect()
         [System.GC]::WaitForPendingFinalizers()
 
-        # Close the current window BEFORE copying files to release file locks
+        # Close the current window BEFORE copying files to release file locks - triggers Add_Closing automatically
         if ($Script:MainWindowStarted -and $window) { $window.Close() }
 
         # Add a small delay to ensure window is closed and files are released
@@ -1030,12 +1039,12 @@ function Start-RestoreFromBackup {
         # Close popup and show success message AFTER everything is completed successfully
         Close-PopUp
         
-        [System.Windows.MessageBox]::Show(
-            "Restore completed successfully!`n`nThe application will now restart with the restored version.",
-            "Restore Complete",
-            "OK",
-            "Information"
-        )
+        # [System.Windows.MessageBox]::Show(
+        #     "Restore completed successfully!`n`nThe application will now restart with the restored version.",
+        #     "Restore Complete",
+        #     "OK",
+        #     "Information"
+        # )
         
         # Restart the application with the restored version
         if (-not $Script:PORTABLE_MODE) {
@@ -1058,9 +1067,9 @@ function Start-RestoreFromBackup {
         Start-Process "explorer.exe" "$Script:WorkingDir"
         Start-Process "explorer.exe" "$backupPath"
         
-        # Only call Close-WindowGracefully if we still have a valid window
+        # Close window (triggers Add_Closing automatically for cleanup)
         if ($Script:MainWindowStarted -and $window -and -not $window.IsClosed) {
-            Close-WindowGracefully -controls $controls -window $window
+            $window.Close()
         }
         exit
     }
@@ -3700,7 +3709,7 @@ function Test-WindowKeyPress {
             }
         }
         'Escape' { 
-            Close-WindowGracefully -controls $controls -window $window
+            $window.Close()  # Triggers Add_Closing automatically
             $keyEventArgs.Handled = $true
         }
     }
@@ -3799,71 +3808,6 @@ function Set-DevToolsVisibility {
         $controls.StatusBarText.Text = $Script:STATUS_READY_TEXT
         $controls.StatusBarText.Foreground = $Script:COLOR_INACTIVE
     }) | Out-Null
-}
-function Close-WindowGracefully {
-    param($controls, $window)
-    
-    try {
-        # Check if settings have changed
-        $changeResult = Test-SettingsChanged -controls $controls
-        
-        if ($changeResult.HasChanges) {
-            $message = if ($changeResult.IsGPOManaged) {
-                "You have unsaved shortcut changes. Do you want to save them before closing?"
-            } else {
-                "You have unsaved changes. Do you want to save them before closing?"
-            }
-            
-            $result = [System.Windows.MessageBox]::Show(
-                $message,
-                "Unsaved Changes",
-                "YesNoCancel",
-                "Question",
-                "Yes"
-            )
-            
-            switch ($result) {
-                'Yes' {
-                    # Save and then close
-                    Save-WAUSettings -controls $controls
-                    # Close window after a short delay to let save operation complete
-                    $window.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Background, [Action]{
-                        Start-Sleep -Milliseconds 500  # Short delay for save to complete
-                        $window.Close()
-                    }) | Out-Null
-                }
-                'No' {
-                    # Close without saving
-                    $window.Close()
-                }
-                'Cancel' {
-                    # Don't close, return to window
-                    return
-                }
-            }
-        } else {
-            # No changes, close directly
-            $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
-            $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED
-            
-            # Create timer to reset status and close window after half standard wait time
-            $timer = New-Object System.Windows.Threading.DispatcherTimer
-            $timer.Interval = [TimeSpan]::FromMilliseconds($Script:WAIT_TIME / 2)
-            $timer.Add_Tick({
-                $controls.StatusBarText.Text = "$Script:STATUS_READY_TEXT"
-                $controls.StatusBarText.Foreground = "$Script:COLOR_INACTIVE"
-                if ($null -ne $timer) {
-                    $timer.Stop()
-                }
-                $window.Close()
-            })
-            $timer.Start()
-        }
-    }
-    catch {
-        # Fallback force close
-        $window.DialogResult = $false
-    }
 }
 
 # 6. Main GUI function (depends on all above)
@@ -4811,7 +4755,7 @@ function Show-WAUSettingsGUI {
 
     # Cancel button handler to close window
     $controls.CancelButton.Add_Click({
-        Close-WindowGracefully -controls $controls -window $window
+        $window.Close()  # Triggers Add_Closing automatically
     })
     
     $controls.RunNowButton.Add_Click({
@@ -4896,9 +4840,55 @@ function Show-WAUSettingsGUI {
 
     # Window closing handler
     $window.Add_Closing({
-        # Stop any running WAU monitoring
-        if ($Script:WAUTaskTimer) {
-            Stop-WAUTaskMonitoring -controls $controls
+        $e = $args[1]  # Get the CancelEventArgs
+        
+        try {
+            # Stop any running WAU monitoring
+            if ($Script:WAUTaskTimer) {
+                Stop-WAUTaskMonitoring -controls $controls
+            }
+            
+            # Skip change detection during update/restore
+            if (-not $Script:UPDATE_RESTORE_MODE) {
+                # Check if settings have changed
+                $changeResult = Test-SettingsChanged -controls $controls
+                
+                if ($changeResult.HasChanges) {
+                    $message = if ($changeResult.IsGPOManaged) {
+                        "You have unsaved shortcut changes. Do you want to save them before closing?"
+                    } else {
+                        "You have unsaved changes. Do you want to save them before closing?"
+                    }
+                    
+                    $result = [System.Windows.MessageBox]::Show(
+                        $message,
+                        "Unsaved Changes",
+                        "YesNoCancel",
+                        "Question",
+                        "Yes"
+                    )
+                    
+                    switch ($result) {
+                        'Yes' {
+                            Save-WAUSettings -controls $controls
+                            Start-Sleep -Milliseconds 200
+                        }
+                        'No' {
+                            # Close without saving
+                        }
+                        'Cancel' {
+                            $e.Cancel = $true
+                            return
+                        }
+                    }
+                }
+            }
+            
+            $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
+            $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED
+            
+        } catch {
+            Write-Host "Error in window closing handler: $($_.Exception.Message)" -ForegroundColor Red
         }
     })
 
