@@ -877,12 +877,12 @@ function Start-WAUGUIUpdate {
                 # Close popup and show success message AFTER everything is completed successfully
                 Close-PopUp
                 
-                [System.Windows.MessageBox]::Show(
-                    "Update installed successfully!`n`nThe application will now restart with the new version.",
-                    "Update Complete",
-                    "OK",
-                    "Information"
-                )
+                # [System.Windows.MessageBox]::Show(
+                #     "Update installed successfully!`n`nThe application will now restart with the new version.",
+                #     "Update Complete",
+                #     "OK",
+                #     "Information"
+                # )
                 
                 # Restart the application with the new version
                 if (-not $Script:PORTABLE_MODE) {
@@ -1039,12 +1039,12 @@ function Start-RestoreFromBackup {
         # Close popup and show success message AFTER everything is completed successfully
         Close-PopUp
         
-        [System.Windows.MessageBox]::Show(
-            "Restore completed successfully!`n`nThe application will now restart with the restored version.",
-            "Restore Complete",
-            "OK",
-            "Information"
-        )
+        # [System.Windows.MessageBox]::Show(
+        #     "Restore completed successfully!`n`nThe application will now restart with the restored version.",
+        #     "Restore Complete",
+        #     "OK",
+        #     "Information"
+        # )
         
         # Restart the application with the restored version
         if (-not $Script:PORTABLE_MODE) {
