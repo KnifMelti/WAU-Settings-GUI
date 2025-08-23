@@ -374,7 +374,7 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
             
     } catch as e {
         if !silent {
-            MsgBox("Failed to trigger MSI reinstallation. Please repair WAU manually from Apps & Features.`n`nError: " e.Message, name_no_ext, 0x10)
+            MsgBox("Failed to trigger MSI reinstallation. Repair WAU manually from Apps & Features (uninstalled?).`n`nError: " e.Message, name_no_ext, 0x10)
         }
     }
 
