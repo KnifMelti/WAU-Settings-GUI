@@ -3961,6 +3961,17 @@ function Show-WAUSettingsGUI {
         }
     })
 
+    $controls.ErrorCodes.Add_RequestNavigate({
+        param($linkSource, $navEventArgs)
+        try {
+            Start-Process $navEventArgs.Uri.AbsoluteUri
+            $navEventArgs.Handled = $true
+        }
+        catch {
+            [System.Windows.MessageBox]::Show("Failed to open link: $($_.Exception.Message)", "Error", "OK", "Error")
+        }
+    })
+
     # Install location hyperlink event handler
     $controls.InstallLocationLink.Add_RequestNavigate({
         param($linkSource, $navEventArgs)

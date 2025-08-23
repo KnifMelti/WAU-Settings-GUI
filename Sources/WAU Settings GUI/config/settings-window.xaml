@@ -37,8 +37,11 @@
                     <TextBlock FontSize="9">
                         <Hyperlink x:Name="ManifestsLink" NavigateUri="https://github.com/microsoft/winget-pkgs/tree/master/manifests" ToolTip="open 'winget-pkgs' Manifests on GitHub" TextDecorations="None">[manifests]</Hyperlink>
                     </TextBlock>
-                    <TextBlock Margin="0,0,0,0" FontSize="9">
+                    <TextBlock FontSize="9">
                         <Hyperlink x:Name="IssuesLink" NavigateUri="https://github.com/microsoft/winget-pkgs/issues" ToolTip="open 'winget-pkgs' Issues on GitHub" TextDecorations="None">[issues]</Hyperlink>
+                    </TextBlock>
+                    <TextBlock Margin="0,0,0,0" FontSize="9">
+                        <Hyperlink x:Name="ErrorCodes" NavigateUri="https://github.com/microsoft/winget-cli/blob/master/doc/windows/package-manager/winget/returnCodes.md" ToolTip="open 'WinGet' error codes on GitHub" TextDecorations="None">[errors]</Hyperlink>
                     </TextBlock>
                 </StackPanel>
                 
