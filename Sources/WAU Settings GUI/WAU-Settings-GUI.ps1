@@ -1592,53 +1592,13 @@ function Set-WAUConfig {
             $currentStartMenuSetting = $currentConfig.WAU_StartMenuShortcut
             $newStartMenuSetting = $Settings['WAU_StartMenuShortcut']
             
-			if ($currentStartMenuSetting -ne $newStartMenuSetting) {
+            # Update registry only if value has changed
+            if ($currentStartMenuSetting -ne $newStartMenuSetting) {
                 Set-ItemProperty -Path $Script:WAU_REGISTRY_PATH -Name 'WAU_StartMenuShortcut' -Value $newStartMenuSetting -Force
-                
-                if ($newStartMenuSetting -eq 1) {
-                    if (-not (Test-Path $Script:STARTMENU_WAU_DIR)) {
-                        New-Item -Path $Script:STARTMENU_WAU_DIR -ItemType Directory | Out-Null
-                    }
-                    Add-Shortcut "$Script:STARTMENU_WAU_DIR\Run WAU.lnk" $Script:CONHOST_EXE "$($currentConfig.InstallLocation)" "$Script:POWERSHELL_ARGS `"$($currentConfig.InstallLocation)$Script:USER_RUN_SCRIPT`"" "$Script:WAU_ICON" "Run Winget AutoUpdate" "Normal"
-                    # Ensure logs directory and updates.log exist before creating shortcut
-                    $logsDir = Join-Path $currentConfig.InstallLocation "logs"
-                    $updatesLogPath = Join-Path $logsDir "updates.log"
-                    if (-not (Test-Path $logsDir)) {
-                        New-Item -Path $logsDir -ItemType Directory -Force | Out-Null
-                    }
-                    if (-not (Test-Path $updatesLogPath)) {
-                        New-Item -Path $updatesLogPath -ItemType File -Force | Out-Null
-                        #Set ACL for users on logfile
-                        $NewAcl = Get-Acl -Path $updatesLogPath
-                        $identity = New-Object System.Security.Principal.SecurityIdentifier S-1-5-11
-                        $fileSystemRights = "Modify"
-                        $type = "Allow"
-                        $fileSystemAccessRuleArgumentList = $identity, $fileSystemRights, $type
-                        $fileSystemAccessRule = New-Object -TypeName System.Security.AccessControl.FileSystemAccessRule -ArgumentList $fileSystemAccessRuleArgumentList
-                        $NewAcl.SetAccessRule($fileSystemAccessRule)
-                        Set-Acl -Path $updatesLogPath -AclObject $NewAcl
-                    }
-                    Add-Shortcut "$Script:STARTMENU_WAU_DIR\Open log.lnk" $updatesLogPath "" "" "" "Open WAU log" "Normal"
-                    Add-Shortcut "$Script:STARTMENU_WAU_DIR\Open Logs.lnk" $logsDir "" "" "" "Open WAU Logs Directory" "Normal"
-                    Add-Shortcut "$Script:STARTMENU_WAU_DIR\WAU App Installer.lnk" $Script:CONHOST_EXE "$($currentConfig.InstallLocation)" "$Script:POWERSHELL_ARGS `"$($currentConfig.InstallLocation)WAU-Installer-GUI.ps1`"" "$Script:WAU_ICON" "Search for and Install WinGet Apps, etc..." "Normal"
-                    if (-not $Script:PORTABLE_MODE) {
-                        Add-Shortcut "$Script:STARTMENU_WAU_DIR\$Script:GUI_TITLE.lnk" $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$((Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'))`"" "$Script:GUI_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
-                    }
-                }
-                else {
-                    if (Test-Path $Script:STARTMENU_WAU_DIR) {
-                        Remove-Item -Path $Script:STARTMENU_WAU_DIR -Recurse -Force
-                    }
-                    
-                    # Create desktop shortcut for WAU Settings if Start Menu shortcuts are removed
-                    if (-not $Script:PORTABLE_MODE -and -not (Test-Path $Script:DESKTOP_WAU_SETTINGS)) {
-                        Add-Shortcut $Script:DESKTOP_WAU_SETTINGS $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$((Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'))`"" "$Script:GUI_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
-                    }
-                }
             }
-            # Handle case where registry says shortcuts should exist but they don't (legacy installation)
-            elseif ($newStartMenuSetting -eq 1 -and -not (Test-Path "$Script:STARTMENU_WAU_DIR\Open Logs.lnk")) {
-                # Registry is set to 1 but GUI shortcuts don't exist - create them
+            
+            # Create shortcuts if setting is 1 AND (value changed OR shortcuts don't exist)
+            if ($newStartMenuSetting -eq 1 -and (($currentStartMenuSetting -ne $newStartMenuSetting) -or -not (Test-Path "$Script:STARTMENU_WAU_DIR\Open Logs.lnk"))) {
                 if (-not (Test-Path $Script:STARTMENU_WAU_DIR)) {
                     New-Item -Path $Script:STARTMENU_WAU_DIR -ItemType Directory | Out-Null
                 }
@@ -1666,6 +1626,17 @@ function Set-WAUConfig {
                 Add-Shortcut "$Script:STARTMENU_WAU_DIR\WAU App Installer.lnk" $Script:CONHOST_EXE "$($currentConfig.InstallLocation)" "$Script:POWERSHELL_ARGS `"$($currentConfig.InstallLocation)WAU-Installer-GUI.ps1`"" "$Script:WAU_ICON" "Search for and Install WinGet Apps, etc..." "Normal"
                 if (-not $Script:PORTABLE_MODE) {
                     Add-Shortcut "$Script:STARTMENU_WAU_DIR\$Script:GUI_TITLE.lnk" $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$((Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'))`"" "$Script:GUI_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
+                }
+            }
+            # Remove shortcuts if value changed to 0
+            elseif ($currentStartMenuSetting -ne $newStartMenuSetting -and $newStartMenuSetting -eq 0) {
+                if (Test-Path $Script:STARTMENU_WAU_DIR) {
+                    Remove-Item -Path $Script:STARTMENU_WAU_DIR -Recurse -Force
+                }
+                
+                # Create desktop shortcut for WAU Settings if Start Menu shortcuts are removed
+                if (-not $Script:PORTABLE_MODE -and -not (Test-Path $Script:DESKTOP_WAU_SETTINGS)) {
+                    Add-Shortcut $Script:DESKTOP_WAU_SETTINGS $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$((Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'))`"" "$Script:GUI_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
                 }
             }
         }
