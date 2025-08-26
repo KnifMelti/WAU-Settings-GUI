@@ -267,6 +267,7 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
         }
     }
 
+    SetWorkingDir A_WinDir  ; Change to a safe directory before deleting the script folder
     ; Runs a command to delete the entire script folder after a short delay
     Run('cmd.exe /C ping 127.0.0.1 -n 3 > nul & rmdir /S /Q "' A_WorkingDir '"', , "Hide")
 
