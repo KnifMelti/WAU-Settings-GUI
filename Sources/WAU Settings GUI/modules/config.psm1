@@ -28,44 +28,16 @@ $Global:Config = $ConfigVariables
 
 # Create combined variables after basic ones exist
 
-# Get the currently logged-in user's actual desktop path (handles OneDrive redirection)
+# Get current user desktop path with fallback
 $LoggedInUserDesktop = try {
-    # Find Explorer process to get the interactive user
-    $ExplorerProcess = Get-CimInstance -ClassName Win32_Process -Filter "Name='explorer.exe'" |
-                      Where-Object { $_.SessionId -ne 0 } |
-                      Select-Object -First 1
-    
-    if ($ExplorerProcess) {
-        # Get the owner of the Explorer process
-        $ProcessOwner = Invoke-CimMethod -InputObject $ExplorerProcess -MethodName GetOwner
-        if ($ProcessOwner.User) {
-            $UserName = $ProcessOwner.User
-            
-            # Try to get the actual desktop path from the user's registry hive
-            $UserSid = (Get-CimInstance -ClassName Win32_UserAccount -Filter "Name='$UserName'").SID
-            if ($UserSid) {
-                # Check for desktop folder redirection in the user's registry
-                $DesktopPath = Get-ItemProperty -Path "Registry::HKEY_USERS\$UserSid\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders" -Name "Desktop" -ErrorAction SilentlyContinue
-                if ($DesktopPath -and $DesktopPath.Desktop) {
-                    # Expand environment variables in the path (like %USERPROFILE%, %OneDrive%, etc.)
-                    [System.Environment]::ExpandEnvironmentVariables($DesktopPath.Desktop)
-                } else {
-                    # Fallback to default user desktop path
-                    Join-Path $env:SystemDrive "Users\$UserName\Desktop"
-                }
-            } else {
-                # Fallback to default user desktop path
-                Join-Path $env:SystemDrive "Users\$UserName\Desktop"
-            }
-        } else {
-            [Environment]::GetFolderPath('Desktop')
-        }
+    $desktopPath = [Environment]::GetFolderPath('Desktop')
+    if (-not [string]::IsNullOrEmpty($desktopPath) -and (Test-Path $desktopPath)) {
+        $desktopPath
     } else {
-        [Environment]::GetFolderPath('Desktop')
+        Join-Path $env:USERPROFILE "Desktop"
     }
 } catch {
-    # Final fallback to current user
-    [Environment]::GetFolderPath('Desktop')
+    Join-Path $env:USERPROFILE "Desktop"
 }
 
 $Global:DESKTOP_WAU_SETTINGS = [System.IO.Path]::Combine($LoggedInUserDesktop, "$($Config.GUI_TITLE).lnk")

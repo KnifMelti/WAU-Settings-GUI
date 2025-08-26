@@ -30,6 +30,7 @@ Benefits from not having to manage the settings in several places when testing e
 - **[GPO Management](#managed-by-gpo-centrallocal)** integration
 - **Status** information display showing version details, last run times, and current configuration state
 - **[Dev Tools](#dev-tools-f12)** for advanced troubleshooting (**F12/click on logo**, **double-click** for **WAU Settings GUI** on **GitHub**):
+  - Useful **WinGet** links
   - `[gpo]` Open **WAU policies path** in registry (if **GPO Managed**)
   - `[tsk]` **Task scheduler** access (look in **WAU** subfolder)
   - `[reg]` Open **WAU settings path** in registry
