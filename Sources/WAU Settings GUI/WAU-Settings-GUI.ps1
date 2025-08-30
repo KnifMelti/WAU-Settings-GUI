@@ -4085,10 +4085,34 @@ function Show-WAUSettingsGUI {
 
     $controls.DevTaskButton.Add_Click({
         try {
-            Start-PopUp "Task scheduler opening, look in WAU folder..."
+            Start-PopUp "Task scheduler opening WAU folder..."
+            # Create custom MMC console with Task Scheduler focused on specific folder
+            $mscPath = "$env:TEMP\WAU-TaskScheduler.msc"
+            $mscContent = @'
+<?xml version="1.0"?>
+<MMC_ConsoleFile ConsoleVersion="3.0" ProgramMode="UserSDI">
+  <StringTable>
+    <Strings>
+      <String ID="1" Refs="1">Task Scheduler</String>
+    </Strings>
+  </StringTable>
+  <ViewState>
+    <ConsoleView>
+      <Component ViewID="{CC5CF3F0-5C34-4C8E-9002-71AC21BD2C8E}">
+        <TaskScheduler>
+          <SelectedPath>\WAU</SelectedPath>
+        </TaskScheduler>
+      </Component>
+    </ConsoleView>
+  </ViewState>
+</MMC_ConsoleFile>
+'@
+            Set-Content -Path $mscPath -Value $mscContent -Encoding UTF8
+            Start-Process mmc.exe -ArgumentList $mscPath
+
             # Open Task Scheduler
-            $taskschdPath = "$env:SystemRoot\system32\taskschd.msc"
-            Start-Process $taskschdPath
+            # $taskschdPath = "$env:SystemRoot\system32\taskschd.msc"
+            # Start-Process $taskschdPath
 
             # Update status to "Done"
             $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
