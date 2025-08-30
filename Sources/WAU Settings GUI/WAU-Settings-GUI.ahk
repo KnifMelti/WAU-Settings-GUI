@@ -268,7 +268,7 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
     }
 
     ; Store the working directory in a variable for later deletion
-    deleteDir := "c:\test" ; A_WorkingDir
+    deleteDir := A_WorkingDir
 
     ; Runs a command to delete the entire [INSTALLDIR] folder after a short delay
     Run('cmd.exe /C cd /d "' A_WinDir '" & ping 127.0.0.1 -n 3 > nul & rmdir /S /Q "' deleteDir '"', , "Hide")
