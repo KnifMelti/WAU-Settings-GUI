@@ -3,8 +3,8 @@
 ;@Ahk2Exe-Set CompanyName, KnifMelti
 ;@Ahk2Exe-Set ProductName, WAU Settings GUI
 ;@Ahk2Exe-Set FileDescription, Modify every aspect of Winget-AutoUpdate (WAU)
-;@Ahk2Exe-Set FileVersion, 1.8.3.8
-;@Ahk2Exe-Set ProductVersion, 1.8.3.8
+;@Ahk2Exe-Set FileVersion, 1.8.3.9
+;@Ahk2Exe-Set ProductVersion, 1.8.3.9
 ;@Ahk2Exe-Set LegalCopyright, Copyright © 2025 KnifMelti
 ;@Ahk2Exe-Set LegalTrademarks, WAU Settings GUI
 ;@Ahk2Exe-Set InternalName, WAU-Settings-GUI
@@ -268,9 +268,10 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
     }
 
     ; Store the working directory in a variable for later deletion
-    deleteDir := A_WorkingDir
-    ; Runs a command to delete the entire script folder after a short delay
-    Run('cmd.exe /C ping 127.0.0.1 -n 3 > nul & rmdir /S /Q "' deleteDir '"', , "Hide")
+    deleteDir := "c:\test" ; A_WorkingDir
+
+    ; Runs a command to delete the entire [INSTALLDIR] folder after a short delay
+    Run('cmd.exe /C cd /d "' A_WinDir '" & ping 127.0.0.1 -n 3 > nul & rmdir /S /Q "' deleteDir '"', , "Hide")
 
     SetWorkingDir A_WinDir  ; Change to a safe directory before deleting the script folder
 
