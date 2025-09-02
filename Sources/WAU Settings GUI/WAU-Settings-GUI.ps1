@@ -450,28 +450,41 @@ function Test-InstalledWAU {
         [string]$displayName
     )
 
-    $uninstallKeys = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
-    $matchingApps = @()
-    
-    foreach ($key in $uninstallKeys) {
-        try {
-            $subKeys = Get-ChildItem -Path $key -ErrorAction Stop
-            foreach ($subKey in $subKeys) {
-                try {
-                    $properties = Get-ItemProperty -Path $subKey.PSPath -ErrorAction Stop
-                    if ($properties.DisplayName -like "$displayName") {
-                        $matchingApps += $properties.DisplayVersion
-                        $parentKeyName = Split-Path -Path $subKey.PSPath -Leaf
-                        $matchingApps += $parentKeyName
+    # Try up to 3 times to find WAU installation (handles timing issues with self-updates)
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        $uninstallKeys = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
+        $matchingApps = @()
+        
+        foreach ($key in $uninstallKeys) {
+            try {
+                $subKeys = Get-ChildItem -Path $key -ErrorAction Stop
+                foreach ($subKey in $subKeys) {
+                    try {
+                        $properties = Get-ItemProperty -Path $subKey.PSPath -ErrorAction Stop
+                        if ($properties.DisplayName -like "$displayName") {
+                            $matchingApps += $properties.DisplayVersion
+                            $parentKeyName = Split-Path -Path $subKey.PSPath -Leaf
+                            $matchingApps += $parentKeyName
+                        }
+                    }
+                    catch {
+                        continue
                     }
                 }
-                catch {
-                    continue
-                }
+            }
+            catch {
+                continue
             }
         }
-        catch {
-            continue
+
+        # Return immediately if WAU is found
+        if ($matchingApps.Count -gt 0) {
+            return $matchingApps
+        }
+
+        # Wait before retry (except on last attempt)
+        if ($attempt -lt 3) {
+            Start-Sleep -Milliseconds $Script:WAIT_TIME
         }
     }
 
