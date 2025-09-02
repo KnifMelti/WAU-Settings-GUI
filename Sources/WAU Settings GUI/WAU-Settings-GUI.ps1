@@ -2761,8 +2761,8 @@ function Set-ControlsState {
 
     $alwaysEnabledControls = @(
         'ScreenshotButton', 'SaveButton', 'CancelButton', 'RunNowButton', 'OpenLogsButton', 'GUIPng',
-        'DevGPOButton', 'DevTaskButton', 'DevRegButton', 'DevGUIDButton', 'DevSysButton', 'DevListButton',
-        'DevUsrButton', 'DevMSIButton', 'DevVerButton', 'DevSrcButton', 'VersionLinksTextBlock'
+        'DevGPOButton', 'DevTaskButton', 'DevRegButton', 'DevGUIDButton', 'DevSysButton', 'DevModsButton', 'DevListButton',
+        'DevUsrButton', 'DevMSIButton', 'DevWSBButton', 'DevVerButton', 'DevSrcButton', 'VersionLinksTextBlock'
     )
 
     function Get-Children($control) {
@@ -3780,9 +3780,11 @@ function Set-DevToolsVisibility {
         $controls.DevRegButton.Visibility = 'Visible'
         $controls.DevGUIDButton.Visibility = 'Visible'
         $controls.DevSysButton.Visibility = 'Visible'
+        $controls.DevModsButton.Visibility = 'Visible'
         $controls.DevListButton.Visibility = 'Visible'
         $controls.DevUsrButton.Visibility = 'Visible'
         $controls.DevMSIButton.Visibility = 'Visible'
+        $controls.DevWSBButton.Visibility = 'Visible'
         $controls.DevCfgButton.Visibility = 'Visible'
         $controls.DevWAUButton.Visibility = 'Visible'
         $controls.DevVerButton.Visibility = 'Visible'
@@ -3799,9 +3801,11 @@ function Set-DevToolsVisibility {
         $controls.DevRegButton.Visibility = 'Collapsed'
         $controls.DevGUIDButton.Visibility = 'Collapsed'
         $controls.DevSysButton.Visibility = 'Collapsed'
+        $controls.DevModsButton.Visibility = 'Collapsed'
         $controls.DevListButton.Visibility = 'Collapsed'
         $controls.DevUsrButton.Visibility = 'Collapsed'
         $controls.DevMSIButton.Visibility = 'Collapsed'
+        $controls.DevWSBButton.Visibility = 'Collapsed'
         $controls.DevCfgButton.Visibility = 'Collapsed'
         $controls.DevWAUButton.Visibility = 'Collapsed'
         $controls.DevVerButton.Visibility = 'Collapsed'
@@ -4257,6 +4261,9 @@ function Show-WAUSettingsGUI {
         }
     })
 
+    $controls.DevModsButton.Add_Click({
+    })
+
     $controls.DevListButton.Add_Click({
         try {
             # Get updated config and policies
@@ -4412,6 +4419,9 @@ function Show-WAUSettingsGUI {
                 $controls.StatusBarText.Foreground = "$Script:COLOR_INACTIVE"
             }) | Out-Null
         }
+    })
+
+    $controls.DevWSBButton.Add_Click({
     })
 
     $controls.DevCfgButton.Add_Click({
