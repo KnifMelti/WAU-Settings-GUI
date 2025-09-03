@@ -2468,7 +2468,7 @@ function Start-WSBTesting {
             
             $wsbStatus = if (-not $wsbFeature) { "not available" } else { "disabled" }
             $result = [System.Windows.MessageBox]::Show(
-                "Windows Sandbox is $wsbStatus on this system.`n`nWindows Sandbox is required for safe MSI testing.`n`nDo you want to enable Windows Sandbox?`n`nNote: This requires a restart and Windows Pro/Enterprise/Education edition.",
+                "Windows Sandbox is $wsbStatus on this system.`n`nWindows Sandbox is required for safe MSI testing.`nDo you want to enable Windows Sandbox?`n`nNote: This requires a restart and Windows Pro/Enterprise/Education edition.",
                 "Windows Sandbox Required",
                 "OkCancel",
                 "Question"
