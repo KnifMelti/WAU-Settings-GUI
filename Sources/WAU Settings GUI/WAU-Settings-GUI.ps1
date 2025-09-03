@@ -2368,6 +2368,242 @@ function New-WAUTransformFile {
         return $false
     }
 }
+function Start-WSBTesting {
+    param($controls)
+    
+    try {
+        Start-PopUp "Checking WSB requirements..."
+        
+        # Get installed WAU version to determine which MSI to look for
+        $targetVersion = $null
+        
+        try {
+            if ($Script:WAU_GUID) {
+                $registryPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$($Script:WAU_GUID)"
+                $wauRegistry = Get-ItemProperty -Path $registryPath -ErrorAction Stop
+                
+                $comments = $wauRegistry.Comments
+                $displayVersion = $wauRegistry.DisplayVersion
+                
+                # Determine version string
+                if ($comments -and $comments -ne "STABLE") {
+                    if ($comments -match "WAU\s+([0-9]+\.[0-9]+\.[0-9]+(?:-\d+)?)(?:\s|\[)") {
+                        $targetVersion = "v$($matches[1])"
+                    } else {
+                        $targetVersion = "v$displayVersion"
+                    }
+                } else {
+                    $targetVersion = "v$($displayVersion -replace '\.\d+$', '')"
+                }
+            }
+        } catch {
+            Close-PopUp
+            [System.Windows.MessageBox]::Show("Could not determine installed WAU version. Please ensure WAU is properly installed.", "Version Detection Failed", "OK", "Warning")
+            return $false
+        }
+        
+        if (-not $targetVersion) {
+            Close-PopUp
+            [System.Windows.MessageBox]::Show("Could not determine WAU version for WSB testing.", "Version Detection Failed", "OK", "Warning")
+            return $false
+        }
+        
+        # Check for MSI file in msi directory
+        $msiDir = Join-Path $Script:WorkingDir "msi"
+        $versionDir = Join-Path $msiDir $targetVersion.TrimStart('v')
+        $expectedMsiName = "WAU-$targetVersion.msi"
+        $msiPath = Join-Path $versionDir $expectedMsiName
+        
+        # Alternative MSI name patterns
+        $msiFound = $false
+        $actualMsiPath = $null
+        
+        if (Test-Path $msiPath) {
+            $msiFound = $true
+            $actualMsiPath = $msiPath
+        } else {
+            # Look for WAU.msi or other patterns in version directory
+            if (Test-Path $versionDir) {
+                $msiFiles = Get-ChildItem -Path $versionDir -Filter "*.msi" -File
+                if ($msiFiles) {
+                    $msiFound = $true
+                    $actualMsiPath = $msiFiles[0].FullName
+                }
+            }
+        }
+        
+        if (-not $msiFound) {
+            Close-PopUp
+            [System.Windows.MessageBox]::Show("No MSI file found for WAU version $targetVersion.`n`nPlease download the MSI first using the [wau] button.", "MSI Not Found", "OK", "Warning")
+            return $false
+        }
+        
+        # Check for corresponding MST file
+        $msiDirectory = Split-Path $actualMsiPath -Parent
+        $mstFiles = Get-ChildItem -Path $msiDirectory -Filter "*.mst" -File
+        
+        if ($mstFiles.Count -eq 0) {
+            Close-PopUp
+            $result = [System.Windows.MessageBox]::Show(
+                "MSI file found: $(Split-Path $actualMsiPath -Leaf)`n`nBut no MST transform file found in the same directory.`n`nYou need to create an MST file first using the [msi] button.`n`nDo you want to create an MST file now?",
+                "MST File Missing",
+                "OkCancel",
+                "Question"
+            )
+            
+            if ($result -eq 'Ok') {
+                # Create MST file using existing function
+                if (New-WAUTransformFile -controls $controls) {
+                    [System.Windows.MessageBox]::Show("MST file created successfully!`n`nYou can now use the WSB testing feature.", "MST Created", "OK", "Information")
+                }
+            }
+            return $false
+        }
+        
+        # Check if Windows Sandbox is installed
+        $wsbFeature = Get-WindowsOptionalFeature -Online -FeatureName "Containers-DisposableClientVM" -ErrorAction SilentlyContinue
+        
+        if (-not $wsbFeature -or $wsbFeature.State -ne "Enabled") {
+            Close-PopUp
+            
+            $wsbStatus = if (-not $wsbFeature) { "not available" } else { "disabled" }
+            $result = [System.Windows.MessageBox]::Show(
+                "Windows Sandbox is $wsbStatus on this system.`n`nWindows Sandbox is required for safe MSI testing.`n`nDo you want to enable Windows Sandbox?`n`nNote: This requires a restart and Windows Pro/Enterprise/Education edition.",
+                "Windows Sandbox Required",
+                "OkCancel",
+                "Question"
+            )
+            
+            if ($result -eq 'Ok') {
+                try {
+                    Start-PopUp "Enabling Windows Sandbox feature..."
+                    
+                    # Enable Windows Sandbox feature
+                    Enable-WindowsOptionalFeature -Online -FeatureName "Containers-DisposableClientVM" -All -NoRestart
+                    
+                    Close-PopUp
+                    [System.Windows.MessageBox]::Show(
+                        "Windows Sandbox has been enabled successfully!`n`nA restart is required before you can use Windows Sandbox.`n`nAfter restart, you can use the WSB testing feature.",
+                        "Feature Enabled",
+                        "OK",
+                        "Information"
+                    )
+                }
+                catch {
+                    Close-PopUp
+                    [System.Windows.MessageBox]::Show(
+                        "Failed to enable Windows Sandbox: $($_.Exception.Message)`n`nPlease ensure you are running Windows Pro/Enterprise/Education and try enabling it manually via 'Turn Windows features on or off'.",
+                        "Enable Failed",
+                        "OK",
+                        "Error"
+                    )
+                }
+            }
+            return $false
+        }
+        
+        Close-PopUp
+        
+        # All requirements met - proceed with WSB testing
+        $mstFile = $mstFiles[0]
+        $message = "Requirements check passed!`n`n"
+        $message += "MSI found: $(Split-Path $actualMsiPath -Leaf)`n"
+        $message += "MST found: $($mstFile.Name)`n"
+        $message += "Windows Sandbox: Enabled`n`n"
+        $message += "Ready for WSB testing. Do you want to continue?"
+        
+        $result = [System.Windows.MessageBox]::Show($message, "WSB Testing Ready", "OkCancel", "Question")
+
+        if ($result -eq 'Ok') {
+            Start-PopUp "Preparing WSB testing environment..."
+            
+            try {
+                # Create WSB-specific install/uninstall scripts
+                $msiDirectory = Split-Path $actualMsiPath -Parent
+                $originalInstallCmd = Join-Path $msiDirectory "Install.cmd"
+                $originalUninstallCmd = Join-Path $msiDirectory "Uninstall.cmd"
+                $wsbInstallCmd = Join-Path $msiDirectory "InstallWSB.cmd"
+                $wsbUninstallCmd = Join-Path $msiDirectory "UninstallWSB.cmd"
+                
+                # Check if original Install.cmd exists
+                if (-not (Test-Path $originalInstallCmd)) {
+                    Close-PopUp
+                    [System.Windows.MessageBox]::Show("Install.cmd not found. Please create MST files first using the [msi] button.", "Missing Install Script", "OK", "Warning")
+                    return $false
+                }
+                
+                # Copy and modify Install.cmd for WSB (replace /qn with /qb and add explorer command)
+                $installContent = Get-Content -Path $originalInstallCmd -Raw
+                $wsbInstallContent = $installContent -replace '/qn', '/qb'
+                
+                # Add explorer command at the beginning
+                $wsbInstallContent = "explorer C:\WAU-Test`r`n" + $wsbInstallContent
+                
+                Set-Content -Path $wsbInstallCmd -Value $wsbInstallContent -Encoding UTF8
+                
+                # Copy and modify Uninstall.cmd for WSB if it exists
+                if (Test-Path $originalUninstallCmd) {
+                    $uninstallContent = Get-Content -Path $originalUninstallCmd -Raw
+                    $wsbUninstallContent = $uninstallContent -replace '/qn', '/qb'
+                    Set-Content -Path $wsbUninstallCmd -Value $wsbUninstallContent -Encoding UTF8
+                }
+                
+                # Create Windows Sandbox configuration file
+                $tempDir = [System.IO.Path]::GetTempPath()
+                $wsbConfigPath = Join-Path $tempDir "test.wsb"
+                
+                # WSB configuration content
+                $wsbConfig = @"
+<Configuration>
+<VGpu>Enable</VGpu>
+<AudioInput>Enable</AudioInput>
+<VideoInput>Enable</VideoInput>
+<ProtectedClient>Enable</ProtectedClient>
+<PrinterRedirection>Enable</PrinterRedirection>
+<ClipboardRedirection>Enable</ClipboardRedirection>
+<MemoryInMB>4096</MemoryInMB>
+<MappedFolders>
+<MappedFolder>
+<HostFolder>$msiDirectory</HostFolder>
+<SandboxFolder>C:\WAU-Test</SandboxFolder>
+<ReadOnly>false</ReadOnly>
+</MappedFolder>
+</MappedFolders>
+<LogonCommand>
+<Command>C:\WAU-Test\InstallWSB.cmd</Command>
+</LogonCommand>
+</Configuration>
+"@
+                
+                # Write WSB configuration file
+                Set-Content -Path $wsbConfigPath -Value $wsbConfig -Encoding UTF8
+                
+                Close-PopUp
+                
+                # Start Windows Sandbox with the configuration
+                Start-Process -FilePath $wsbConfigPath
+                
+                [System.Windows.MessageBox]::Show("Windows Sandbox has been launched with WAU testing environment.`n`nThe C:\WAU-Test folder will open automatically, then the MSI installation will start.", "WSB Testing Started", "OK", "Information")
+                
+                return $true
+                
+            }
+            catch {
+                Close-PopUp
+                [System.Windows.MessageBox]::Show("Failed to create WSB testing environment: $($_.Exception.Message)", "WSB Preparation Failed", "OK", "Error")
+                return $false
+            }
+        }
+        
+        return $true
+        
+    }
+    catch {
+        Close-PopUp
+        [System.Windows.MessageBox]::Show("WSB check failed: $($_.Exception.Message)", "Error", "OK", "Error")
+        return $false
+    }
+}
 function Start-WAUManually {
     try {
         $currentConfig = Get-WAUCurrentConfig
@@ -4423,244 +4659,22 @@ function Show-WAUSettingsGUI {
 
     $controls.DevWSBButton.Add_Click({
         try {
-            Start-PopUp "Checking WSB requirements..."
-            
-            # Get installed WAU version to determine which MSI to look for
-            $targetVersion = $null
-            $isPreRelease = $false
-            
-            try {
-                if ($Script:WAU_GUID) {
-                    $registryPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$($Script:WAU_GUID)"
-                    $wauRegistry = Get-ItemProperty -Path $registryPath -ErrorAction Stop
-                    
-                    $comments = $wauRegistry.Comments
-                    $displayVersion = $wauRegistry.DisplayVersion
-                    
-                    # Determine version string like other dev buttons
-                    if ($comments -and $comments -ne "STABLE") {
-                        $isPreRelease = $true
-                        if ($comments -match "WAU\s+([0-9]+\.[0-9]+\.[0-9]+(?:-\d+)?)(?:\s|\[)") {
-                            $targetVersion = "v$($matches[1])"
-                        } else {
-                            $targetVersion = "v$displayVersion"
-                        }
-                    } else {
-                        $targetVersion = "v$($displayVersion -replace '\.\d+$', '')"
-                    }
-                }
-            } catch {
-                Close-PopUp
-                [System.Windows.MessageBox]::Show("Could not determine installed WAU version. Please ensure WAU is properly installed.", "Version Detection Failed", "OK", "Warning")
-                return
-            }
-            
-            if (-not $targetVersion) {
-                Close-PopUp
-                [System.Windows.MessageBox]::Show("Could not determine WAU version for WSB testing.", "Version Detection Failed", "OK", "Warning")
-                return
-            }
-            
-            # Check for MSI file in msi directory
-            $msiDir = Join-Path $Script:WorkingDir "msi"
-            $versionDir = Join-Path $msiDir $targetVersion.TrimStart('v')
-            $expectedMsiName = "WAU-$targetVersion.msi"
-            $msiPath = Join-Path $versionDir $expectedMsiName
-            
-            # Alternative MSI name patterns
-            $msiFound = $false
-            $actualMsiPath = $null
-            
-            if (Test-Path $msiPath) {
-                $msiFound = $true
-                $actualMsiPath = $msiPath
-            } else {
-                # Look for WAU.msi or other patterns in version directory
-                if (Test-Path $versionDir) {
-                    $msiFiles = Get-ChildItem -Path $versionDir -Filter "*.msi" -File
-                    if ($msiFiles) {
-                        $msiFound = $true
-                        $actualMsiPath = $msiFiles[0].FullName
-                    }
-                }
-            }
-            
-            if (-not $msiFound) {
-                Close-PopUp
-                [System.Windows.MessageBox]::Show("No MSI file found for WAU version $targetVersion.`n`nPlease download the MSI first using the [msi] button.", "MSI Not Found", "OK", "Warning")
-                return
-            }
-            
-            # Check for corresponding MST file
-            $msiDirectory = Split-Path $actualMsiPath -Parent
-            $mstFiles = Get-ChildItem -Path $msiDirectory -Filter "*.mst" -File
-            
-            if ($mstFiles.Count -eq 0) {
-                Close-PopUp
-                $result = [System.Windows.MessageBox]::Show(
-                    "MSI file found: $(Split-Path $actualMsiPath -Leaf)`n`nBut no MST transform file found in the same directory.`n`nYou need to create an MST file first using the [msi] button.`n`nDo you want to create an MST file now?",
-                    "MST File Missing",
-                    "OkCancel",
-                    "Question"
-                )
+            if (Start-WSBTesting -controls $controls) {
+                # Update status to "Done"
+                $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
+                $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED
                 
-                if ($result -eq 'Ok') {
-                    # Create MST file using existing function
-                    if (New-WAUTransformFile -controls $controls) {
-                        [System.Windows.MessageBox]::Show("MST file created successfully!`n`nYou can now use the WSB testing feature.", "MST Created", "OK", "Information")
-                    }
-                }
-                return
+                # Create timer to reset status back to ready after standard wait time
+                $window.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Background, [Action]{
+                    Start-Sleep -Milliseconds $Script:WAIT_TIME
+                    $controls.StatusBarText.Text = $Script:STATUS_READY_TEXT
+                    $controls.StatusBarText.Foreground = $Script:COLOR_INACTIVE
+                }) | Out-Null
             }
-            
-            # Check if Windows Sandbox is installed
-            $wsbFeature = Get-WindowsOptionalFeature -Online -FeatureName "Containers-DisposableClientVM" -ErrorAction SilentlyContinue
-            
-            if (-not $wsbFeature -or $wsbFeature.State -ne "Enabled") {
-                Close-PopUp
-                
-                $wsbStatus = if (-not $wsbFeature) { "not available" } else { "disabled" }
-                $result = [System.Windows.MessageBox]::Show(
-                    "Windows Sandbox is $wsbStatus on this system.`n`nWindows Sandbox is required for safe MSI testing.`n`nDo you want to enable Windows Sandbox?`n`nNote: This requires a restart and Windows Pro/Enterprise/Education edition.",
-                    "Windows Sandbox Required",
-                    "OkCancel",
-                    "Question"
-                )
-                
-                if ($result -eq 'Ok') {
-                    try {
-                        Start-PopUp "Enabling Windows Sandbox feature..."
-                        
-                        # Enable Windows Sandbox feature
-                        Enable-WindowsOptionalFeature -Online -FeatureName "Containers-DisposableClientVM" -All -NoRestart
-                        
-                        Close-PopUp
-                        [System.Windows.MessageBox]::Show(
-                            "Windows Sandbox has been enabled successfully!`n`nA restart is required before you can use Windows Sandbox.`n`nAfter restart, you can use the WSB testing feature.",
-                            "Feature Enabled",
-                            "OK",
-                            "Information"
-                        )
-                    }
-                    catch {
-                        Close-PopUp
-                        [System.Windows.MessageBox]::Show(
-                            "Failed to enable Windows Sandbox: $($_.Exception.Message)`n`nPlease ensure you are running Windows Pro/Enterprise/Education and try enabling it manually via 'Turn Windows features on or off'.",
-                            "Enable Failed",
-                            "OK",
-                            "Error"
-                        )
-                    }
-                }
-                return
-            }
-            
-            Close-PopUp
-            
-            # All requirements met - proceed with WSB testing
-            $mstFile = $mstFiles[0]
-            $message = "Requirements check passed!`n`n"
-            $message += "MSI found: $(Split-Path $actualMsiPath -Leaf)`n"
-            $message += "MST found: $($mstFile.Name)`n"
-            $message += "Windows Sandbox: Enabled`n`n"
-            $message += "Ready for WSB testing. Do you want to continue?"
-            
-            $result = [System.Windows.MessageBox]::Show($message, "WSB Testing Ready", "OkCancel", "Question")
-
-            if ($result -eq 'Ok') {
-                Start-PopUp "Preparing WSB testing environment..."
-                
-                try {
-                    # Create WSB-specific install/uninstall scripts
-                    $msiDirectory = Split-Path $actualMsiPath -Parent
-                    $originalInstallCmd = Join-Path $msiDirectory "Install.cmd"
-                    $originalUninstallCmd = Join-Path $msiDirectory "Uninstall.cmd"
-                    $wsbInstallCmd = Join-Path $msiDirectory "InstallWSB.cmd"
-                    $wsbUninstallCmd = Join-Path $msiDirectory "UninstallWSB.cmd"
-                    
-                    # Check if original Install.cmd exists
-                    if (-not (Test-Path $originalInstallCmd)) {
-                        Close-PopUp
-                        [System.Windows.MessageBox]::Show("Install.cmd not found. Please create MST files first using the [msi] button.", "Missing Install Script", "OK", "Warning")
-                        return
-                    }
-                    
-                    # Copy and modify Install.cmd for WSB (replace /qn with /qb and add explorer command)
-                    $installContent = Get-Content -Path $originalInstallCmd -Raw
-                    $wsbInstallContent = $installContent -replace '/qn', '/qb'
-                    
-                    # Add explorer command at the beginning
-                    $wsbInstallContent = "explorer C:\WAU-Test`r`n" + $wsbInstallContent
-                    
-                    Set-Content -Path $wsbInstallCmd -Value $wsbInstallContent -Encoding UTF8
-                    
-                    # Copy and modify Uninstall.cmd for WSB if it exists
-                    if (Test-Path $originalUninstallCmd) {
-                        $uninstallContent = Get-Content -Path $originalUninstallCmd -Raw
-                        $wsbUninstallContent = $uninstallContent -replace '/qn', '/qb'
-                        Set-Content -Path $wsbUninstallCmd -Value $wsbUninstallContent -Encoding UTF8
-                    }
-                    
-                    # Create Windows Sandbox configuration file
-                    $tempDir = [System.IO.Path]::GetTempPath()
-                    $wsbConfigPath = Join-Path $tempDir "test.wsb"
-                    
-                    # WSB configuration content
-                    $wsbConfig = @"
-<Configuration>
-<VGpu>Enable</VGpu>
-<AudioInput>Enable</AudioInput>
-<VideoInput>Enable</VideoInput>
-<ProtectedClient>Enable</ProtectedClient>
-<PrinterRedirection>Enable</PrinterRedirection>
-<ClipboardRedirection>Enable</ClipboardRedirection>
-<MemoryInMB>4096</MemoryInMB>
-<MappedFolders>
-<MappedFolder>
-<HostFolder>$msiDirectory</HostFolder>
-<SandboxFolder>C:\WAU-Test</SandboxFolder>
-<ReadOnly>false</ReadOnly>
-</MappedFolder>
-</MappedFolders>
-<LogonCommand>
-<Command>C:\WAU-Test\InstallWSB.cmd</Command>
-</LogonCommand>
-</Configuration>
-"@
-                    
-                    # Write WSB configuration file
-                    Set-Content -Path $wsbConfigPath -Value $wsbConfig -Encoding UTF8
-                    
-                    Close-PopUp
-                    
-                    # Start Windows Sandbox with the configuration
-                    Start-Process -FilePath $wsbConfigPath
-                    
-                    [System.Windows.MessageBox]::Show("Windows Sandbox has been launched with WAU testing environment.`n`nThe C:\WAU-Test folder will open automatically, then the MSI installation will start.", "WSB Testing Started", "OK", "Information")
-                    
-                }
-                catch {
-                    Close-PopUp
-                    [System.Windows.MessageBox]::Show("Failed to create WSB testing environment: $($_.Exception.Message)", "WSB Preparation Failed", "OK", "Error")
-                    return
-                }
-            }
-
-            # Update status to "Done"
-            $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
-            $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED
-            
-            # Create timer to reset status back to ready after standard wait time
-            $window.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Background, [Action]{
-                Start-Sleep -Milliseconds $Script:WAIT_TIME
-                $controls.StatusBarText.Text = $Script:STATUS_READY_TEXT
-                $controls.StatusBarText.Foreground = $Script:COLOR_INACTIVE
-            }) | Out-Null
-            
         }
         catch {
-            Close-PopUp
-            [System.Windows.MessageBox]::Show("WSB check failed: $($_.Exception.Message)", "Error", "OK", "Error")
+            # This should only catch unexpected errors that Start-WSBTesting doesn't handle
+            [System.Windows.MessageBox]::Show("Unexpected error in WSB operation: $($_.Exception.Message)", "Error", "OK", "Error")
         }
     })
 
