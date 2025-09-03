@@ -2483,11 +2483,14 @@ function Start-WSBTesting {
                     
                     Close-PopUp
                     [System.Windows.MessageBox]::Show(
-                        "Windows Sandbox has been enabled successfully!`n`nA restart is REQUIRED before you can use Windows Sandbox.`n`nAfter restart, you can use the WSB testing feature.",
+                        "Windows Sandbox has been enabled successfully!`n`nA restart is REQUIRED before you can use Windows Sandbox.`n`nDo you want to restart now?",
                         "Feature Enabled",
-                        "OK",
-                        "Information"
+                        "OKCancel",
+                        "Question"
                     )
+                    if ($result -eq 'Ok') {
+                        Restart-Computer
+                    }
                 }
                 catch {
                     Close-PopUp
