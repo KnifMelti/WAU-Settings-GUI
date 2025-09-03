@@ -2476,14 +2476,14 @@ function Start-WSBTesting {
             
             if ($result -eq 'Ok') {
                 try {
-                    Start-PopUp "Enabling Windows Sandbox feature..."
+                    Start-PopUp "Enabling Windows Sandbox feature (can take some time)..."
                     
                     # Enable Windows Sandbox feature
                     Enable-WindowsOptionalFeature -Online -FeatureName "Containers-DisposableClientVM" -All -NoRestart
                     
                     Close-PopUp
                     [System.Windows.MessageBox]::Show(
-                        "Windows Sandbox has been enabled successfully!`n`nA restart is required before you can use Windows Sandbox.`n`nAfter restart, you can use the WSB testing feature.",
+                        "Windows Sandbox has been enabled successfully!`n`nA restart is REQUIRED before you can use Windows Sandbox.`n`nAfter restart, you can use the WSB testing feature.",
                         "Feature Enabled",
                         "OK",
                         "Information"
