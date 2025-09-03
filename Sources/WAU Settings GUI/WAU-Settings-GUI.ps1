@@ -2434,7 +2434,7 @@ function Start-WSBTesting {
         
         if (-not $msiFound) {
             Close-PopUp
-            [System.Windows.MessageBox]::Show("No MSI file found for WAU version $targetVersion.`n`nPlease download the MSI first using the [wau] button.", "MSI Not Found", "OK", "Warning")
+            [System.Windows.MessageBox]::Show("No MSI file found for WAU version $targetVersion.`n`nPlease download the MSI first using the [msi] button.", "MSI Not Found", "OK", "Warning")
             return $false
         }
         
