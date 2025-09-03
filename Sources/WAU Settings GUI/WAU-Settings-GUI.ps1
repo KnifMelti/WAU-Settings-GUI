@@ -2525,13 +2525,6 @@ function Start-WSBTesting {
                 $wsbInstallCmd = Join-Path $msiDirectory "InstallWSB.cmd"
                 $wsbUninstallCmd = Join-Path $msiDirectory "UninstallWSB.cmd"
                 
-                # Check if original Install.cmd exists
-                if (-not (Test-Path $originalInstallCmd)) {
-                    Close-PopUp
-                    [System.Windows.MessageBox]::Show("Install.cmd not found. Please create MST files first using the [msi] button.", "Missing Install Script", "OK", "Warning")
-                    return $false
-                }
-                
                 # Copy and modify Install.cmd for WSB (replace /qn with /qb and add explorer command)
                 $installContent = Get-Content -Path $originalInstallCmd -Raw
                 $wsbInstallContent = $installContent -replace '/qn', '/qb'
