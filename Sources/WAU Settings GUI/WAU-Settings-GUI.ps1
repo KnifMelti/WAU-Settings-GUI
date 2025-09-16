@@ -2532,17 +2532,21 @@ function Start-WSBTesting {
                 $installContent = Get-Content -Path $originalInstallCmd -Raw
                 $wsbInstallContent = $installContent -replace '/qn', '/qb'
                 
-                # Add explorer command at the beginning
-                $wsbInstallContent = "explorer C:\WAU-Test`r`n" + $wsbInstallContent
+                # Add delete log files at the beginning
+                $wsbInstallContent = "del /q C:\WAU-Test\*.log`r`n" + $wsbInstallContent
+
+                # Add explorer command at the end
+                $wsbInstallContent = $wsbInstallContent + "`r`nexplorer C:\WAU-Test"
                 
-                Set-Content -Path $wsbInstallCmd -Value $wsbInstallContent -Encoding UTF8
+                Set-Content -Path $wsbInstallCmd -Value $wsbInstallContent -Encoding ASCII
                 
                 # Copy and modify Uninstall.cmd for WSB if it exists
                 if (Test-Path $originalUninstallCmd) {
                     $uninstallContent = Get-Content -Path $originalUninstallCmd -Raw
                     $wsbUninstallContent = $uninstallContent -replace '/qn', '/qb'
-                    Set-Content -Path $wsbUninstallCmd -Value $wsbUninstallContent -Encoding UTF8
+                    Set-Content -Path $wsbUninstallCmd -Value $wsbUninstallContent -Encoding ASCII
                 }
+                
                 
                 # Create Windows Sandbox configuration file
                 $tempDir = [System.IO.Path]::GetTempPath()
