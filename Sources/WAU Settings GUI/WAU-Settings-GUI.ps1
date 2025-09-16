@@ -1958,7 +1958,7 @@ msiexec /i "%~dp0$msiFileName" TRANSFORMS="%~dp0$transformName" /qn /l*v "%~dp0I
 msiexec /x"$($guid)" REBOOT=R /qn /l*v "%~dp0Uninst-$logFileName"
 
 ::Uninstall for ANY version:
-::powershell.exe -Command "Get-Package -Name "*Winget-AutoUpdate*" | Uninstall-Package -Force"
+::powershell.exe -Command "Get-Package -Name '*Winget-AutoUpdate*' | Uninstall-Package -Force"
 "@
             Set-Content -Path $cmdFilePath -Value $cmdContent -Encoding ASCII
             
