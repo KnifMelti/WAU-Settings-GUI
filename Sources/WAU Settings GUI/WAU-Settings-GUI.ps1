@@ -2460,51 +2460,6 @@ function Start-WSBTesting {
             return $false
         }
         
-        # Check if Windows Sandbox is installed
-        $wsbFeature = Get-WindowsOptionalFeature -Online -FeatureName "Containers-DisposableClientVM" -ErrorAction SilentlyContinue
-        
-        if (-not $wsbFeature -or $wsbFeature.State -ne "Enabled") {
-            Close-PopUp
-            
-            $wsbStatus = if (-not $wsbFeature) { "not available" } else { "disabled" }
-            $result = [System.Windows.MessageBox]::Show(
-                "Windows Sandbox is $wsbStatus on this system.`n`nWindows Sandbox is required for safe MSI testing.`nDo you want to enable Windows Sandbox?`n`nNote: This requires a restart and Windows Pro/Enterprise/Education edition.",
-                "Windows Sandbox Required",
-                "OkCancel",
-                "Question"
-            )
-            
-            if ($result -eq 'Ok') {
-                try {
-                    Start-PopUp "Enabling Windows Sandbox feature (can take some time)..."
-                    
-                    # Enable Windows Sandbox feature
-                    Enable-WindowsOptionalFeature -Online -FeatureName "Containers-DisposableClientVM" -All -NoRestart
-                    
-                    Close-PopUp
-                    [System.Windows.MessageBox]::Show(
-                        "Windows Sandbox has been enabled successfully!`n`nA restart is REQUIRED before you can use Windows Sandbox.`n`nDo you want to restart now?",
-                        "Feature Enabled",
-                        "OKCancel",
-                        "Question"
-                    )
-                    if ($result -eq 'Ok') {
-                        Restart-Computer
-                    }
-                }
-                catch {
-                    Close-PopUp
-                    [System.Windows.MessageBox]::Show(
-                        "Failed to enable Windows Sandbox: $($_.Exception.Message)`n`nPlease ensure you are running Windows Pro/Enterprise/Education and try enabling it manually via 'Turn Windows features on or off'.",
-                        "Enable Failed",
-                        "OK",
-                        "Error"
-                    )
-                }
-            }
-            return $false
-        }
-        
         Close-PopUp
         
         # All requirements met - proceed with WSB testing
@@ -4659,6 +4614,37 @@ function Show-WAUSettingsGUI {
 
     $controls.DevWSBButton.Add_Click({
         try {
+            # Windows Sandbox readiness logic
+            $sandboxExe = Join-Path $env:SystemRoot "System32\WindowsSandbox.exe"
+            if (-not (Test-Path $sandboxExe)) {
+                # Exe missing => either not enabled or enabled but pending reboot
+                $wsbFeature = Get-WindowsOptionalFeature -Online -FeatureName "Containers-DisposableClientVM" -ErrorAction SilentlyContinue
+                if ($wsbFeature -and $wsbFeature.State -eq 'Enabled') {
+                    # Enabled but exe missing -> pending reboot
+                    $pendingMsg = "Windows Sandbox feature is enabled but the executable is missing:`n$sandboxExe`n`nA restart is required before it can be used.`n`nRestart now?"
+                    $restartChoice = [System.Windows.MessageBox]::Show($pendingMsg, "Restart Required", "OkCancel", "Information")
+                    if ($restartChoice -eq 'Ok') { Restart-Computer }
+                    return
+                } else {
+                    # Not enabled (or not found) -> offer enable
+                    $enablePrompt = "Windows Sandbox is not enabled (exe missing:`n$sandboxExe`).`n`nEnable the feature now? (Restart required after enabling)"
+                    $choice = [System.Windows.MessageBox]::Show($enablePrompt, "Windows Sandbox Not Enabled", "OkCancel", "Question")
+                    if ($choice -ne 'Ok') { return }
+                    try {
+                        Start-PopUp "Enabling Windows Sandbox (this can take a while)..."
+                        Enable-WindowsOptionalFeature -Online -FeatureName "Containers-DisposableClientVM" -All -NoRestart -ErrorAction Stop | Out-Null
+                        Close-PopUp
+                        $reboot = [System.Windows.MessageBox]::Show("Feature enabled. A restart is required before Windows Sandbox can be used.`n`nRestart now?", "Restart Required", "OkCancel", "Information")
+                        if ($reboot -eq 'Ok') { Restart-Computer }
+                    }
+                    catch {
+                        Close-PopUp
+                        [System.Windows.MessageBox]::Show("Failed to enable Windows Sandbox: $($_.Exception.Message)", "Enable Failed", "OK", "Error") | Out-Null
+                    }
+                    return
+                }
+            }
+
             if (Start-WSBTesting -controls $controls) {
                 # Update status to "Done"
                 $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
