@@ -37,8 +37,24 @@ Must be run as Administrator
 #>
 
 param(
-    [switch]$Portable
+    [switch]$Portable,
+    [switch]$SandboxTest
  )
+
+if ($SandboxTest.IsPresent) {
+    $Script:WorkingDir = $PSScriptRoot
+    # Import required assemblies
+    Add-Type -AssemblyName System.Windows.Forms
+    Add-Type -AssemblyName System.Drawing
+    Add-Type -AssemblyName PresentationFramework
+    . $WorkingDir\SandboxTest.ps1
+    # Call the function
+    SandboxTest -MapFolder "D:\WAU Settings GUI\msi\2.8.0" -SandboxFolderName "WAU-install" -EnableExperimentalFeatures -Script {
+        $SandboxFolderName = "WAU-install"
+        Start-Process cmd.exe -ArgumentList "/c del /Q ""$env:USERPROFILE\Desktop\$SandboxFolderName\*.log"" & ""$env:USERPROFILE\Desktop\$SandboxFolderName\InstallWSB.cmd"" && explorer ""$env:USERPROFILE\Desktop\$SandboxFolderName"""
+    } -Async -Verbose
+    exit
+}
 
 # Set portable mode flag
 $Script:PORTABLE_MODE = $Portable.IsPresent
@@ -2488,10 +2504,10 @@ function Start-WSBTesting {
                 $wsbInstallContent = $installContent -replace '/qn', '/qb'
                 
                 # Add delete log files at the beginning
-                $wsbInstallContent = "del /q C:\WAU-Test\*.log`r`n" + $wsbInstallContent
+                # $wsbInstallContent = "del /q C:\WAU-Test\*.log`r`n" + $wsbInstallContent
 
                 # Add explorer command at the end
-                $wsbInstallContent = $wsbInstallContent + "`r`nexplorer C:\WAU-Test"
+                # $wsbInstallContent = $wsbInstallContent + "`r`nexplorer C:\WAU-Test"
                 
                 Set-Content -Path $wsbInstallCmd -Value $wsbInstallContent -Encoding ASCII
                 
@@ -2503,42 +2519,50 @@ function Start-WSBTesting {
                 }
                 
                 
-                # Create Windows Sandbox configuration file
-                $tempDir = [System.IO.Path]::GetTempPath()
-                $wsbConfigPath = Join-Path $tempDir "test.wsb"
+#                 # Create Windows Sandbox configuration file
+#                 $tempDir = [System.IO.Path]::GetTempPath()
+#                 $wsbConfigPath = Join-Path $tempDir "test.wsb"
                 
-                # WSB configuration content
-                $wsbConfig = @"
-<Configuration>
-<VGpu>Enable</VGpu>
-<AudioInput>Enable</AudioInput>
-<VideoInput>Enable</VideoInput>
-<ProtectedClient>Enable</ProtectedClient>
-<PrinterRedirection>Enable</PrinterRedirection>
-<ClipboardRedirection>Enable</ClipboardRedirection>
-<MemoryInMB>4096</MemoryInMB>
-<MappedFolders>
-<MappedFolder>
-<HostFolder>$msiDirectory</HostFolder>
-<SandboxFolder>C:\WAU-Test</SandboxFolder>
-<ReadOnly>false</ReadOnly>
-</MappedFolder>
-</MappedFolders>
-<LogonCommand>
-<Command>C:\WAU-Test\InstallWSB.cmd</Command>
-</LogonCommand>
-</Configuration>
-"@
+#                 # WSB configuration content
+#                 $wsbConfig = @"
+# <Configuration>
+# <VGpu>Enable</VGpu>
+# <AudioInput>Enable</AudioInput>
+# <VideoInput>Enable</VideoInput>
+# <ProtectedClient>Enable</ProtectedClient>
+# <PrinterRedirection>Enable</PrinterRedirection>
+# <ClipboardRedirection>Enable</ClipboardRedirection>
+# <MemoryInMB>4096</MemoryInMB>
+# <MappedFolders>
+# <MappedFolder>
+# <HostFolder>$msiDirectory</HostFolder>
+# <SandboxFolder>C:\WAU-Test</SandboxFolder>
+# <ReadOnly>false</ReadOnly>
+# </MappedFolder>
+# </MappedFolders>
+# <LogonCommand>
+# <Command>C:\WAU-Test\InstallWSB.cmd</Command>
+# </LogonCommand>
+# </Configuration>
+# "@
                 
-                # Write WSB configuration file
-                Set-Content -Path $wsbConfigPath -Value $wsbConfig -Encoding UTF8
+#                 # Write WSB configuration file
+#                 Set-Content -Path $wsbConfigPath -Value $wsbConfig -Encoding UTF8
                 
-                Close-PopUp
                 
                 # Start Windows Sandbox with the configuration
-                Start-Process -FilePath $wsbConfigPath
-                
-                [System.Windows.MessageBox]::Show("Windows Sandbox has been launched with WAU testing environment.`n`nThe C:\WAU-Test folder will open automatically, then the MSI installation will start.", "WSB Testing Started", "OK", "Information")
+                # Start-Process -FilePath $wsbConfigPath
+                . $WorkingDir\SandboxTest.ps1
+
+                # Call the function
+                SandboxTest -MapFolder $msiDirectory -SandboxFolderName "WAU-install" -EnableExperimentalFeatures -Script {
+                    $SandboxFolderName = "WAU-install"
+                    Start-Process cmd.exe -ArgumentList "/c del /Q ""$env:USERPROFILE\Desktop\$SandboxFolderName\*.log"" & ""$env:USERPROFILE\Desktop\$SandboxFolderName\InstallWSB.cmd"" && explorer ""$env:USERPROFILE\Desktop\$SandboxFolderName"""
+                } -Async -Verbose
+
+                Close-PopUp
+
+                [System.Windows.MessageBox]::Show("Windows Sandbox is launching with the WAU testing environment.", "WSB Testing Starting", "OK", "Information")
                 
                 return $true
                 
