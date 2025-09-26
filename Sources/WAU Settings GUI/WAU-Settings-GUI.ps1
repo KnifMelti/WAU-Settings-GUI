@@ -4669,6 +4669,32 @@ function Show-WAUSettingsGUI {
                 }
             }
 
+            # Create SandboxTest shortcut in user's start menu if it doesn't exist
+            $userStartMenuPath = [Environment]::GetFolderPath('StartMenu')
+            $sandboxTestShortcutPath = Join-Path $userStartMenuPath "Programs\SandboxTest.lnk"
+
+            if (-not (Test-Path $sandboxTestShortcutPath)) {
+                try {
+                    # Ensure the Programs directory exists
+                    $programsDir = Join-Path $userStartMenuPath "Programs"
+                    if (-not (Test-Path $programsDir)) {
+                        New-Item -Path $programsDir -ItemType Directory -Force | Out-Null
+                    }
+                    
+                    # Create the shortcut
+                    Add-Shortcut -Shortcut $sandboxTestShortcutPath `
+                                -Target "powershell.exe" `
+                                -StartIn $Script:WorkingDir `
+                                -Arguments "-NoProfile -ExecutionPolicy Bypass -NoExit -File `"$($Script:WorkingDir)\WAU-Settings-GUI.ps1`" -SandboxTest" `
+                                -Icon $Script:GUI_ICON `
+                                -Description "Launch WAU Settings GUI in SandboxTest mode" `
+                                -WindowStyle "Normal"
+                }
+                catch {
+                    Write-Warning "Failed to create SandboxTest shortcut: $($_.Exception.Message)"
+                }
+            }
+
             if (Start-WSBTesting -controls $controls) {
                 # Update status to "Done"
                 $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
