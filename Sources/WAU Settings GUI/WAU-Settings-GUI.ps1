@@ -240,7 +240,6 @@ Start-Process explorer.exe -ArgumentList "`$env:USERPROFILE\Desktop\`$SandboxFol
             $chkVerbose.Location = New-Object System.Drawing.Point($leftMargin, $y)
             $chkVerbose.Size = New-Object System.Drawing.Size(200, $labelHeight)
             $chkVerbose.Text = "Verbose (log)"
-            $chkVerbose.Checked = $true
             $form.Controls.Add($chkVerbose)
             
             $y += $labelHeight + 5
@@ -248,7 +247,7 @@ Start-Process explorer.exe -ArgumentList "`$env:USERPROFILE\Desktop\`$SandboxFol
             $chkWait = New-Object System.Windows.Forms.CheckBox
             $chkWait.Location = New-Object System.Drawing.Point($leftMargin, $y)
             $chkWait.Size = New-Object System.Drawing.Size(250, $labelHeight)
-            $chkWait.Text = "Wait (for key press before exit)"
+            $chkWait.Text = "Wait (for key press before exit PS window)"
             $form.Controls.Add($chkWait)
             
             $y += $labelHeight + $spacing + 10
