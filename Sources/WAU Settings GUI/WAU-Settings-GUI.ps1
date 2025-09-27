@@ -4650,9 +4650,17 @@ function Show-WAUSettingsGUI {
                                 -Icon $Script:GUI_ICON `
                                 -Description "Launch WAU Settings GUI in SandboxTest mode" `
                                 -WindowStyle "Normal"
+                    
+                    # Show dialog about created shortcut
+                    [System.Windows.MessageBox]::Show(
+                        "A SandboxTest shortcut has been created in the Start Menu.`n`nYou can now run SandboxTest standalone from the Start Menu without opening WAU Settings GUI first.",
+                        "SandboxTest Shortcut Created",
+                        "OK",
+                        "Information"
+                    )
                 }
                 catch {
-                    Write-Warning "Failed to create SandboxTest shortcut: $($_.Exception.Message)"
+                    [System.Windows.MessageBox]::Show("Failed to create SandboxTest shortcut: $($_.Exception.Message)", "Shortcut Creation Failed", "OK", "Warning")
                 }
             }
 
