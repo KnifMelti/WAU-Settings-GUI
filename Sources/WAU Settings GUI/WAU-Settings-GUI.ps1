@@ -4898,6 +4898,51 @@ function Show-WAUSettingsGUI {
     })
 
     $controls.DevModsButton.Add_Click({
+        try {
+            # Get updated config
+            $updatedConfig = Get-WAUCurrentConfig
+            $installdir = $updatedConfig.InstallLocation
+            $modsPath = $updatedConfig.WAU_ModsPath
+            
+            if (-not [string]::IsNullOrWhiteSpace($modsPath) -and 
+                ($modsPath -match '^[a-zA-Z]:\\' -or $modsPath -match '^\\\\')) {
+                
+                # Use the external ModsPath
+                if (Test-Path $modsPath) {
+                    Start-PopUp "WAU Mods folder opening..."
+                    Start-Process "explorer.exe" -ArgumentList "`"$modsPath`""
+                } else {
+                    [System.Windows.MessageBox]::Show("Mods path doesn't exist ('$modsPath')", "Path Not Found", "OK", "Warning")
+                    return
+                }
+            } else {
+                # Use the default WAU installation directory for Mods
+                $defaultModsPath = Join-Path $installdir 'mods'
+                if (Test-Path $defaultModsPath) {
+                    Start-PopUp "WAU Mods folder opening..."
+                    Start-Process "explorer.exe" -ArgumentList "`"$defaultModsPath`""
+                } else {
+                    [System.Windows.MessageBox]::Show("No Mods folder found ('mods')", "Folder Not Found", "OK", "Warning")
+                    return
+                }
+            }
+
+            # Update status to "Done"
+            $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
+            $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED
+            
+            # Create timer to reset status back to ready after standard wait time
+            $window.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Background, [Action]{
+                Start-Sleep -Milliseconds $Script:WAIT_TIME
+                $controls.StatusBarText.Text = "$Script:STATUS_READY_TEXT"
+                $controls.StatusBarText.Foreground = "$Script:COLOR_INACTIVE"
+                Close-PopUp
+            }) | Out-Null
+        }
+        catch {
+            Close-PopUp
+            [System.Windows.MessageBox]::Show("Failed to open Mods folder: $($_.Exception.Message)", "Error", "OK", "Error")
+        }
     })
 
     $controls.DevListButton.Add_Click({
