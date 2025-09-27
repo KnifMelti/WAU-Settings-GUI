@@ -474,7 +474,6 @@ $ Enable-WindowsOptionalFeature -Online -FeatureName 'Containers-DisposableClien
         Stop-NamedProcess -ProcessName 'WindowsSandboxClient'
         Stop-NamedProcess -ProcessName 'WindowsSandboxRemoteSession'
         Stop-NamedProcess -ProcessName 'WindowsSandbox'
-        Stop-NamedProcess -ProcessName 'vmmemSandbox'
         Start-Sleep -Milliseconds 5000
 
         Write-Verbose 'Cleaning up previous test data'
