@@ -243,6 +243,14 @@ Start-Process explorer.exe -ArgumentList "`$env:USERPROFILE\Desktop\`$SandboxFol
             $chkVerbose.Checked = $true
             $form.Controls.Add($chkVerbose)
             
+            $y += $labelHeight + 5
+            
+            $chkWait = New-Object System.Windows.Forms.CheckBox
+            $chkWait.Location = New-Object System.Drawing.Point($leftMargin, $y)
+            $chkWait.Size = New-Object System.Drawing.Size(250, $labelHeight)
+            $chkWait.Text = "Wait (for key press before exit)"
+            $form.Controls.Add($chkWait)
+            
             $y += $labelHeight + $spacing + 10
             
             # Script section
@@ -332,6 +340,7 @@ Start-Process explorer.exe -ArgumentList "`$env:USERPROFILE\Desktop\`$SandboxFol
                 Clean = $chkClean.Checked
                 Async = $chkAsync.Checked
                 Verbose = $chkVerbose.Checked
+                Wait = $chkWait.Checked
                 Script = if (![string]::IsNullOrWhiteSpace($txtScript.Text)) { 
                     [ScriptBlock]::Create($txtScript.Text) 
                 } else { 
@@ -389,6 +398,12 @@ Start-Process explorer.exe -ArgumentList "`$env:USERPROFILE\Desktop\`$SandboxFol
         
         # Call SandboxTest with collected parameters
         SandboxTest @sandboxParams
+        
+        # Wait for key press if requested
+        if ($dialogResult.Wait) {
+            Write-Host "`nPress any key to exit..." -ForegroundColor Yellow
+            $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+        }
     }
     exit
 }
@@ -4981,7 +4996,7 @@ function Show-WAUSettingsGUI {
                     Add-Shortcut -Shortcut $sandboxTestShortcutPath `
                                 -Target "powershell.exe" `
                                 -StartIn $Script:WorkingDir `
-                                -Arguments "-NoProfile -ExecutionPolicy Bypass -NoExit -File `"$($Script:WorkingDir)\WAU-Settings-GUI.ps1`" -SandboxTest" `
+                                -Arguments "-NoProfile -ExecutionPolicy Bypass -File `"$($Script:WorkingDir)\WAU-Settings-GUI.ps1`" -SandboxTest" `
                                 -Icon $Script:GUI_ICON `
                                 -Description "Launch WAU Settings GUI in SandboxTest mode" `
                                 -WindowStyle "Normal"
