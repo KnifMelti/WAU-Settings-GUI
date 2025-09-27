@@ -647,7 +647,11 @@ $($Script.ToString())
         } else {
             # Start Sandbox and wait for it to exit
             Write-Verbose 'Launching Sandbox synchronously'
-            WindowsSandbox $script:ConfigurationFile
+            $wsbPath = (Get-Command 'WindowsSandbox').Source
+            $process = Start-Process -FilePath $wsbPath -ArgumentList $script:ConfigurationFile -WindowStyle Normal -PassThru
+            Write-Information '--> Waiting for Windows Sandbox to complete...'
+            $process.WaitForExit()
+            Write-Verbose "Sandbox exited with code: $($process.ExitCode)"
             return (Invoke-CleanExit -ExitCode 0)
         }        
     }
