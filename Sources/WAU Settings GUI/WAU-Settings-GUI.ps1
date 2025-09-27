@@ -54,22 +54,50 @@ if ($SandboxTest.IsPresent) {
         <#
         .SYNOPSIS
         Shows a GUI dialog for configuring Windows Sandbox test parameters
-        
+
         .DESCRIPTION
         Creates a Windows Forms dialog to collect all parameters needed for SandboxTest function
         #>
-        
+
         try {
+            # Define default scripts array
+            $defaultScripts = @{
+                "InstallWSB" = @'
+$SandboxFolderName = "{0}"
+Start-Process cmd.exe -ArgumentList "/c del /Q `"$env:USERPROFILE\Desktop\$SandboxFolderName\*.log`" & `"$env:USERPROFILE\Desktop\$SandboxFolderName\InstallWSB.cmd`" && explorer `"$env:USERPROFILE\Desktop\$SandboxFolderName`""
+'@
+                "WinGetManifest" = @'
+$SandboxFolderName = "{0}"
+Start-Process cmd.exe -ArgumentList "/k cd /d `"$env:USERPROFILE\Desktop\$SandboxFolderName`" && winget install --manifest . --accept-source-agreements --accept-package-agreements"
+'@
+                "Explorer" = @'
+$SandboxFolderName = "{0}"
+Start-Process explorer.exe -ArgumentList "`"$env:USERPROFILE\Desktop\$SandboxFolderName`""
+'@
+            }
+
+            # Ensure wsb directory exists and create default scripts if needed
+            $wsbDir = Join-Path $WorkingDir "wsb"
+            if (-not (Test-Path $wsbDir)) {
+                New-Item -ItemType Directory -Path $wsbDir -Force | Out-Null
+
+                # Create default script files
+                foreach ($scriptName in $defaultScripts.Keys) {
+                    $scriptPath = Join-Path $wsbDir "$scriptName.ps1"
+                    $defaultScripts[$scriptName] -f "DefaultFolder" | Out-File -FilePath $scriptPath -Encoding ASCII
+                }
+            }
+
             # Create the main form
             $form = New-Object System.Windows.Forms.Form
             $form.Text = "Windows Sandbox Test Configuration"
-            $form.Size = New-Object System.Drawing.Size(450, 650)  # Width=450, Height=650
+            $form.Size = New-Object System.Drawing.Size(450, 690)  # Increased height for Load/Save buttons
             $form.StartPosition = "CenterScreen"
             $form.FormBorderStyle = "FixedDialog"
             $form.MaximizeBox = $false
             $form.MinimizeBox = $false
             $form.ShowIcon = $false
-            
+
             # Create controls
             $y = 20
             $labelHeight = 20
@@ -77,14 +105,14 @@ if ($SandboxTest.IsPresent) {
             $spacing = 10
             $leftMargin = 20
             $controlWidth = 400
-            
+
             # Map Folder selection
             $lblMapFolder = New-Object System.Windows.Forms.Label
             $lblMapFolder.Location = New-Object System.Drawing.Point($leftMargin, $y)
             $lblMapFolder.Size = New-Object System.Drawing.Size(150, $labelHeight)
             $lblMapFolder.Text = "Map Folder:"
             $form.Controls.Add($lblMapFolder)
-            
+
             $txtMapFolder = New-Object System.Windows.Forms.TextBox
             $txtMapFolder.Location = New-Object System.Drawing.Point($leftMargin, ($y + $labelHeight))
             $txtMapFolder.Size = New-Object System.Drawing.Size(($controlWidth - 80), $controlHeight)
@@ -92,7 +120,7 @@ if ($SandboxTest.IsPresent) {
             $msiDir = Join-Path $WorkingDir "msi"
             $txtMapFolder.Text = if (Test-Path $msiDir) { $msiDir } else { $WorkingDir }
             $form.Controls.Add($txtMapFolder)
-            
+
             $btnBrowse = New-Object System.Windows.Forms.Button
             $btnBrowse.Location = New-Object System.Drawing.Point(($leftMargin + $controlWidth - 75), ($y + $labelHeight))
             $btnBrowse.Size = New-Object System.Drawing.Size(75, $controlHeight)
@@ -103,7 +131,7 @@ if ($SandboxTest.IsPresent) {
                 $folderDialog.SelectedPath = $txtMapFolder.Text
                 if ($folderDialog.ShowDialog() -eq "OK") {
                     $txtMapFolder.Text = $folderDialog.SelectedPath
-                    
+
                     # Update sandbox folder name based on whether WAU MSI exists in the new folder
                     $msiFiles = Get-ChildItem -Path $folderDialog.SelectedPath -Filter "WAU*.msi" -File -ErrorAction SilentlyContinue
                     if ($msiFiles) {
@@ -114,40 +142,31 @@ if ($SandboxTest.IsPresent) {
                             $txtSandboxFolderName.Text = $folderName
                         }
                     }
-                    
+
                     # Update script based on folder contents
                     $installWSBPath = Join-Path $folderDialog.SelectedPath "InstallWSB.cmd"
                     $installerYamlFiles = Get-ChildItem -Path $folderDialog.SelectedPath -Filter "*.installer.yaml" -File -ErrorAction SilentlyContinue
-                    
+
                     if (Test-Path $installWSBPath) {
-                        $txtScript.Text = @"
-`$SandboxFolderName = "$($txtSandboxFolderName.Text)"
-Start-Process cmd.exe -ArgumentList "/c del /Q ""`$env:USERPROFILE\Desktop\`$SandboxFolderName\*.log"" & ""`$env:USERPROFILE\Desktop\`$SandboxFolderName\InstallWSB.cmd"" && explorer ""`$env:USERPROFILE\Desktop\`$SandboxFolderName"""
-"@
+                        $txtScript.Text = $defaultScripts["InstallWSB"] -f $txtSandboxFolderName.Text
                     } elseif ($installerYamlFiles) {
-                        $txtScript.Text = @"
-`$SandboxFolderName = "$($txtSandboxFolderName.Text)"
-Start-Process cmd.exe -ArgumentList "/k cd /d ""`$env:USERPROFILE\Desktop\`$SandboxFolderName"" && winget install --manifest . --accept-source-agreements --accept-package-agreements"
-"@
+                        $txtScript.Text = $defaultScripts["WinGetManifest"] -f $txtSandboxFolderName.Text
                     } else {
-                        $txtScript.Text = @"
-`$SandboxFolderName = "$($txtSandboxFolderName.Text)"
-Start-Process explorer.exe -ArgumentList "`$env:USERPROFILE\Desktop\`$SandboxFolderName"
-"@
+                        $txtScript.Text = $defaultScripts["Explorer"] -f $txtSandboxFolderName.Text
                     }
                 }
             })
             $form.Controls.Add($btnBrowse)
-            
+
             $y += $labelHeight + $controlHeight + $spacing
-            
+
             # Sandbox Folder Name
             $lblSandboxFolderName = New-Object System.Windows.Forms.Label
             $lblSandboxFolderName.Location = New-Object System.Drawing.Point($leftMargin, $y)
             $lblSandboxFolderName.Size = New-Object System.Drawing.Size(200, $labelHeight)
             $lblSandboxFolderName.Text = "Sandbox Desktop Folder Name:"
             $form.Controls.Add($lblSandboxFolderName)
-            
+
             $txtSandboxFolderName = New-Object System.Windows.Forms.TextBox
             $txtSandboxFolderName.Location = New-Object System.Drawing.Point($leftMargin, ($y + $labelHeight))
             $txtSandboxFolderName.Size = New-Object System.Drawing.Size($controlWidth, $controlHeight)
@@ -158,208 +177,264 @@ Start-Process explorer.exe -ArgumentList "`$env:USERPROFILE\Desktop\`$SandboxFol
             } else {
                 $txtSandboxFolderName.Text = Split-Path $txtMapFolder.Text -Leaf
             }
-            
+
             # Add event handler to update script when folder name changes
             $txtSandboxFolderName.Add_TextChanged({
-                # Just update the folder name in the existing script, don't change the logic
                 $currentScript = $txtScript.Text
                 if (![string]::IsNullOrWhiteSpace($currentScript)) {
                     # Replace the SandboxFolderName variable value in the existing script
-                    $txtScript.Text = $currentScript -replace '\$SandboxFolderName = ".*?"', "`$SandboxFolderName = `"$($txtSandboxFolderName.Text)`""
+                    $txtScript.Text = $currentScript -replace '\$SandboxFolderName\s*=\s*"[^"]*"', "`$SandboxFolderName = `"$($txtSandboxFolderName.Text)`""
                 }
             })
-            
+
             $form.Controls.Add($txtSandboxFolderName)
-            
+
             $y += $labelHeight + $controlHeight + $spacing
-            
+
             # WinGet Version
             $lblWinGetVersion = New-Object System.Windows.Forms.Label
             $lblWinGetVersion.Location = New-Object System.Drawing.Point($leftMargin, $y)
             $lblWinGetVersion.Size = New-Object System.Drawing.Size(300, $labelHeight)
             $lblWinGetVersion.Text = "WinGet Version (leave empty for latest):"
             $form.Controls.Add($lblWinGetVersion)
-            
+
             $txtWinGetVersion = New-Object System.Windows.Forms.TextBox
             $txtWinGetVersion.Location = New-Object System.Drawing.Point($leftMargin, ($y + $labelHeight))
             $txtWinGetVersion.Size = New-Object System.Drawing.Size($controlWidth, $controlHeight)
             $form.Controls.Add($txtWinGetVersion)
-            
+
             $y += $labelHeight + $controlHeight + $spacing
-            
+
             # WinGet Options
             $lblWinGetOptions = New-Object System.Windows.Forms.Label
             $lblWinGetOptions.Location = New-Object System.Drawing.Point($leftMargin, $y)
             $lblWinGetOptions.Size = New-Object System.Drawing.Size(300, $labelHeight)
             $lblWinGetOptions.Text = "WinGet Options (additional options):"
             $form.Controls.Add($lblWinGetOptions)
-            
+
             $txtWinGetOptions = New-Object System.Windows.Forms.TextBox
             $txtWinGetOptions.Location = New-Object System.Drawing.Point($leftMargin, ($y + $labelHeight))
             $txtWinGetOptions.Size = New-Object System.Drawing.Size($controlWidth, $controlHeight)
             $form.Controls.Add($txtWinGetOptions)
-            
+
             $y += $labelHeight + $controlHeight + $spacing + 10
-            
+
             # Checkboxes
             $chkPrerelease = New-Object System.Windows.Forms.CheckBox
             $chkPrerelease.Location = New-Object System.Drawing.Point($leftMargin, $y)
             $chkPrerelease.Size = New-Object System.Drawing.Size(200, $labelHeight)
             $chkPrerelease.Text = "Prerelease (of WinGet)"
             $form.Controls.Add($chkPrerelease)
-            
+
             $y += $labelHeight + 5
-            
+
             $chkEnableExperimentalFeatures = New-Object System.Windows.Forms.CheckBox
             $chkEnableExperimentalFeatures.Location = New-Object System.Drawing.Point($leftMargin, $y)
             $chkEnableExperimentalFeatures.Size = New-Object System.Drawing.Size(250, $labelHeight)
             $chkEnableExperimentalFeatures.Text = "Enable Experimental Features (in WinGet)"
             $chkEnableExperimentalFeatures.Checked = $true
             $form.Controls.Add($chkEnableExperimentalFeatures)
-            
+
             $y += $labelHeight + 5
-            
+
             $chkClean = New-Object System.Windows.Forms.CheckBox
             $chkClean.Location = New-Object System.Drawing.Point($leftMargin, $y)
             $chkClean.Size = New-Object System.Drawing.Size(200, $labelHeight)
             $chkClean.Text = "Clean (cached dependencies)"
             $form.Controls.Add($chkClean)
-            
+
             $y += $labelHeight + 5
-            
+
             $chkAsync = New-Object System.Windows.Forms.CheckBox
             $chkAsync.Location = New-Object System.Drawing.Point($leftMargin, $y)
             $chkAsync.Size = New-Object System.Drawing.Size(200, $labelHeight)
             $chkAsync.Text = "Async (return directly)"
             $chkAsync.Checked = $true
             $form.Controls.Add($chkAsync)
-            
+
             $y += $labelHeight + 5
-            
+
             $chkVerbose = New-Object System.Windows.Forms.CheckBox
             $chkVerbose.Location = New-Object System.Drawing.Point($leftMargin, $y)
             $chkVerbose.Size = New-Object System.Drawing.Size(200, $labelHeight)
-            $chkVerbose.Text = "Verbose (log)"
+            $chkVerbose.Text = "Verbose (screen log)"
             $form.Controls.Add($chkVerbose)
-            
+
             $y += $labelHeight + 5
-            
+
             $chkWait = New-Object System.Windows.Forms.CheckBox
             $chkWait.Location = New-Object System.Drawing.Point($leftMargin, $y)
             $chkWait.Size = New-Object System.Drawing.Size(250, $labelHeight)
-            $chkWait.Text = "Wait (for key press before exit PS window)"
+            $chkWait.Text = "Wait (before exit PS window)"
             $form.Controls.Add($chkWait)
-            
+
             $y += $labelHeight + $spacing + 10
-            
+
+            # (Removed) force CMD execution option; PowerShell execution is robust enough
+
+            $y += $labelHeight + 5
+
             # Script section
             $lblScript = New-Object System.Windows.Forms.Label
             $lblScript.Location = New-Object System.Drawing.Point($leftMargin, $y)
             $lblScript.Size = New-Object System.Drawing.Size(200, $labelHeight)
             $lblScript.Text = "Script:"
             $form.Controls.Add($lblScript)
-            
+
+            # Load/Save buttons for scripts
+            $btnLoadScript = New-Object System.Windows.Forms.Button
+            $btnLoadScript.Location = New-Object System.Drawing.Point(($leftMargin + $controlWidth - 160), $y)
+            $btnLoadScript.Size = New-Object System.Drawing.Size(75, $controlHeight)
+            $btnLoadScript.Text = "Load"
+            $btnLoadScript.Add_Click({
+                $openFileDialog = New-Object System.Windows.Forms.OpenFileDialog
+                $openFileDialog.InitialDirectory = $wsbDir
+                $openFileDialog.Filter = "PowerShell Scripts (*.ps1)|*.ps1"
+                $openFileDialog.Title = "Load Script"
+
+                if ($openFileDialog.ShowDialog() -eq "OK") {
+                    try {
+                        $scriptContent = Get-Content -Path $openFileDialog.FileName -Raw -Encoding ASCII
+                        $txtScript.Text = $scriptContent
+
+                        # Extract SandboxFolderName from the loaded script
+                        $pattern = '\$SandboxFolderName\s*=\s*"([^"]*)"'
+                        if ($scriptContent -match $pattern) {
+                            $extractedFolderName = $matches[1]
+                            if (![string]::IsNullOrWhiteSpace($extractedFolderName) -and $extractedFolderName -ne "DefaultFolder") {
+                                $txtSandboxFolderName.Text = $extractedFolderName
+                            }
+                        }
+
+                        # Update script content with current folder name from the text field
+                        $currentFolderName = $txtSandboxFolderName.Text
+                        if (![string]::IsNullOrWhiteSpace($currentFolderName)) {
+                            $txtScript.Text = $txtScript.Text -replace '\$SandboxFolderName\s*=\s*"[^"]*"', "`$SandboxFolderName = `"$currentFolderName`""
+                        }
+                    }
+                    catch {
+                        [System.Windows.Forms.MessageBox]::Show("Error loading script: $($_.Exception.Message)", "Load Error", "OK", "Error")
+                    }
+                }
+            })
+            $form.Controls.Add($btnLoadScript)
+
+            $btnSaveScript = New-Object System.Windows.Forms.Button
+            $btnSaveScript.Location = New-Object System.Drawing.Point(($leftMargin + $controlWidth - 75), $y)
+            $btnSaveScript.Size = New-Object System.Drawing.Size(75, $controlHeight)
+            $btnSaveScript.Text = "Save"
+            $btnSaveScript.Add_Click({
+                if ([string]::IsNullOrWhiteSpace($txtScript.Text)) {
+                    [System.Windows.Forms.MessageBox]::Show("No script content to save.", "Save Error", "OK", "Warning")
+                    return
+                }
+
+                $saveFileDialog = New-Object System.Windows.Forms.SaveFileDialog
+                $saveFileDialog.InitialDirectory = $wsbDir
+                $saveFileDialog.Filter = "PowerShell Scripts (*.ps1)|*.ps1"
+                $saveFileDialog.DefaultExt = "ps1"
+                $saveFileDialog.Title = "Save Script"
+
+                if ($saveFileDialog.ShowDialog() -eq "OK") {
+                    try {
+                        # Ensure wsb directory exists
+                        if (-not (Test-Path $wsbDir)) {
+                            New-Item -ItemType Directory -Path $wsbDir -Force | Out-Null
+                        }
+                        # Enforce .ps1 extension even if user removes it in filename box
+                        $targetPath = if ([System.IO.Path]::GetExtension($saveFileDialog.FileName).ToLower() -ne ".ps1") { "$($saveFileDialog.FileName).ps1" } else { $saveFileDialog.FileName }
+                        $txtScript.Text | Out-File -FilePath $targetPath -Encoding ASCII
+                        [System.Windows.Forms.MessageBox]::Show("Script saved successfully!", "Save Complete", "OK", "Information")
+                    }
+                    catch {
+                        [System.Windows.Forms.MessageBox]::Show("Error saving script: $($_.Exception.Message)", "Save Error", "OK", "Error")
+                    }
+                }
+            })
+            $form.Controls.Add($btnSaveScript)
+
             $txtScript = New-Object System.Windows.Forms.TextBox
-            $txtScript.Location = New-Object System.Drawing.Point($leftMargin, ($y + $labelHeight))
+            $txtScript.Location = New-Object System.Drawing.Point($leftMargin, ($y + $labelHeight + 5))
             $txtScript.Size = New-Object System.Drawing.Size($controlWidth, 120)
             $txtScript.Multiline = $true
             $txtScript.ScrollBars = "Vertical"
             # Set default script based on folder contents
             $installWSBPath = Join-Path $txtMapFolder.Text "InstallWSB.cmd"
             $installerYamlFiles = Get-ChildItem -Path $txtMapFolder.Text -Filter "*.installer.yaml" -File -ErrorAction SilentlyContinue
-            
+
             if (Test-Path $installWSBPath) {
-                $txtScript.Text = @"
-`$SandboxFolderName = "$($txtSandboxFolderName.Text)"
-Start-Process cmd.exe -ArgumentList "/c del /Q ""`$env:USERPROFILE\Desktop\`$SandboxFolderName\*.log"" & ""`$env:USERPROFILE\Desktop\`$SandboxFolderName\InstallWSB.cmd"" && explorer ""`$env:USERPROFILE\Desktop\`$SandboxFolderName"""
-"@
+                $txtScript.Text = $defaultScripts["InstallWSB"] -f $txtSandboxFolderName.Text
             } elseif ($installerYamlFiles) {
-                $txtScript.Text = @"
-`$SandboxFolderName = "$($txtSandboxFolderName.Text)"
-Start-Process cmd.exe -ArgumentList "/k cd /d ""`$env:USERPROFILE\Desktop\`$SandboxFolderName"" && winget install --manifest . --accept-source-agreements --accept-package-agreements"
-"@
+                $txtScript.Text = $defaultScripts["WinGetManifest"] -f $txtSandboxFolderName.Text
             } else {
-                $txtScript.Text = @"
-`$SandboxFolderName = "$($txtSandboxFolderName.Text)"
-Start-Process explorer.exe -ArgumentList "`$env:USERPROFILE\Desktop\`$SandboxFolderName"
-"@
+                $txtScript.Text = $defaultScripts["Explorer"] -f $txtSandboxFolderName.Text
             }
             $form.Controls.Add($txtScript)
-            
-            $y += $labelHeight + 120 + $spacing + 20
-            
+
+            $y += $labelHeight + 5 + 120 + $spacing + 20
+
             # Buttons
             $btnOK = New-Object System.Windows.Forms.Button
             $btnOK.Location = New-Object System.Drawing.Point(($leftMargin + $controlWidth - 160), $y)
             $btnOK.Size = New-Object System.Drawing.Size(75, 30)
             $btnOK.Text = "OK"
-            $btnOK.DialogResult = "OK"
             $btnOK.Add_Click({
-                # Validate required fields
-                if ([string]::IsNullOrWhiteSpace($txtMapFolder.Text)) {
-                    [System.Windows.Forms.MessageBox]::Show("Please select a folder to map.", "Validation Error", "OK", "Warning")
-                    return
+                $resultScript = $null
+                if (-not [string]::IsNullOrWhiteSpace($txtScript.Text)) {
+                    try { $resultScript = [ScriptBlock]::Create($txtScript.Text) } catch { $resultScript = $null }
                 }
-                if (![System.IO.Directory]::Exists($txtMapFolder.Text)) {
-                    [System.Windows.Forms.MessageBox]::Show("Selected folder does not exist.", "Validation Error", "OK", "Warning")
-                    return
+
+                $script:__dialogReturn = @{
+                    DialogResult = 'OK'
+                    MapFolder = $txtMapFolder.Text
+                    SandboxFolderName = $txtSandboxFolderName.Text
+                    WinGetVersion = $txtWinGetVersion.Text
+                    WinGetOptions = $txtWinGetOptions.Text
+                    Prerelease = $chkPrerelease.Checked
+                    EnableExperimentalFeatures = $chkEnableExperimentalFeatures.Checked
+                    Clean = $chkClean.Checked
+                    Async = $chkAsync.Checked
+                    Verbose = $chkVerbose.Checked
+                    Wait = $chkWait.Checked
+                    Script = $resultScript
                 }
-                if ([string]::IsNullOrWhiteSpace($txtSandboxFolderName.Text)) {
-                    [System.Windows.Forms.MessageBox]::Show("Please enter a sandbox folder name.", "Validation Error", "OK", "Warning")
-                    return
-                }
-                $form.DialogResult = "OK"
                 $form.Close()
             })
             $form.Controls.Add($btnOK)
-            
+
             $btnCancel = New-Object System.Windows.Forms.Button
             $btnCancel.Location = New-Object System.Drawing.Point(($leftMargin + $controlWidth - 75), $y)
             $btnCancel.Size = New-Object System.Drawing.Size(75, 30)
             $btnCancel.Text = "Cancel"
-            $btnCancel.DialogResult = "Cancel"
+            $btnCancel.Add_Click({
+                $script:__dialogReturn = @{ DialogResult = 'Cancel' }
+                $form.Close()
+            })
             $form.Controls.Add($btnCancel)
-            
-            # Set form properties
+
+            # Set default accept/cancel buttons
             $form.AcceptButton = $btnOK
             $form.CancelButton = $btnCancel
-            
-            # Show dialog
-            $result = $form.ShowDialog()
-            
-            # Return results
-            $returnObject = @{
-                DialogResult = $result
-                MapFolder = $txtMapFolder.Text
-                SandboxFolderName = $txtSandboxFolderName.Text
-                WinGetVersion = $txtWinGetVersion.Text
-                WinGetOptions = $txtWinGetOptions.Text
-                Prerelease = $chkPrerelease.Checked
-                EnableExperimentalFeatures = $chkEnableExperimentalFeatures.Checked
-                Clean = $chkClean.Checked
-                Async = $chkAsync.Checked
-                Verbose = $chkVerbose.Checked
-                Wait = $chkWait.Checked
-                Script = if (![string]::IsNullOrWhiteSpace($txtScript.Text)) { 
-                    [ScriptBlock]::Create($txtScript.Text) 
-                } else { 
-                    $null 
-                }
+
+            # Show dialog (modal)
+            [void]$form.ShowDialog()
+
+            # Prepare return object
+            if ($script:__dialogReturn) {
+                return $script:__dialogReturn
+            } else {
+                return @{ DialogResult = 'Cancel' }
             }
-            
-            return $returnObject
         }
         catch {
             [System.Windows.Forms.MessageBox]::Show("Error creating dialog: $($_.Exception.Message)", "Error", "OK", "Error")
             return @{ DialogResult = "Cancel" }
         }
         finally {
-            if ($form) {
-                $form.Dispose()
-            }
+            if ($form) { $form.Dispose() }
         }
     }
-    
+
     # Show configuration dialog
     $dialogResult = Show-SandboxTestDialog
     if ($dialogResult.DialogResult -eq 'OK') {
@@ -369,7 +444,7 @@ Start-Process explorer.exe -ArgumentList "`$env:USERPROFILE\Desktop\`$SandboxFol
             SandboxFolderName = $dialogResult.SandboxFolderName
             Script = $dialogResult.Script
         }
-        
+
         # Add optional parameters if they have values
         if (![string]::IsNullOrWhiteSpace($dialogResult.WinGetVersion)) {
             $sandboxParams.WinGetVersion = $dialogResult.WinGetVersion
@@ -377,27 +452,15 @@ Start-Process explorer.exe -ArgumentList "`$env:USERPROFILE\Desktop\`$SandboxFol
         if (![string]::IsNullOrWhiteSpace($dialogResult.WinGetOptions)) {
             $sandboxParams.WinGetOptions = $dialogResult.WinGetOptions
         }
-        if ($dialogResult.Prerelease) {
-            $sandboxParams.Prerelease = $true
-        }
-        if ($dialogResult.EnableExperimentalFeatures) {
-            $sandboxParams.EnableExperimentalFeatures = $true
-        }
-        if ($dialogResult.Clean) {
-            $sandboxParams.Clean = $true
-        }
-        if ($dialogResult.Async) {
-            $sandboxParams.Async = $true
-        }
-        
-        # Add -Verbose if specified
-        if ($dialogResult.Verbose) {
-            $sandboxParams.Verbose = $true
-        }
-        
+        if ($dialogResult.Prerelease) { $sandboxParams.Prerelease = $true }
+        if ($dialogResult.EnableExperimentalFeatures) { $sandboxParams.EnableExperimentalFeatures = $true }
+        if ($dialogResult.Clean) { $sandboxParams.Clean = $true }
+        if ($dialogResult.Async) { $sandboxParams.Async = $true }
+        if ($dialogResult.Verbose) { $sandboxParams.Verbose = $true }
+
         # Call SandboxTest with collected parameters
         SandboxTest @sandboxParams
-        
+
         # Wait for key press if requested
         if ($dialogResult.Wait) {
             Write-Host "`nPress any key to exit..." -ForegroundColor Yellow
@@ -407,7 +470,6 @@ Start-Process explorer.exe -ArgumentList "`$env:USERPROFILE\Desktop\`$SandboxFol
     exit
 }
 
-# Set portable mode flag
 $Script:PORTABLE_MODE = $Portable.IsPresent
 
 # Flag for update/restore mode
