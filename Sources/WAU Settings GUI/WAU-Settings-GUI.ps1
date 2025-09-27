@@ -2931,7 +2931,7 @@ function Start-WSBTesting {
                 # Call the function
                 SandboxTest -MapFolder $msiDirectory -SandboxFolderName "WAU-install" -EnableExperimentalFeatures -Script {
                     $SandboxFolderName = "WAU-install"
-                    Start-Process cmd.exe -ArgumentList "/c del /Q ""$env:USERPROFILE\Desktop\$SandboxFolderName\*.log"" & ""$env:USERPROFILE\Desktop\$SandboxFolderName\InstallWSB.cmd"" && explorer ""$env:USERPROFILE\Desktop\$SandboxFolderName"""
+                    Start-Process cmd.exe -ArgumentList "/c del /Q `"$env:USERPROFILE\Desktop\$SandboxFolderName\*.log`" & `"$env:USERPROFILE\Desktop\$SandboxFolderName\InstallWSB.cmd`" && explorer `"$env:USERPROFILE\Desktop\$SandboxFolderName`""
                 } -Async -Verbose
 
                 Close-PopUp
