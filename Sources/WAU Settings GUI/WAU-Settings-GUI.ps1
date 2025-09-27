@@ -2835,8 +2835,6 @@ function Start-WSBTesting {
 
                 Close-PopUp
 
-                [System.Windows.MessageBox]::Show("Windows Sandbox is launching with the WAU testing environment.", "WSB Testing Starting", "OK", "Information")
-                
                 return $true
                 
             }
