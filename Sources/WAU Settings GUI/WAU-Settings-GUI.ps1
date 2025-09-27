@@ -115,12 +115,19 @@ if ($SandboxTest.IsPresent) {
                         }
                     }
                     
-                    # Update script based on whether InstallWSB.cmd exists in the new folder
+                    # Update script based on folder contents
                     $installWSBPath = Join-Path $folderDialog.SelectedPath "InstallWSB.cmd"
+                    $installerYamlFiles = Get-ChildItem -Path $folderDialog.SelectedPath -Filter "*.installer.yaml" -File -ErrorAction SilentlyContinue
+                    
                     if (Test-Path $installWSBPath) {
                         $txtScript.Text = @"
 `$SandboxFolderName = "$($txtSandboxFolderName.Text)"
 Start-Process cmd.exe -ArgumentList "/c del /Q ""`$env:USERPROFILE\Desktop\`$SandboxFolderName\*.log"" & ""`$env:USERPROFILE\Desktop\`$SandboxFolderName\InstallWSB.cmd"" && explorer ""`$env:USERPROFILE\Desktop\`$SandboxFolderName"""
+"@
+                    } elseif ($installerYamlFiles) {
+                        $txtScript.Text = @"
+`$SandboxFolderName = "$($txtSandboxFolderName.Text)"
+Start-Process cmd.exe -ArgumentList "/k cd /d ""`$env:USERPROFILE\Desktop\`$SandboxFolderName"" && winget install --manifest . --accept-source-agreements --accept-package-agreements"
 "@
                     } else {
                         $txtScript.Text = @"
@@ -151,6 +158,17 @@ Start-Process explorer.exe -ArgumentList "`$env:USERPROFILE\Desktop\`$SandboxFol
             } else {
                 $txtSandboxFolderName.Text = Split-Path $txtMapFolder.Text -Leaf
             }
+            
+            # Add event handler to update script when folder name changes
+            $txtSandboxFolderName.Add_TextChanged({
+                # Just update the folder name in the existing script, don't change the logic
+                $currentScript = $txtScript.Text
+                if (![string]::IsNullOrWhiteSpace($currentScript)) {
+                    # Replace the SandboxFolderName variable value in the existing script
+                    $txtScript.Text = $currentScript -replace '\$SandboxFolderName = ".*?"', "`$SandboxFolderName = `"$($txtSandboxFolderName.Text)`""
+                }
+            })
+            
             $form.Controls.Add($txtSandboxFolderName)
             
             $y += $labelHeight + $controlHeight + $spacing
@@ -239,12 +257,19 @@ Start-Process explorer.exe -ArgumentList "`$env:USERPROFILE\Desktop\`$SandboxFol
             $txtScript.Size = New-Object System.Drawing.Size($controlWidth, 120)
             $txtScript.Multiline = $true
             $txtScript.ScrollBars = "Vertical"
-            # Set default script based on whether InstallWSB.cmd exists in the mapped folder
+            # Set default script based on folder contents
             $installWSBPath = Join-Path $txtMapFolder.Text "InstallWSB.cmd"
+            $installerYamlFiles = Get-ChildItem -Path $txtMapFolder.Text -Filter "*.installer.yaml" -File -ErrorAction SilentlyContinue
+            
             if (Test-Path $installWSBPath) {
                 $txtScript.Text = @"
 `$SandboxFolderName = "$($txtSandboxFolderName.Text)"
 Start-Process cmd.exe -ArgumentList "/c del /Q ""`$env:USERPROFILE\Desktop\`$SandboxFolderName\*.log"" & ""`$env:USERPROFILE\Desktop\`$SandboxFolderName\InstallWSB.cmd"" && explorer ""`$env:USERPROFILE\Desktop\`$SandboxFolderName"""
+"@
+            } elseif ($installerYamlFiles) {
+                $txtScript.Text = @"
+`$SandboxFolderName = "$($txtSandboxFolderName.Text)"
+Start-Process cmd.exe -ArgumentList "/k cd /d ""`$env:USERPROFILE\Desktop\`$SandboxFolderName"" && winget install --manifest . --accept-source-agreements --accept-package-agreements"
 "@
             } else {
                 $txtScript.Text = @"
