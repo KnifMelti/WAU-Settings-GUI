@@ -2503,12 +2503,6 @@ function Start-WSBTesting {
                 $installContent = Get-Content -Path $originalInstallCmd -Raw
                 $wsbInstallContent = $installContent -replace '/qn', '/qb'
                 
-                # Add delete log files at the beginning
-                # $wsbInstallContent = "del /q C:\WAU-Test\*.log`r`n" + $wsbInstallContent
-
-                # Add explorer command at the end
-                # $wsbInstallContent = $wsbInstallContent + "`r`nexplorer C:\WAU-Test"
-                
                 Set-Content -Path $wsbInstallCmd -Value $wsbInstallContent -Encoding ASCII
                 
                 # Copy and modify Uninstall.cmd for WSB if it exists
@@ -2518,40 +2512,7 @@ function Start-WSBTesting {
                     Set-Content -Path $wsbUninstallCmd -Value $wsbUninstallContent -Encoding ASCII
                 }
                 
-                
-#                 # Create Windows Sandbox configuration file
-#                 $tempDir = [System.IO.Path]::GetTempPath()
-#                 $wsbConfigPath = Join-Path $tempDir "test.wsb"
-                
-#                 # WSB configuration content
-#                 $wsbConfig = @"
-# <Configuration>
-# <VGpu>Enable</VGpu>
-# <AudioInput>Enable</AudioInput>
-# <VideoInput>Enable</VideoInput>
-# <ProtectedClient>Enable</ProtectedClient>
-# <PrinterRedirection>Enable</PrinterRedirection>
-# <ClipboardRedirection>Enable</ClipboardRedirection>
-# <MemoryInMB>4096</MemoryInMB>
-# <MappedFolders>
-# <MappedFolder>
-# <HostFolder>$msiDirectory</HostFolder>
-# <SandboxFolder>C:\WAU-Test</SandboxFolder>
-# <ReadOnly>false</ReadOnly>
-# </MappedFolder>
-# </MappedFolders>
-# <LogonCommand>
-# <Command>C:\WAU-Test\InstallWSB.cmd</Command>
-# </LogonCommand>
-# </Configuration>
-# "@
-                
-#                 # Write WSB configuration file
-#                 Set-Content -Path $wsbConfigPath -Value $wsbConfig -Encoding UTF8
-                
-                
-                # Start Windows Sandbox with the configuration
-                # Start-Process -FilePath $wsbConfigPath
+                # Load sandbox script
                 . $WorkingDir\SandboxTest.ps1
 
                 # Call the function
