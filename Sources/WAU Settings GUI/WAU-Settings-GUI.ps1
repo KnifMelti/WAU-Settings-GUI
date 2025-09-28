@@ -22,9 +22,12 @@ Configure **WAU** settings after installation:
   - `[reg]` Open **WAU** settings path in registry
   - `[uid]` **GUID** path exploration (**MSI** installation)
   - `[sys]` Open **WinGet** system wide installed application list (if previously saved by **WAU**)
+  - `[mod]` Open the external **WAU** mods folder
   - `[lst]` Open the current local list
   - `[usr]` Change colors/update schedule for **WAU Settings GUI**
   - `[msi]` **MSI** transform creation (using current showing configuration)
+  - `[wsb]` Windows Sandbox test for **WAU**
+    - A standalone **SandboxTest** shortcut for running advanced tests is created in User Start Menu
   - `[cfg]` **Configuration** backup/import (i.e. for sharing settings)
   - `[wau]` Reinstall **WAU** (with current showing configuration)
     - Stores source in `[INSTALLDIR]\msi\[VERSION]` (enables **WAU** `Repair` in **Programs and Features**)
@@ -37,10 +40,448 @@ Must be run as Administrator
 #>
 
 param(
-    [switch]$Portable
+    [switch]$Portable,
+    [switch]$SandboxTest
  )
 
-# Set portable mode flag
+if ($SandboxTest.IsPresent) {
+    $Script:WorkingDir = $PSScriptRoot
+    # Import required assemblies
+    Add-Type -AssemblyName System.Windows.Forms
+    Add-Type -AssemblyName System.Drawing
+    Add-Type -AssemblyName PresentationFramework
+    . $WorkingDir\SandboxTest.ps1
+    
+    # Define the dialog function here since it's needed before the main functions section
+    function Show-SandboxTestDialog {
+        <#
+        .SYNOPSIS
+        Shows a GUI dialog for configuring Windows Sandbox test parameters
+
+        .DESCRIPTION
+        Creates a Windows Forms dialog to collect all parameters needed for SandboxTest function
+        #>
+
+        try {
+            # Define default scripts array
+            $defaultScripts = @{
+                "InstallWSB" = @'
+$SandboxFolderName = "{0}"
+Start-Process cmd.exe -ArgumentList "/c del /Q `"$env:USERPROFILE\Desktop\$SandboxFolderName\*.log`" & `"$env:USERPROFILE\Desktop\$SandboxFolderName\InstallWSB.cmd`" && explorer `"$env:USERPROFILE\Desktop\$SandboxFolderName`""
+'@
+                "WinGetManifest" = @'
+$SandboxFolderName = "{0}"
+Start-Process cmd.exe -ArgumentList "/k cd /d `"$env:USERPROFILE\Desktop\$SandboxFolderName`" && winget install --manifest . --accept-source-agreements --accept-package-agreements"
+'@
+                "Explorer" = @'
+$SandboxFolderName = "{0}"
+Start-Process explorer.exe -ArgumentList "`"$env:USERPROFILE\Desktop\$SandboxFolderName`""
+'@
+            }
+
+            # Ensure wsb directory exists and create default scripts if needed
+            $wsbDir = Join-Path $WorkingDir "wsb"
+            if (-not (Test-Path $wsbDir)) {
+                New-Item -ItemType Directory -Path $wsbDir -Force | Out-Null
+
+                # Create default script files
+                foreach ($scriptName in $defaultScripts.Keys) {
+                    $scriptPath = Join-Path $wsbDir "$scriptName.ps1"
+                    $defaultScripts[$scriptName] -f "DefaultFolder" | Out-File -FilePath $scriptPath -Encoding ASCII
+                }
+            }
+
+            # Create the main form
+            $form = New-Object System.Windows.Forms.Form
+            $form.Text = "Windows Sandbox Test Configuration"
+            $form.Size = New-Object System.Drawing.Size(450, 690)
+            $form.StartPosition = "CenterScreen"
+            $form.FormBorderStyle = "FixedDialog"
+            $form.MaximizeBox = $false
+            $form.MinimizeBox = $false
+            $form.ShowIcon = $false
+
+            # Create controls
+            $y = 20
+            $labelHeight = 20
+            $controlHeight = 23
+            $spacing = 10
+            $leftMargin = 20
+            $controlWidth = 400
+
+            # Map Folder selection
+            $lblMapFolder = New-Object System.Windows.Forms.Label
+            $lblMapFolder.Location = New-Object System.Drawing.Point($leftMargin, $y)
+            $lblMapFolder.Size = New-Object System.Drawing.Size(150, $labelHeight)
+            $lblMapFolder.Text = "Map Folder:"
+            $form.Controls.Add($lblMapFolder)
+
+            $txtMapFolder = New-Object System.Windows.Forms.TextBox
+            $txtMapFolder.Location = New-Object System.Drawing.Point($leftMargin, ($y + $labelHeight))
+            $txtMapFolder.Size = New-Object System.Drawing.Size(($controlWidth - 80), $controlHeight)
+            # Set default path based on whether msi directory exists
+            $msiDir = Join-Path $WorkingDir "msi"
+            $txtMapFolder.Text = if (Test-Path $msiDir) { $msiDir } else { $WorkingDir }
+            $form.Controls.Add($txtMapFolder)
+
+            $btnBrowse = New-Object System.Windows.Forms.Button
+            $btnBrowse.Location = New-Object System.Drawing.Point(($leftMargin + $controlWidth - 75), ($y + $labelHeight))
+            $btnBrowse.Size = New-Object System.Drawing.Size(75, $controlHeight)
+            $btnBrowse.Text = "Browse..."
+            $btnBrowse.Add_Click({
+                $folderDialog = New-Object System.Windows.Forms.FolderBrowserDialog
+                $folderDialog.Description = "Select folder to map to Windows Sandbox"
+                $folderDialog.SelectedPath = $txtMapFolder.Text
+                if ($folderDialog.ShowDialog() -eq "OK") {
+                    $txtMapFolder.Text = $folderDialog.SelectedPath
+
+                    # Update sandbox folder name based on whether WAU MSI exists in the new folder
+                    $msiFiles = Get-ChildItem -Path $folderDialog.SelectedPath -Filter "WAU*.msi" -File -ErrorAction SilentlyContinue
+                    if ($msiFiles) {
+                        $txtSandboxFolderName.Text = "WAU-install"
+                    } else {
+                        $folderName = Split-Path $folderDialog.SelectedPath -Leaf
+                        if (![string]::IsNullOrWhiteSpace($folderName)) {
+                            $txtSandboxFolderName.Text = $folderName
+                        }
+                    }
+
+                    # Update script based on folder contents
+                    $installWSBPath = Join-Path $folderDialog.SelectedPath "InstallWSB.cmd"
+                    $installerYamlFiles = Get-ChildItem -Path $folderDialog.SelectedPath -Filter "*.installer.yaml" -File -ErrorAction SilentlyContinue
+
+                    if (Test-Path $installWSBPath) {
+                        $txtScript.Text = $defaultScripts["InstallWSB"] -f $txtSandboxFolderName.Text
+                    } elseif ($installerYamlFiles) {
+                        $txtScript.Text = $defaultScripts["WinGetManifest"] -f $txtSandboxFolderName.Text
+                    } else {
+                        $txtScript.Text = $defaultScripts["Explorer"] -f $txtSandboxFolderName.Text
+                    }
+                }
+            })
+            $form.Controls.Add($btnBrowse)
+
+            $y += $labelHeight + $controlHeight + $spacing
+
+            # Sandbox Folder Name
+            $lblSandboxFolderName = New-Object System.Windows.Forms.Label
+            $lblSandboxFolderName.Location = New-Object System.Drawing.Point($leftMargin, $y)
+            $lblSandboxFolderName.Size = New-Object System.Drawing.Size(200, $labelHeight)
+            $lblSandboxFolderName.Text = "Sandbox Desktop Folder Name:"
+            $form.Controls.Add($lblSandboxFolderName)
+
+            $txtSandboxFolderName = New-Object System.Windows.Forms.TextBox
+            $txtSandboxFolderName.Location = New-Object System.Drawing.Point($leftMargin, ($y + $labelHeight))
+            $txtSandboxFolderName.Size = New-Object System.Drawing.Size($controlWidth, $controlHeight)
+            # Set default based on whether WAU MSI exists in the mapped folder
+            $msiFiles = Get-ChildItem -Path $txtMapFolder.Text -Filter "WAU*.msi" -File -ErrorAction SilentlyContinue
+            if ($msiFiles) {
+                $txtSandboxFolderName.Text = "WAU-install"
+            } else {
+                $txtSandboxFolderName.Text = Split-Path $txtMapFolder.Text -Leaf
+            }
+
+            # Add event handler to update script when folder name changes
+            $txtSandboxFolderName.Add_TextChanged({
+                $currentScript = $txtScript.Text
+                if (![string]::IsNullOrWhiteSpace($currentScript)) {
+                    # Replace the SandboxFolderName variable value in the existing script
+                    $txtScript.Text = $currentScript -replace '\$SandboxFolderName\s*=\s*"[^"]*"', "`$SandboxFolderName = `"$($txtSandboxFolderName.Text)`""
+                }
+            })
+
+            $form.Controls.Add($txtSandboxFolderName)
+
+            $y += $labelHeight + $controlHeight + $spacing
+
+            # WinGet Version
+            $lblWinGetVersion = New-Object System.Windows.Forms.Label
+            $lblWinGetVersion.Location = New-Object System.Drawing.Point($leftMargin, $y)
+            $lblWinGetVersion.Size = New-Object System.Drawing.Size(300, $labelHeight)
+            $lblWinGetVersion.Text = "WinGet Version (leave empty for latest):"
+            $form.Controls.Add($lblWinGetVersion)
+
+            $txtWinGetVersion = New-Object System.Windows.Forms.TextBox
+            $txtWinGetVersion.Location = New-Object System.Drawing.Point($leftMargin, ($y + $labelHeight))
+            $txtWinGetVersion.Size = New-Object System.Drawing.Size($controlWidth, $controlHeight)
+            $form.Controls.Add($txtWinGetVersion)
+
+            $y += $labelHeight + $controlHeight + $spacing
+
+            # WinGet Options
+            $lblWinGetOptions = New-Object System.Windows.Forms.Label
+            $lblWinGetOptions.Location = New-Object System.Drawing.Point($leftMargin, $y)
+            $lblWinGetOptions.Size = New-Object System.Drawing.Size(300, $labelHeight)
+            $lblWinGetOptions.Text = "WinGet Options (additional options):"
+            $form.Controls.Add($lblWinGetOptions)
+
+            $txtWinGetOptions = New-Object System.Windows.Forms.TextBox
+            $txtWinGetOptions.Location = New-Object System.Drawing.Point($leftMargin, ($y + $labelHeight))
+            $txtWinGetOptions.Size = New-Object System.Drawing.Size($controlWidth, $controlHeight)
+            $form.Controls.Add($txtWinGetOptions)
+
+            $y += $labelHeight + $controlHeight + $spacing + 10
+
+            # Checkboxes
+            $chkPrerelease = New-Object System.Windows.Forms.CheckBox
+            $chkPrerelease.Location = New-Object System.Drawing.Point($leftMargin, $y)
+            $chkPrerelease.Size = New-Object System.Drawing.Size(200, $labelHeight)
+            $chkPrerelease.Text = "Prerelease (of WinGet)"
+            $form.Controls.Add($chkPrerelease)
+
+            $y += $labelHeight + 5
+
+            $chkEnableExperimentalFeatures = New-Object System.Windows.Forms.CheckBox
+            $chkEnableExperimentalFeatures.Location = New-Object System.Drawing.Point($leftMargin, $y)
+            $chkEnableExperimentalFeatures.Size = New-Object System.Drawing.Size(250, $labelHeight)
+            $chkEnableExperimentalFeatures.Text = "Enable Experimental Features (in WinGet)"
+            $chkEnableExperimentalFeatures.Checked = $true
+            $form.Controls.Add($chkEnableExperimentalFeatures)
+
+            $y += $labelHeight + 5
+
+            $chkClean = New-Object System.Windows.Forms.CheckBox
+            $chkClean.Location = New-Object System.Drawing.Point($leftMargin, $y)
+            $chkClean.Size = New-Object System.Drawing.Size(200, $labelHeight)
+            $chkClean.Text = "Clean (cached dependencies)"
+            $form.Controls.Add($chkClean)
+
+            $y += $labelHeight + 5
+
+            $chkAsync = New-Object System.Windows.Forms.CheckBox
+            $chkAsync.Location = New-Object System.Drawing.Point($leftMargin, $y)
+            $chkAsync.Size = New-Object System.Drawing.Size(200, $labelHeight)
+            $chkAsync.Text = "Async (return directly)"
+            $chkAsync.Checked = $true
+            $form.Controls.Add($chkAsync)
+
+            $y += $labelHeight + 5
+
+            $chkVerbose = New-Object System.Windows.Forms.CheckBox
+            $chkVerbose.Location = New-Object System.Drawing.Point($leftMargin, $y)
+            $chkVerbose.Size = New-Object System.Drawing.Size(200, $labelHeight)
+            $chkVerbose.Text = "Verbose (screen log)"
+            $form.Controls.Add($chkVerbose)
+
+            $y += $labelHeight + 5
+
+            $chkWait = New-Object System.Windows.Forms.CheckBox
+            $chkWait.Location = New-Object System.Drawing.Point($leftMargin, $y)
+            $chkWait.Size = New-Object System.Drawing.Size(250, $labelHeight)
+            $chkWait.Text = "Wait (before exit PS window)"
+            $form.Controls.Add($chkWait)
+
+            $y += $labelHeight + $spacing + 10
+
+            # (Removed) force CMD execution option; PowerShell execution is robust enough
+
+            $y += $labelHeight + 5
+
+            # Script section
+            $lblScript = New-Object System.Windows.Forms.Label
+            $lblScript.Location = New-Object System.Drawing.Point($leftMargin, $y)
+            $lblScript.Size = New-Object System.Drawing.Size(200, $labelHeight)
+            $lblScript.Text = "Script:"
+            $form.Controls.Add($lblScript)
+
+            # Load/Save buttons for scripts
+            $btnLoadScript = New-Object System.Windows.Forms.Button
+            $btnLoadScript.Location = New-Object System.Drawing.Point(($leftMargin + $controlWidth - 160), $y)
+            $btnLoadScript.Size = New-Object System.Drawing.Size(75, $controlHeight)
+            $btnLoadScript.Text = "Load"
+            $btnLoadScript.Add_Click({
+                $openFileDialog = New-Object System.Windows.Forms.OpenFileDialog
+                $openFileDialog.InitialDirectory = $wsbDir
+                $openFileDialog.Filter = "PowerShell Scripts (*.ps1)|*.ps1"
+                $openFileDialog.Title = "Load Script"
+
+                if ($openFileDialog.ShowDialog() -eq "OK") {
+                    try {
+                        $scriptContent = Get-Content -Path $openFileDialog.FileName -Raw -Encoding ASCII
+                        $txtScript.Text = $scriptContent
+
+                        # Extract SandboxFolderName from the loaded script
+                        $pattern = '\$SandboxFolderName\s*=\s*"([^"]*)"'
+                        if ($scriptContent -match $pattern) {
+                            $extractedFolderName = $matches[1]
+                            if (![string]::IsNullOrWhiteSpace($extractedFolderName) -and $extractedFolderName -ne "DefaultFolder") {
+                                $txtSandboxFolderName.Text = $extractedFolderName
+                            }
+                        }
+
+                        # Update script content with current folder name from the text field
+                        $currentFolderName = $txtSandboxFolderName.Text
+                        if (![string]::IsNullOrWhiteSpace($currentFolderName)) {
+                            $txtScript.Text = $txtScript.Text -replace '\$SandboxFolderName\s*=\s*"[^"]*"', "`$SandboxFolderName = `"$currentFolderName`""
+                        }
+                    }
+                    catch {
+                        [System.Windows.Forms.MessageBox]::Show("Error loading script: $($_.Exception.Message)", "Load Error", "OK", "Error")
+                    }
+                }
+            })
+            $form.Controls.Add($btnLoadScript)
+
+            $btnSaveScript = New-Object System.Windows.Forms.Button
+            $btnSaveScript.Location = New-Object System.Drawing.Point(($leftMargin + $controlWidth - 75), $y)
+            $btnSaveScript.Size = New-Object System.Drawing.Size(75, $controlHeight)
+            $btnSaveScript.Text = "Save"
+            $btnSaveScript.Add_Click({
+                if ([string]::IsNullOrWhiteSpace($txtScript.Text)) {
+                    [System.Windows.Forms.MessageBox]::Show("No script content to save.", "Save Error", "OK", "Warning")
+                    return
+                }
+
+                $saveFileDialog = New-Object System.Windows.Forms.SaveFileDialog
+                $saveFileDialog.InitialDirectory = $wsbDir
+                $saveFileDialog.Filter = "PowerShell Scripts (*.ps1)|*.ps1"
+                $saveFileDialog.DefaultExt = "ps1"
+                $saveFileDialog.Title = "Save Script"
+
+                if ($saveFileDialog.ShowDialog() -eq "OK") {
+                    # Enforce .ps1 extension even if user removes it in filename box
+                    $targetPath = if ([System.IO.Path]::GetExtension($saveFileDialog.FileName).ToLower() -ne ".ps1") { "$($saveFileDialog.FileName).ps1" } else { $saveFileDialog.FileName }
+                    
+                    # Check if trying to overwrite a predefined script
+                    $targetFileName = [System.IO.Path]::GetFileName($targetPath)
+                    $protectedFiles = @("InstallWSB.ps1", "WinGetManifest.ps1", "Explorer.ps1")
+                    if ($protectedFiles -contains $targetFileName) {
+                        [System.Windows.Forms.MessageBox]::Show("Cannot overwrite predefined script '$targetFileName'. Please choose a different filename.", "Save Error", "OK", "Warning")
+                        return
+                    }
+                    
+                    try {
+                        # Ensure wsb directory exists
+                        if (-not (Test-Path $wsbDir)) {
+                            New-Item -ItemType Directory -Path $wsbDir -Force | Out-Null
+                        }
+                        $txtScript.Text | Out-File -FilePath $targetPath -Encoding ASCII
+                        [System.Windows.Forms.MessageBox]::Show("Script saved successfully!", "Save Complete", "OK", "Information")
+                    }
+                    catch {
+                        [System.Windows.Forms.MessageBox]::Show("Error saving script: $($_.Exception.Message)", "Save Error", "OK", "Error")
+                    }
+                }
+            })
+            $form.Controls.Add($btnSaveScript)
+
+            $txtScript = New-Object System.Windows.Forms.TextBox
+            $txtScript.Location = New-Object System.Drawing.Point($leftMargin, ($y + $labelHeight + 5))
+            $txtScript.Size = New-Object System.Drawing.Size($controlWidth, 120)
+            $txtScript.Multiline = $true
+            $txtScript.ScrollBars = "Vertical"
+            # Set default script based on folder contents
+            $installWSBPath = Join-Path $txtMapFolder.Text "InstallWSB.cmd"
+            $installerYamlFiles = Get-ChildItem -Path $txtMapFolder.Text -Filter "*.installer.yaml" -File -ErrorAction SilentlyContinue
+
+            if (Test-Path $installWSBPath) {
+                $txtScript.Text = $defaultScripts["InstallWSB"] -f $txtSandboxFolderName.Text
+            } elseif ($installerYamlFiles) {
+                $txtScript.Text = $defaultScripts["WinGetManifest"] -f $txtSandboxFolderName.Text
+            } else {
+                $txtScript.Text = $defaultScripts["Explorer"] -f $txtSandboxFolderName.Text
+            }
+            $form.Controls.Add($txtScript)
+
+            $y += $labelHeight + 5 + 120 + $spacing + 20
+
+            # Buttons
+            $btnOK = New-Object System.Windows.Forms.Button
+            $btnOK.Location = New-Object System.Drawing.Point(($leftMargin + $controlWidth - 160), $y)
+            $btnOK.Size = New-Object System.Drawing.Size(75, 30)
+            $btnOK.Text = "OK"
+            $btnOK.Add_Click({
+                $resultScript = $null
+                if (-not [string]::IsNullOrWhiteSpace($txtScript.Text)) {
+                    try { $resultScript = [ScriptBlock]::Create($txtScript.Text) } catch { $resultScript = $null }
+                }
+
+                $script:__dialogReturn = @{
+                    DialogResult = 'OK'
+                    MapFolder = $txtMapFolder.Text
+                    SandboxFolderName = $txtSandboxFolderName.Text
+                    WinGetVersion = $txtWinGetVersion.Text
+                    WinGetOptions = $txtWinGetOptions.Text
+                    Prerelease = $chkPrerelease.Checked
+                    EnableExperimentalFeatures = $chkEnableExperimentalFeatures.Checked
+                    Clean = $chkClean.Checked
+                    Async = $chkAsync.Checked
+                    Verbose = $chkVerbose.Checked
+                    Wait = $chkWait.Checked
+                    Script = $resultScript
+                }
+                $form.Close()
+            })
+            $form.Controls.Add($btnOK)
+
+            $btnCancel = New-Object System.Windows.Forms.Button
+            $btnCancel.Location = New-Object System.Drawing.Point(($leftMargin + $controlWidth - 75), $y)
+            $btnCancel.Size = New-Object System.Drawing.Size(75, 30)
+            $btnCancel.Text = "Cancel"
+            $btnCancel.Add_Click({
+                $script:__dialogReturn = @{ DialogResult = 'Cancel' }
+                $form.Close()
+            })
+            $form.Controls.Add($btnCancel)
+
+            # Set default accept/cancel buttons
+            $form.AcceptButton = $btnOK
+            $form.CancelButton = $btnCancel
+
+            # Show dialog (modal)
+            [void]$form.ShowDialog()
+
+            # Prepare return object
+            if ($script:__dialogReturn) {
+                return $script:__dialogReturn
+            } else {
+                return @{ DialogResult = 'Cancel' }
+            }
+        }
+        catch {
+            [System.Windows.Forms.MessageBox]::Show("Error creating dialog: $($_.Exception.Message)", "Error", "OK", "Error")
+            return @{ DialogResult = "Cancel" }
+        }
+        finally {
+            if ($form) { $form.Dispose() }
+        }
+    }
+
+    # Show configuration dialog
+    $dialogResult = Show-SandboxTestDialog
+    if ($dialogResult.DialogResult -eq 'OK') {
+        # Build parameters for SandboxTest
+        $sandboxParams = @{
+            MapFolder = $dialogResult.MapFolder
+            SandboxFolderName = $dialogResult.SandboxFolderName
+            Script = $dialogResult.Script
+        }
+
+        # Add optional parameters if they have values
+        if (![string]::IsNullOrWhiteSpace($dialogResult.WinGetVersion)) {
+            $sandboxParams.WinGetVersion = $dialogResult.WinGetVersion
+        }
+        if (![string]::IsNullOrWhiteSpace($dialogResult.WinGetOptions)) {
+            $sandboxParams.WinGetOptions = $dialogResult.WinGetOptions
+        }
+        if ($dialogResult.Prerelease) { $sandboxParams.Prerelease = $true }
+        if ($dialogResult.EnableExperimentalFeatures) { $sandboxParams.EnableExperimentalFeatures = $true }
+        if ($dialogResult.Clean) { $sandboxParams.Clean = $true }
+        if ($dialogResult.Async) { $sandboxParams.Async = $true }
+        if ($dialogResult.Verbose) { $sandboxParams.Verbose = $true }
+
+        # Call SandboxTest with collected parameters
+        SandboxTest @sandboxParams
+
+        # Wait for key press if requested
+        if ($dialogResult.Wait) {
+            Write-Host "`nPress any key to exit..." -ForegroundColor Yellow
+            $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+        }
+    }
+    exit
+}
+
 $Script:PORTABLE_MODE = $Portable.IsPresent
 
 # Flag for update/restore mode
@@ -450,28 +891,41 @@ function Test-InstalledWAU {
         [string]$displayName
     )
 
-    $uninstallKeys = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
-    $matchingApps = @()
-    
-    foreach ($key in $uninstallKeys) {
-        try {
-            $subKeys = Get-ChildItem -Path $key -ErrorAction Stop
-            foreach ($subKey in $subKeys) {
-                try {
-                    $properties = Get-ItemProperty -Path $subKey.PSPath -ErrorAction Stop
-                    if ($properties.DisplayName -like "$displayName") {
-                        $matchingApps += $properties.DisplayVersion
-                        $parentKeyName = Split-Path -Path $subKey.PSPath -Leaf
-                        $matchingApps += $parentKeyName
+    # Try up to 3 times to find WAU installation (handles timing issues with self-updates)
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        $uninstallKeys = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
+        $matchingApps = @()
+        
+        foreach ($key in $uninstallKeys) {
+            try {
+                $subKeys = Get-ChildItem -Path $key -ErrorAction Stop
+                foreach ($subKey in $subKeys) {
+                    try {
+                        $properties = Get-ItemProperty -Path $subKey.PSPath -ErrorAction Stop
+                        if ($properties.DisplayName -like "$displayName") {
+                            $matchingApps += $properties.DisplayVersion
+                            $parentKeyName = Split-Path -Path $subKey.PSPath -Leaf
+                            $matchingApps += $parentKeyName
+                        }
+                    }
+                    catch {
+                        continue
                     }
                 }
-                catch {
-                    continue
-                }
+            }
+            catch {
+                continue
             }
         }
-        catch {
-            continue
+
+        # Return immediately if WAU is found
+        if ($matchingApps.Count -gt 0) {
+            return $matchingApps
+        }
+
+        # Wait before retry (except on last attempt)
+        if ($attempt -lt 3) {
+            Start-Sleep -Milliseconds $Script:WAIT_TIME
         }
     }
 
@@ -1945,7 +2399,7 @@ msiexec /i "%~dp0$msiFileName" TRANSFORMS="%~dp0$transformName" /qn /l*v "%~dp0I
 msiexec /x"$($guid)" REBOOT=R /qn /l*v "%~dp0Uninst-$logFileName"
 
 ::Uninstall for ANY version:
-::powershell.exe -Command "Get-Package -Name "*Winget-AutoUpdate*" | Uninstall-Package -Force"
+::powershell.exe -Command "Get-Package -Name '*Winget-AutoUpdate*' | Uninstall-Package -Force"
 "@
             Set-Content -Path $cmdFilePath -Value $cmdContent -Encoding ASCII
             
@@ -2355,6 +2809,164 @@ function New-WAUTransformFile {
         return $false
     }
 }
+function Start-WSBTesting {
+    param($controls)
+    
+    try {
+        Start-PopUp "Checking WSB requirements..."
+        
+        # Get installed WAU version to determine which MSI to look for
+        $targetVersion = $null
+        
+        try {
+            if ($Script:WAU_GUID) {
+                $registryPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$($Script:WAU_GUID)"
+                $wauRegistry = Get-ItemProperty -Path $registryPath -ErrorAction Stop
+                
+                $comments = $wauRegistry.Comments
+                $displayVersion = $wauRegistry.DisplayVersion
+                
+                # Determine version string
+                if ($comments -and $comments -ne "STABLE") {
+                    if ($comments -match "WAU\s+([0-9]+\.[0-9]+\.[0-9]+(?:-\d+)?)(?:\s|\[)") {
+                        $targetVersion = "v$($matches[1])"
+                    } else {
+                        $targetVersion = "v$displayVersion"
+                    }
+                } else {
+                    $targetVersion = "v$($displayVersion -replace '\.\d+$', '')"
+                }
+            }
+        } catch {
+            Close-PopUp
+            [System.Windows.MessageBox]::Show("Could not determine installed WAU version. Please ensure WAU is properly installed.", "Version Detection Failed", "OK", "Warning")
+            return $false
+        }
+        
+        if (-not $targetVersion) {
+            Close-PopUp
+            [System.Windows.MessageBox]::Show("Could not determine WAU version for WSB testing.", "Version Detection Failed", "OK", "Warning")
+            return $false
+        }
+        
+        # Check for MSI file in msi directory
+        $msiDir = Join-Path $Script:WorkingDir "msi"
+        $versionDir = Join-Path $msiDir $targetVersion.TrimStart('v')
+        $expectedMsiName = "WAU-$targetVersion.msi"
+        $msiPath = Join-Path $versionDir $expectedMsiName
+        
+        # Alternative MSI name patterns
+        $msiFound = $false
+        $actualMsiPath = $null
+        
+        if (Test-Path $msiPath) {
+            $msiFound = $true
+            $actualMsiPath = $msiPath
+        } else {
+            # Look for WAU.msi or other patterns in version directory
+            if (Test-Path $versionDir) {
+                $msiFiles = Get-ChildItem -Path $versionDir -Filter "*.msi" -File
+                if ($msiFiles) {
+                    $msiFound = $true
+                    $actualMsiPath = $msiFiles[0].FullName
+                }
+            }
+        }
+        
+        if (-not $msiFound) {
+            Close-PopUp
+            [System.Windows.MessageBox]::Show("No MSI file found for WAU version $targetVersion.`n`nPlease download the MSI first using the [msi] button.", "MSI Not Found", "OK", "Warning")
+            return $false
+        }
+        
+        # Check for corresponding MST file
+        $msiDirectory = Split-Path $actualMsiPath -Parent
+        $mstFiles = Get-ChildItem -Path $msiDirectory -Filter "*.mst" -File
+        
+        if ($mstFiles.Count -eq 0) {
+            Close-PopUp
+            $result = [System.Windows.MessageBox]::Show(
+                "MSI file found: $(Split-Path $actualMsiPath -Leaf)`n`nBut no MST transform file found in the same directory.`n`nYou need to create an MST file first using the [msi] button.`n`nDo you want to create an MST file now?",
+                "MST File Missing",
+                "OkCancel",
+                "Question"
+            )
+            
+            if ($result -eq 'Ok') {
+                # Create MST file using existing function
+                if (New-WAUTransformFile -controls $controls) {
+                    [System.Windows.MessageBox]::Show("MST file created successfully!`n`nYou can now use the WSB testing feature.", "MST Created", "OK", "Information")
+                }
+            }
+            return $false
+        }
+        
+        Close-PopUp
+        
+        # All requirements met - proceed with WSB testing
+        $mstFile = $mstFiles[0]
+        $message = "Requirements check passed!`n`n"
+        $message += "MSI found: $(Split-Path $actualMsiPath -Leaf)`n"
+        $message += "MST found: $($mstFile.Name)`n"
+        $message += "Windows Sandbox: Enabled`n`n"
+        $message += "Ready for WSB testing. Do you want to continue?"
+        
+        $result = [System.Windows.MessageBox]::Show($message, "WSB Testing Ready", "OkCancel", "Question")
+
+        if ($result -eq 'Ok') {
+            Start-PopUp "Preparing WSB testing environment (this can take a while)..."
+            
+            try {
+                # Create WSB-specific install/uninstall scripts
+                $msiDirectory = Split-Path $actualMsiPath -Parent
+                $originalInstallCmd = Join-Path $msiDirectory "Install.cmd"
+                $originalUninstallCmd = Join-Path $msiDirectory "Uninstall.cmd"
+                $wsbInstallCmd = Join-Path $msiDirectory "InstallWSB.cmd"
+                $wsbUninstallCmd = Join-Path $msiDirectory "UninstallWSB.cmd"
+                
+                # Copy and modify Install.cmd for WSB (replace /qn with /qb and add explorer command)
+                $installContent = Get-Content -Path $originalInstallCmd -Raw
+                $wsbInstallContent = $installContent -replace '/qn', '/qb'
+                
+                Set-Content -Path $wsbInstallCmd -Value $wsbInstallContent -Encoding ASCII
+                
+                # Copy and modify Uninstall.cmd for WSB if it exists
+                if (Test-Path $originalUninstallCmd) {
+                    $uninstallContent = Get-Content -Path $originalUninstallCmd -Raw
+                    $wsbUninstallContent = $uninstallContent -replace '/qn', '/qb'
+                    Set-Content -Path $wsbUninstallCmd -Value $wsbUninstallContent -Encoding ASCII
+                }
+                
+                # Load sandbox script
+                . $WorkingDir\SandboxTest.ps1
+
+                # Call the function
+                SandboxTest -MapFolder $msiDirectory -SandboxFolderName "WAU-install" -EnableExperimentalFeatures -Script {
+                    $SandboxFolderName = "WAU-install"
+                    Start-Process cmd.exe -ArgumentList "/c del /Q `"$env:USERPROFILE\Desktop\$SandboxFolderName\*.log`" & `"$env:USERPROFILE\Desktop\$SandboxFolderName\InstallWSB.cmd`" && explorer `"$env:USERPROFILE\Desktop\$SandboxFolderName`""
+                } -Async -Verbose
+
+                Close-PopUp
+
+                return $true
+                
+            }
+            catch {
+                Close-PopUp
+                [System.Windows.MessageBox]::Show("Failed to create WSB testing environment: $($_.Exception.Message)", "WSB Preparation Failed", "OK", "Error")
+                return $false
+            }
+        }
+        
+        return $true
+        
+    }
+    catch {
+        Close-PopUp
+        [System.Windows.MessageBox]::Show("WSB check failed: $($_.Exception.Message)", "Error", "OK", "Error")
+        return $false
+    }
+}
 function Start-WAUManually {
     try {
         $currentConfig = Get-WAUCurrentConfig
@@ -2748,8 +3360,8 @@ function Set-ControlsState {
 
     $alwaysEnabledControls = @(
         'ScreenshotButton', 'SaveButton', 'CancelButton', 'RunNowButton', 'OpenLogsButton', 'GUIPng',
-        'DevGPOButton', 'DevTaskButton', 'DevRegButton', 'DevGUIDButton', 'DevSysButton', 'DevListButton',
-        'DevUsrButton', 'DevMSIButton', 'DevVerButton', 'DevSrcButton', 'VersionLinksTextBlock'
+        'DevGPOButton', 'DevTaskButton', 'DevRegButton', 'DevGUIDButton', 'DevSysButton', 'DevModsButton', 'DevListButton',
+        'DevUsrButton', 'DevMSIButton', 'DevWSBButton', 'DevVerButton', 'DevSrcButton', 'VersionLinksTextBlock'
     )
 
     function Get-Children($control) {
@@ -3767,9 +4379,11 @@ function Set-DevToolsVisibility {
         $controls.DevRegButton.Visibility = 'Visible'
         $controls.DevGUIDButton.Visibility = 'Visible'
         $controls.DevSysButton.Visibility = 'Visible'
+        $controls.DevModsButton.Visibility = 'Visible'
         $controls.DevListButton.Visibility = 'Visible'
         $controls.DevUsrButton.Visibility = 'Visible'
         $controls.DevMSIButton.Visibility = 'Visible'
+        $controls.DevWSBButton.Visibility = 'Visible'
         $controls.DevCfgButton.Visibility = 'Visible'
         $controls.DevWAUButton.Visibility = 'Visible'
         $controls.DevVerButton.Visibility = 'Visible'
@@ -3786,9 +4400,11 @@ function Set-DevToolsVisibility {
         $controls.DevRegButton.Visibility = 'Collapsed'
         $controls.DevGUIDButton.Visibility = 'Collapsed'
         $controls.DevSysButton.Visibility = 'Collapsed'
+        $controls.DevModsButton.Visibility = 'Collapsed'
         $controls.DevListButton.Visibility = 'Collapsed'
         $controls.DevUsrButton.Visibility = 'Collapsed'
         $controls.DevMSIButton.Visibility = 'Collapsed'
+        $controls.DevWSBButton.Visibility = 'Collapsed'
         $controls.DevCfgButton.Visibility = 'Collapsed'
         $controls.DevWAUButton.Visibility = 'Collapsed'
         $controls.DevVerButton.Visibility = 'Collapsed'
@@ -4086,6 +4702,7 @@ function Show-WAUSettingsGUI {
     $controls.DevTaskButton.Add_Click({
         try {
             Start-PopUp "Task scheduler opening, look in WAU folder..."
+
             # Open Task Scheduler
             $taskschdPath = "$env:SystemRoot\system32\taskschd.msc"
             Start-Process $taskschdPath
@@ -4243,6 +4860,76 @@ function Show-WAUSettingsGUI {
         }
     })
 
+    $controls.DevModsButton.Add_Click({
+        try {
+            # Get updated config
+            $updatedConfig = Get-WAUCurrentConfig
+            $installdir = $updatedConfig.InstallLocation
+            $modsPath = $updatedConfig.WAU_ModsPath
+            
+            $defaultModsPath = Join-Path $installdir 'mods'
+            
+            if ($modsPath -ne $defaultModsPath -and -not [string]::IsNullOrWhiteSpace($modsPath) -and $modsPath -notmatch '^https?://' -and $modsPath -ne 'AzureBlob') {
+                # Use the external ModsPath
+                if (Test-Path $modsPath) {
+                    Start-PopUp "WAU Mods folder opening..."
+                    Start-Process "explorer.exe" -ArgumentList "`"$modsPath`""
+                } else {
+                    [System.Windows.MessageBox]::Show("Mods path doesn't exist ('$modsPath')", "Path Not Found", "OK", "Warning")
+                    return
+                }
+            } else {
+                # Check if we should open default or show error for external path
+                if ([string]::IsNullOrWhiteSpace($modsPath) -or $modsPath -eq $defaultModsPath) {
+                    # Use the default WAU installation directory for Mods
+                    if (Test-Path $defaultModsPath) {
+                        Start-PopUp "WAU Mods folder opening..."
+                        Start-Process "explorer.exe" -ArgumentList "`"$defaultModsPath`""
+                    } else {
+                        [System.Windows.MessageBox]::Show("No Mods folder found ('mods')", "Folder Not Found", "OK", "Warning")
+                        return
+                    }
+                } else {
+                    # External path is set but cannot be opened (URL or AzureBlob) - ask to open local instead
+                    $result = [System.Windows.MessageBox]::Show(
+                        "External mods path cannot be opened because it is a URL or AzureBlob ('$modsPath').`n`nDo you want to open the local mods folder instead?`n`nNote: Any changes made there will be overwritten by WAU.",
+                        "Cannot Open External Path",
+                        "OKCancel",
+                        "Question"
+                    )
+                    if ($result -eq 'OK') {
+                        # Open the default local mods path
+                        if (Test-Path $defaultModsPath) {
+                            Start-PopUp "WAU Mods folder opening..."
+                            Start-Process "explorer.exe" -ArgumentList "`"$defaultModsPath`""
+                        } else {
+                            [System.Windows.MessageBox]::Show("No Mods folder found ('mods')", "Folder Not Found", "OK", "Warning")
+                            return
+                        }
+                    } else {
+                        return
+                    }
+                }
+            }
+
+            # Update status to "Done"
+            $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
+            $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED
+            
+            # Create timer to reset status back to ready after standard wait time
+            $window.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Background, [Action]{
+                Start-Sleep -Milliseconds $Script:WAIT_TIME
+                $controls.StatusBarText.Text = "$Script:STATUS_READY_TEXT"
+                $controls.StatusBarText.Foreground = "$Script:COLOR_INACTIVE"
+                Close-PopUp
+            }) | Out-Null
+        }
+        catch {
+            Close-PopUp
+            [System.Windows.MessageBox]::Show("Failed to open Mods folder: $($_.Exception.Message)", "Error", "OK", "Error")
+        }
+    })
+
     $controls.DevListButton.Add_Click({
         try {
             # Get updated config and policies
@@ -4397,6 +5084,92 @@ function Show-WAUSettingsGUI {
                 $controls.StatusBarText.Text = "$Script:STATUS_READY_TEXT"
                 $controls.StatusBarText.Foreground = "$Script:COLOR_INACTIVE"
             }) | Out-Null
+        }
+    })
+
+    $controls.DevWSBButton.Add_Click({
+        try {
+            # Windows Sandbox readiness logic
+            $sandboxExe = Join-Path $env:SystemRoot "System32\WindowsSandbox.exe"
+            if (-not (Test-Path $sandboxExe)) {
+                # Exe missing => either not enabled or enabled but pending reboot
+                $wsbFeature = Get-WindowsOptionalFeature -Online -FeatureName "Containers-DisposableClientVM" -ErrorAction SilentlyContinue
+                if ($wsbFeature -and $wsbFeature.State -eq 'Enabled') {
+                    # Enabled but exe missing -> pending reboot
+                    $pendingMsg = "Windows Sandbox feature is enabled but the executable is missing:`n$sandboxExe`n`nA restart is required before it can be used.`n`nRestart now?"
+                    $restartChoice = [System.Windows.MessageBox]::Show($pendingMsg, "Restart Required", "OkCancel", "Information")
+                    if ($restartChoice -eq 'Ok') { Restart-Computer }
+                    return
+                } else {
+                    # Not enabled (or not found) -> offer enable
+                    $enablePrompt = "Windows Sandbox is not enabled (exe missing:`n$sandboxExe`).`n`nEnable the feature now? (Restart required after enabling)"
+                    $choice = [System.Windows.MessageBox]::Show($enablePrompt, "Windows Sandbox Not Enabled", "OkCancel", "Question")
+                    if ($choice -ne 'Ok') { return }
+                    try {
+                        Start-PopUp "Enabling Windows Sandbox (this can take a while)..."
+                        Enable-WindowsOptionalFeature -Online -FeatureName "Containers-DisposableClientVM" -All -NoRestart -ErrorAction Stop | Out-Null
+                        Close-PopUp
+                        $reboot = [System.Windows.MessageBox]::Show("Feature enabled. A restart is required before Windows Sandbox can be used.`n`nRestart now?", "Restart Required", "OkCancel", "Information")
+                        if ($reboot -eq 'Ok') { Restart-Computer }
+                    }
+                    catch {
+                        Close-PopUp
+                        [System.Windows.MessageBox]::Show("Failed to enable Windows Sandbox: $($_.Exception.Message)", "Enable Failed", "OK", "Error") | Out-Null
+                    }
+                    return
+                }
+            }
+
+            # Create SandboxTest shortcut in user's start menu if it doesn't exist
+            $userStartMenuPath = [Environment]::GetFolderPath('StartMenu')
+            $sandboxTestShortcutPath = Join-Path $userStartMenuPath "Programs\SandboxTest.lnk"
+
+            if (-not (Test-Path $sandboxTestShortcutPath)) {
+                try {
+                    # Ensure the Programs directory exists
+                    $programsDir = Join-Path $userStartMenuPath "Programs"
+                    if (-not (Test-Path $programsDir)) {
+                        New-Item -Path $programsDir -ItemType Directory -Force | Out-Null
+                    }
+                    
+                    # Create the shortcut
+                    Add-Shortcut -Shortcut $sandboxTestShortcutPath `
+                                -Target "powershell.exe" `
+                                -StartIn $Script:WorkingDir `
+                                -Arguments "-NoProfile -ExecutionPolicy Bypass -File `"$($Script:WorkingDir)\WAU-Settings-GUI.ps1`" -SandboxTest" `
+                                -Icon $Script:GUI_ICON `
+                                -Description "Launch WAU Settings GUI in SandboxTest mode" `
+                                -WindowStyle "Normal"
+                    
+                    # Show dialog about created shortcut
+                    [System.Windows.MessageBox]::Show(
+                        "A SandboxTest shortcut has been created in the Start Menu.`n`nYou can now run SandboxTest standalone from the Start Menu without opening WAU Settings GUI first.",
+                        "SandboxTest Shortcut Created",
+                        "OK",
+                        "Information"
+                    )
+                }
+                catch {
+                    [System.Windows.MessageBox]::Show("Failed to create SandboxTest shortcut: $($_.Exception.Message)", "Shortcut Creation Failed", "OK", "Warning")
+                }
+            }
+
+            if (Start-WSBTesting -controls $controls) {
+                # Update status to "Done"
+                $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
+                $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED
+                
+                # Create timer to reset status back to ready after standard wait time
+                $window.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Background, [Action]{
+                    Start-Sleep -Milliseconds $Script:WAIT_TIME
+                    $controls.StatusBarText.Text = $Script:STATUS_READY_TEXT
+                    $controls.StatusBarText.Foreground = $Script:COLOR_INACTIVE
+                }) | Out-Null
+            }
+        }
+        catch {
+            # This should only catch unexpected errors that Start-WSBTesting doesn't handle
+            [System.Windows.MessageBox]::Show("Unexpected error in WSB operation: $($_.Exception.Message)", "Error", "OK", "Error")
         }
     })
 
@@ -5173,6 +5946,3 @@ try {
 
 # Show the GUI
 Show-WAUSettingsGUI
-
-
-

@@ -36,9 +36,12 @@ Benefits from not having to manage the settings in several places when testing e
   - `[reg]` Open **WAU settings path** in registry
   - `[uid]` **GUID** path exploration (regarding **WAU MSI** installation)
   - `[sys]` Open **WinGet** system wide installed application list (if previously saved by **WAU**)
+  - `[mod]` Open the external **WAU** mods folder
   - `[lst]` Open the **current local list**
   - `[usr]` **Change colors/update schedule** for **WAU Settings GUI**
   - `[msi]` **MSI** transform creation (using current showing configuration)
+  - `[wsb]` **Windows Sandbox (WSB)** installation/test of **WAU** installation
+    - A standalone **SandboxTest** shortcut for running advanced tests is created in **User Start Menu**
   - `[cfg]` **Configuration** backup/import (i.e. for sharing settings)
   - `[wau]` Reinstall **WAU** (with current showing configuration)
     - Stores source in `[INSTALLDIR]\msi\[VERSION]` (enables **WAU** `Repair` in **Programs and Features**)
@@ -94,6 +97,15 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
 - The built-in updater is absolutely the preferred option, making a backup of your current installed version first and taking care of locked/open files
   - A repair is automatically performed if files are corrupted/missing when starting
 
+### SandboxTest
+- **Microsoft** have developed a script for prepping, starting and running/validate local manifests in a **Windows Sandbox (WSB)** environment 
+- Now incorporated in **WAU Settings GUI** for testing the installation of **WAU** (with generated transform)
+- A **SandboxTest** shortcut is also created in the user **Start Menu** for more advanced testing, including recognition of files in the selected folder
+- 3 predefined scripts are included:
+    - **InstallWSB**: detects if the chosen folder contains files created from `[msi]`
+    - **WinGetManifest**: detects if the chosen folder contains **WinGet** manifests
+    - **Explorer**: a general script opening the selected mapped folder in **WSB**
+
 ### Uninstallation
 - Use **[Programs and Features](#uninstallation-1)** in **Control Panel** to uninstall **KnifMelti WAU Settings GUI**
 - Uninstall can be done from `CMD` too (`/UNINSTALL` or silent `/UNINSTALL /S` parameter) using `UnInst.exe` in the **WAU Settings GUI** `[INSTALLDIR]`:
@@ -119,6 +131,8 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
 ![image](Sources/assets/Screenshot_F12.png)
 #### Managed by GPO (central/local)
 ![image](Sources/assets/Screenshot_GPO.png)
+#### SandboxTest
+![image](Sources/assets/SandboxTest.png)
 #### Uninstallation
 ![image](Sources/assets/Screenshot_Uninstall.png)
 
