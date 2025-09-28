@@ -100,7 +100,7 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
 ### SandboxTest
 - **Microsoft** have developed a script for prepping, starting and running/validate local manifests in a **Windows Sandbox (WSB)** environment 
 - Now incorporated in **WAU Settings GUI** for testing the installation of **WAU** (with generated transform)
-- A **SandboxTest** shortcut is also created in the user **Start Menu** for more advanced testing, including recognition of files in the selected folder
+- A **[SandboxTest](#sandboxtest-1)** shortcut is also created in the user **Start Menu** for more advanced testing, including recognition of files in the selected folder
 - 3 predefined scripts are included:
     - **InstallWSB**: detects if the chosen folder contains files created from `[msi]`
     - **WinGetManifest**: detects if the chosen folder contains **WinGet** manifests
