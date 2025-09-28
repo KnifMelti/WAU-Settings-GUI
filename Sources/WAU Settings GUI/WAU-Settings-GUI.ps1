@@ -2914,7 +2914,7 @@ function Start-WSBTesting {
         $result = [System.Windows.MessageBox]::Show($message, "WSB Testing Ready", "OkCancel", "Question")
 
         if ($result -eq 'Ok') {
-            Start-PopUp "Preparing WSB testing environment..."
+            Start-PopUp "Preparing WSB testing environment (this can take a while)..."
             
             try {
                 # Create WSB-specific install/uninstall scripts
