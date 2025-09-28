@@ -2784,56 +2784,7 @@ function New-WAUTransformFile {
             $versionInfo = "Using WAU $targetVersion $(if($isPreRelease){'(Pre-release)'}else{'(Stable)'})"
             $fullMessage = "$($transformResult.Message)`n`n$versionInfo"
             [System.Windows.MessageBox]::Show($fullMessage, "Transform Created", "OK", "Information")
-
-            try {
-                # First try to open the MST file with its default association (MSI editor)
-                $mstFile = $transformResult.Directory | Get-ChildItem -Filter "*.mst" | Select-Object -First 1
-                if ($mstFile) {
-                    try {
-                        # Attempt to open MST file with associated program
-                        Start-Process -FilePath $mstFile.FullName -ErrorAction Stop
-                    }
-                    catch {
-                        # If MST association fails, try to find common MSI editors
-                        $commonEditors = @(
-                            "${env:ProgramFiles(x86)}\instedit.com\InstEd\InstEd.exe",
-                            "${env:ProgramFiles(x86)}\Master Packager Ltd\Master Packager\MasterPackager.exe",
-                            "${env:ProgramFiles(x86)}\InstallShield\*\System\isdev.exe",
-                            "${env:ProgramFiles(x86)}\Microsoft SDKs\Windows\*\bin\Orca.exe"
-                        )
-                        
-                        $editorFound = $false
-                        foreach ($editorPath in $commonEditors) {
-                            $foundEditors = Get-ChildItem -Path $editorPath -ErrorAction SilentlyContinue
-                            if ($foundEditors) {
-                                $editor = $foundEditors | Select-Object -First 1
-                                try {
-                                    Start-Process -FilePath $editor.FullName -ArgumentList "`"$($mstFile.FullName)`"" -ErrorAction Stop
-                                    $editorFound = $true
-                                    break
-                                }
-                                catch {
-                                    continue
-                                }
-                            }
-                        }
-                        
-                        if (-not $editorFound) {
-                            # Fall back to Explorer with file selected
-                            Start-Process "explorer.exe" -ArgumentList "/select,`"$($mstFile.FullName)`""
-                        }
-                    }
-                }
-                else {
-                    # No MST file found, just open the directory
-                    Start-Process "explorer.exe" -ArgumentList $transformResult.Directory
-                }
-            }
-            catch {
-                # Ultimate fallback - just open the directory
-                Start-Process "explorer.exe" -ArgumentList $transformResult.Directory
-            }
-
+            Start-Process "explorer.exe" -ArgumentList "/select,`"$($mstFile.FullName)`""
         } else {
             [System.Windows.MessageBox]::Show($transformResult.Message, "Error", "OK", "Error")
         }
