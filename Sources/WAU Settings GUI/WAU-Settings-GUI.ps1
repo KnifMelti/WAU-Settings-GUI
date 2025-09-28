@@ -22,9 +22,12 @@ Configure **WAU** settings after installation:
   - `[reg]` Open **WAU** settings path in registry
   - `[uid]` **GUID** path exploration (**MSI** installation)
   - `[sys]` Open **WinGet** system wide installed application list (if previously saved by **WAU**)
+  - `[mod]` Open the external **WAU** mods folder
   - `[lst]` Open the current local list
   - `[usr]` Change colors/update schedule for **WAU Settings GUI**
   - `[msi]` **MSI** transform creation (using current showing configuration)
+  - `[wsb]` Windows Sandbox test for **WAU**
+    - A standalone shortcut for running advanced tests is created in User Start Menu
   - `[cfg]` **Configuration** backup/import (i.e. for sharing settings)
   - `[wau]` Reinstall **WAU** (with current showing configuration)
     - Stores source in `[INSTALLDIR]\msi\[VERSION]` (enables **WAU** `Repair` in **Programs and Features**)
@@ -91,7 +94,7 @@ Start-Process explorer.exe -ArgumentList "`"$env:USERPROFILE\Desktop\$SandboxFol
             # Create the main form
             $form = New-Object System.Windows.Forms.Form
             $form.Text = "Windows Sandbox Test Configuration"
-            $form.Size = New-Object System.Drawing.Size(450, 690)  # Increased height for Load/Save buttons
+            $form.Size = New-Object System.Drawing.Size(450, 690)
             $form.StartPosition = "CenterScreen"
             $form.FormBorderStyle = "FixedDialog"
             $form.MaximizeBox = $false
@@ -336,13 +339,22 @@ Start-Process explorer.exe -ArgumentList "`"$env:USERPROFILE\Desktop\$SandboxFol
                 $saveFileDialog.Title = "Save Script"
 
                 if ($saveFileDialog.ShowDialog() -eq "OK") {
+                    # Enforce .ps1 extension even if user removes it in filename box
+                    $targetPath = if ([System.IO.Path]::GetExtension($saveFileDialog.FileName).ToLower() -ne ".ps1") { "$($saveFileDialog.FileName).ps1" } else { $saveFileDialog.FileName }
+                    
+                    # Check if trying to overwrite a predefined script
+                    $targetFileName = [System.IO.Path]::GetFileName($targetPath)
+                    $protectedFiles = @("InstallWSB.ps1", "WinGetManifest.ps1", "Explorer.ps1")
+                    if ($protectedFiles -contains $targetFileName) {
+                        [System.Windows.Forms.MessageBox]::Show("Cannot overwrite predefined script '$targetFileName'. Please choose a different filename.", "Save Error", "OK", "Warning")
+                        return
+                    }
+                    
                     try {
                         # Ensure wsb directory exists
                         if (-not (Test-Path $wsbDir)) {
                             New-Item -ItemType Directory -Path $wsbDir -Force | Out-Null
                         }
-                        # Enforce .ps1 extension even if user removes it in filename box
-                        $targetPath = if ([System.IO.Path]::GetExtension($saveFileDialog.FileName).ToLower() -ne ".ps1") { "$($saveFileDialog.FileName).ps1" } else { $saveFileDialog.FileName }
                         $txtScript.Text | Out-File -FilePath $targetPath -Encoding ASCII
                         [System.Windows.Forms.MessageBox]::Show("Script saved successfully!", "Save Complete", "OK", "Information")
                     }
@@ -2784,7 +2796,7 @@ function New-WAUTransformFile {
             $versionInfo = "Using WAU $targetVersion $(if($isPreRelease){'(Pre-release)'}else{'(Stable)'})"
             $fullMessage = "$($transformResult.Message)`n`n$versionInfo"
             [System.Windows.MessageBox]::Show($fullMessage, "Transform Created", "OK", "Information")
-            Start-Process "explorer.exe" -ArgumentList "/select,`"$($mstFile.FullName)`""
+            Start-Process "explorer.exe" -ArgumentList $transformResult.Directory
         } else {
             [System.Windows.MessageBox]::Show($transformResult.Message, "Error", "OK", "Error")
         }
@@ -4855,9 +4867,9 @@ function Show-WAUSettingsGUI {
             $installdir = $updatedConfig.InstallLocation
             $modsPath = $updatedConfig.WAU_ModsPath
             
-            if (-not [string]::IsNullOrWhiteSpace($modsPath) -and 
-                ($modsPath -match '^[a-zA-Z]:\\' -or $modsPath -match '^\\\\')) {
-                
+            $defaultModsPath = Join-Path $installdir 'mods'
+            
+            if ($modsPath -ne $defaultModsPath -and -not [string]::IsNullOrWhiteSpace($modsPath) -and $modsPath -notmatch '^https?://' -and $modsPath -ne 'AzureBlob') {
                 # Use the external ModsPath
                 if (Test-Path $modsPath) {
                     Start-PopUp "WAU Mods folder opening..."
@@ -4867,14 +4879,36 @@ function Show-WAUSettingsGUI {
                     return
                 }
             } else {
-                # Use the default WAU installation directory for Mods
-                $defaultModsPath = Join-Path $installdir 'mods'
-                if (Test-Path $defaultModsPath) {
-                    Start-PopUp "WAU Mods folder opening..."
-                    Start-Process "explorer.exe" -ArgumentList "`"$defaultModsPath`""
+                # Check if we should open default or show error for external path
+                if ([string]::IsNullOrWhiteSpace($modsPath) -or $modsPath -eq $defaultModsPath) {
+                    # Use the default WAU installation directory for Mods
+                    if (Test-Path $defaultModsPath) {
+                        Start-PopUp "WAU Mods folder opening..."
+                        Start-Process "explorer.exe" -ArgumentList "`"$defaultModsPath`""
+                    } else {
+                        [System.Windows.MessageBox]::Show("No Mods folder found ('mods')", "Folder Not Found", "OK", "Warning")
+                        return
+                    }
                 } else {
-                    [System.Windows.MessageBox]::Show("No Mods folder found ('mods')", "Folder Not Found", "OK", "Warning")
-                    return
+                    # External path is set but cannot be opened (URL or AzureBlob) - ask to open local instead
+                    $result = [System.Windows.MessageBox]::Show(
+                        "External mods path cannot be opened because it is a URL or AzureBlob ('$modsPath').`n`nDo you want to open the local mods folder instead?`n`nNote: Any changes made there will be overwritten by WAU.",
+                        "Cannot Open External Path",
+                        "OKCancel",
+                        "Question"
+                    )
+                    if ($result -eq 'OK') {
+                        # Open the default local mods path
+                        if (Test-Path $defaultModsPath) {
+                            Start-PopUp "WAU Mods folder opening..."
+                            Start-Process "explorer.exe" -ArgumentList "`"$defaultModsPath`""
+                        } else {
+                            [System.Windows.MessageBox]::Show("No Mods folder found ('mods')", "Folder Not Found", "OK", "Warning")
+                            return
+                        }
+                    } else {
+                        return
+                    }
                 }
             }
 
@@ -5912,6 +5946,3 @@ try {
 
 # Show the GUI
 Show-WAUSettingsGUI
-
-
-
