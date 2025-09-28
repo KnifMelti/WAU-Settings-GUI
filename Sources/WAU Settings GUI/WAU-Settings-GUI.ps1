@@ -27,7 +27,7 @@ Configure **WAU** settings after installation:
   - `[usr]` Change colors/update schedule for **WAU Settings GUI**
   - `[msi]` **MSI** transform creation (using current showing configuration)
   - `[wsb]` Windows Sandbox test for **WAU**
-    - A standalone shortcut for running advanced tests is created in User Start Menu
+    - A standalone **SandboxTest** shortcut for running advanced tests is created in User Start Menu
   - `[cfg]` **Configuration** backup/import (i.e. for sharing settings)
   - `[wau]` Reinstall **WAU** (with current showing configuration)
     - Stores source in `[INSTALLDIR]\msi\[VERSION]` (enables **WAU** `Repair` in **Programs and Features**)
