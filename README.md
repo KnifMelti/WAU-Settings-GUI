@@ -41,7 +41,7 @@ Benefits from not having to manage the settings in several places when testing e
   - `[usr]` **Change colors/update schedule** for **WAU Settings GUI**
   - `[msi]` **MSI** transform creation (using current showing configuration)
   - `[wsb]` **Windows Sandbox (WSB)** installation/test of **WAU** installation
-    - A standalone **SandboxTest** shortcut for running advanced tests is created in **User Start Menu**
+    - A standalone **SandboxTest** shortcut for running advanced tests is created in **User Start Menu** the first time `[wsb]` is used with **WSB** installed
   - `[cfg]` **Configuration** backup/import (i.e. for sharing settings)
   - `[wau]` Reinstall **WAU** (with current showing configuration)
     - Stores source in `[INSTALLDIR]\msi\[VERSION]` (enables **WAU** `Repair` in **Programs and Features**)
@@ -98,9 +98,10 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
   - A repair is automatically performed if files are corrupted/missing when starting
 
 ### SandboxTest
-- **Microsoft** have developed a script for prepping, starting and running/validate local manifests in a **Windows Sandbox (WSB)** environment 
-- Now incorporated in **WAU Settings GUI** for testing the installation of **WAU** (with generated transform)
-- A **[SandboxTest](#sandboxtest-1)** shortcut is also created in the user **Start Menu** for more advanced testing, including recognition of files in the selected folder
+- **Microsoft** have developed a script for prepping, starting and running/validate local manifests in a **Windows Sandbox (WSB)** environment:
+https://github.com/microsoft/winget-pkgs/blob/master/doc/README.md#in-windows-sandbox
+- Now incorporated (heavily modified) in **WAU Settings GUI** for testing the installation of **WAU** (with generated transform)
+- A **[SandboxTest](#sandboxtest-1)** shortcut is also created in the user **Start Menu** (the first time `[wsb]` is used with **WSB** installed) for more advanced testing, including recognition of files in the selected folder
 - 3 predefined scripts are included:
     - **InstallWSB**: detects if the chosen folder contains files created from `[msi]`
     - **WinGetManifest**: detects if the chosen folder contains **WinGet** manifests
