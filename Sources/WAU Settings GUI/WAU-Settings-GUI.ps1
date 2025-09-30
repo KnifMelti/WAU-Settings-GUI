@@ -1167,7 +1167,8 @@ function Start-WAUGUIUpdate {
                     New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
                 }
                 
-                # Backup current files (exclude created directories)
+                # Backup current files (exclude created directories: ver, ver_*, msi, cfg)
+                # Includes wsb folder if it exists
                 Get-ChildItem -Path $Script:WorkingDir -Exclude "ver", "ver_*", "msi", "cfg" | ForEach-Object {
                     Copy-Item -Path $_.FullName -Destination $backupDir -Recurse -Force
                 }
@@ -1289,13 +1290,14 @@ function Start-WAUGUIUpdate {
                     }
                 }
 
-                # Create/update the desktop shortcut AFTER copying files
+                # Create/update the desktop shortcut AFTER copying files (only if Start Menu shortcut doesn't exist)
                 if (-not $Script:PORTABLE_MODE) {
+                    $startMenuShortcut = "$Script:STARTMENU_WAU_DIR\$Script:GUI_TITLE.lnk"
                     $shortcutPath = $Script:DESKTOP_WAU_SETTINGS
                     $targetPath = Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'
                     $newIconPath = Join-Path $Script:WorkingDir "config\WAU Settings GUI.ico"
-                    
-                    if (Test-Path $targetPath) {
+
+                    if ((Test-Path $targetPath) -and -not (Test-Path $startMenuShortcut)) {
                         Add-Shortcut -Shortcut $shortcutPath `
                                 -Target $Script:CONHOST_EXE `
                                 -StartIn $Script:WorkingDir `
@@ -1451,13 +1453,14 @@ function Start-RestoreFromBackup {
             }
         }
 
-        # Create/update the desktop shortcut AFTER copying files (same as in Start-WAUGUIUpdate)
+        # Create/update the desktop shortcut AFTER copying files (only if Start Menu shortcut doesn't exist)
         if (-not $Script:PORTABLE_MODE) {
+            $startMenuShortcut = "$Script:STARTMENU_WAU_DIR\$Script:GUI_TITLE.lnk"
             $shortcutPath = $Script:DESKTOP_WAU_SETTINGS
             $targetPath = Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'
             $newIconPath = Join-Path $Script:WorkingDir "config\WAU Settings GUI.ico"
-            
-            if (Test-Path $targetPath) {
+
+            if ((Test-Path $targetPath) -and -not (Test-Path $startMenuShortcut)) {
                 Add-Shortcut -Shortcut $shortcutPath `
                         -Target $Script:CONHOST_EXE `
                         -StartIn $Script:WorkingDir `
@@ -1562,6 +1565,114 @@ function Get-WAUPoliciesStatus {
     # 2. BlackList subkey has values
     # 3. WhiteList subkey has values
     return ($null -ne $mainPolicies) -or ($null -ne $blackListItems) -or ($null -ne $whiteListItems)
+}
+function Get-WAUListPoliciesStatus {
+    # Check if list management is controlled by GPO
+    # Returns an object with:
+    #   IsManaged: $true if any list policy exists
+    #   ListType: 'BlackList' or 'WhiteList', determined by WAU_UseWhiteList setting
+    # This checks specifically for list-related policies:
+    # 1. WAU_ListPath property (external list path)
+    # 2. BlackList subkey (GPO-managed blacklist)
+    # 3. WhiteList subkey (GPO-managed whitelist)
+    # When both BlackList and WhiteList exist, WAU_UseWhiteList determines which is active
+
+    $result = @{
+        IsManaged = $false
+        ListType = $null
+    }
+
+    $policies = Get-ItemProperty -Path $Script:WAU_POLICIES_PATH -ErrorAction SilentlyContinue
+
+    # Check if WAU_ListPath property exists (external path takes precedence)
+    if ($null -ne $policies -and $null -ne $policies.WAU_ListPath) {
+        $result.IsManaged = $true
+        # Determine type based on WAU_UseWhiteList setting
+        if ($policies.WAU_UseWhiteList -eq 1) {
+            $result.ListType = 'WhiteList'
+        } else {
+            $result.ListType = 'BlackList'
+        }
+        return $result
+    }
+
+    # Check if BlackList or WhiteList subkeys exist
+    $blackListPath = Join-Path $Script:WAU_POLICIES_PATH "BlackList"
+    $whiteListPath = Join-Path $Script:WAU_POLICIES_PATH "WhiteList"
+
+    $hasBlackList = $false
+    $hasWhiteList = $false
+
+    # Check BlackList subkey
+    if (Test-Path $blackListPath) {
+        $blackListItems = Get-ItemProperty -Path $blackListPath -ErrorAction SilentlyContinue
+        if ($blackListItems) {
+            $blackListProps = $blackListItems.PSObject.Properties | Where-Object {
+                $_.Name -notin @('PSPath', 'PSParentPath', 'PSChildName', 'PSDrive', 'PSProvider')
+            }
+            if ($blackListProps.Count -gt 0) {
+                $hasBlackList = $true
+            }
+        }
+    }
+
+    # Check WhiteList subkey
+    if (Test-Path $whiteListPath) {
+        $whiteListItems = Get-ItemProperty -Path $whiteListPath -ErrorAction SilentlyContinue
+        if ($whiteListItems) {
+            $whiteListProps = $whiteListItems.PSObject.Properties | Where-Object {
+                $_.Name -notin @('PSPath', 'PSParentPath', 'PSChildName', 'PSDrive', 'PSProvider')
+            }
+            if ($whiteListProps.Count -gt 0) {
+                $hasWhiteList = $true
+            }
+        }
+    }
+
+    # If either list exists, determine which one is active
+    # IMPORTANT: The list type is determined by WAU_UseWhiteList setting
+    # - If WAU_UseWhiteList = 1: Only WhiteList is used (if it exists)
+    # - If WAU_UseWhiteList ≠ 1: Only BlackList is used (if it exists)
+    if ($hasBlackList -or $hasWhiteList) {
+        $useWhiteList = ($policies -and $policies.WAU_UseWhiteList -eq 1)
+
+        if ($useWhiteList -and $hasWhiteList) {
+            # UseWhiteList is enabled AND WhiteList exists
+            $result.IsManaged = $true
+            $result.ListType = 'WhiteList'
+        } elseif (-not $useWhiteList -and $hasBlackList) {
+            # UseWhiteList is disabled AND BlackList exists
+            $result.IsManaged = $true
+            $result.ListType = 'BlackList'
+        }
+        # If setting doesn't match available list, IsManaged stays false
+    }
+
+    return $result
+}
+function Get-GPOListItems {
+    # Reads app list items from GPO registry subkeys
+    # Returns array of app names from BlackList or WhiteList subkey
+    param (
+        [string]$ListType  # 'BlackList' or 'WhiteList'
+    )
+
+    $listPath = Join-Path $Script:WAU_POLICIES_PATH $ListType
+    $appList = @()
+
+    if (Test-Path $listPath) {
+        $listItems = Get-ItemProperty -Path $listPath -ErrorAction SilentlyContinue
+        if ($listItems) {
+            # Get all properties except PowerShell default properties
+            $appProps = $listItems.PSObject.Properties | Where-Object {
+                $_.Name -notin @('PSPath', 'PSParentPath', 'PSChildName', 'PSDrive', 'PSProvider')
+            }
+            # Extract app names from property VALUES (not names)
+            $appList = $appProps | ForEach-Object { $_.Value }
+        }
+    }
+
+    return $appList
 }
 function Get-DisplayValue {
     param (
@@ -2661,8 +2772,6 @@ function Install-WAU {
         # Check if installation was successful
         $Script:WAU_INSTALL_INFO = Test-InstalledWAU -DisplayName "Winget-AutoUpdate"
         if ($Script:WAU_INSTALL_INFO.Count -ge 1) {
-            [System.Windows.MessageBox]::Show("WAU installed successfully! Please configure the new installation.", "Installation Complete", "OK", "Information")
-
             # Get WAU installation info and store as constants
             $Script:WAU_VERSION = if ($Script:WAU_INSTALL_INFO.Count -ge 1) { $Script:WAU_INSTALL_INFO[0] } else { "Unknown" }
             $Script:WAU_GUID = if ($Script:WAU_INSTALL_INFO.Count -ge 2) { $Script:WAU_INSTALL_INFO[1] } else { $null }
@@ -2877,11 +2986,26 @@ function Start-WSBTesting {
             if ($result -eq 'Ok') {
                 # Create MST file using existing function
                 if (New-WAUTransformFile -controls $controls) {
-                    [System.Windows.MessageBox]::Show("MST file created successfully!`n`nYou can now use the WSB testing feature.", "MST Created", "OK", "Information")
+                    # MST file created successfully - now continue with WSB testing
+                    # Re-check for MST files after creation
+                    $mstFiles = Get-ChildItem -Path $msiDirectory -Filter "*.mst" -File
+                    if ($mstFiles.Count -gt 0) {
+                        # MST file now exists, continue with WSB testing by NOT returning here
+                        # The function will continue to the WSB testing logic below
+                    } else {
+                        # MST creation reported success but file still missing
+                        [System.Windows.MessageBox]::Show("MST file creation succeeded but file not found. Please try again.", "MST Creation Issue", "OK", "Warning")
+                        return $false
+                    }
+                } else {
+                    # MST creation failed
+                    return $false
                 }
+            } else {
+                # User cancelled MST creation
+                return $false
             }
-            return $false
-        }
+        }        
         
         Close-PopUp
         
@@ -3648,21 +3772,14 @@ function Update-WAUGUIFromConfig {
     $Controls.InstallLocationLink.NavigateUri = $updatedConfig.InstallLocation
     
     # Check if GPO is managing the list
-    $wauGPOListPathEnabled = Get-WAUPoliciesStatus
-    
-    if ($wauGPOListPathEnabled) {
+    $listPolicyStatus = Get-WAUListPoliciesStatus
+
+    if ($listPolicyStatus.IsManaged) {
         $Controls.LocalListText.Inlines.Clear()
         $Controls.LocalListText.Inlines.Add("GPO Managed List: ")
-        
-        # Check if it's whitelist mode - ONLY based on WAU_UseWhiteList setting
-        $isWhitelistMode = $false
-        
-        # Only check WAU_UseWhiteList policy setting, ignore existence of entries
-        if ($updatedPolicies -and $updatedPolicies.WAU_UseWhiteList -eq 1) {
-            $isWhitelistMode = $true
-        }
-        
-        if ($isWhitelistMode) {
+
+        # Determine list type based on actual GPO configuration
+        if ($listPolicyStatus.ListType -eq 'WhiteList') {
             $run = New-Object System.Windows.Documents.Run("'GPO (Included Apps)'")
         } else {
             $run = New-Object System.Windows.Documents.Run("'GPO (Excluded Apps)'")
@@ -3672,7 +3789,9 @@ function Update-WAUGUIFromConfig {
     } else {
         try {
             $installdir = $updatedConfig.InstallLocation
-            if ($updatedConfig.WAU_UseWhiteList -eq 1) {
+            # Check WAU_UseWhiteList from both policies and config (GPO takes precedence)
+            $useWhiteList = [bool](Get-DisplayValue -PropertyName "WAU_UseWhiteList" -Config $updatedConfig -Policies $updatedPolicies)
+            if ($useWhiteList) {
                 $whiteListFile = Join-Path $installdir 'included_apps.txt'
                 if (Test-Path $whiteListFile) {
                     $Controls.LocalListText.Inlines.Clear()
@@ -4924,63 +5043,121 @@ function Show-WAUSettingsGUI {
                 # GPO registry key doesn't exist or can't be read
             }
             $installdir = $updatedConfig.InstallLocation
-            
+
             # Get the ListPath from config or policies
             $listPath = Get-DisplayValue -PropertyName "WAU_ListPath" -Config $updatedConfig -Policies $updatedPolicies
-            
-            if ($updatedConfig.WAU_UseWhiteList -eq 1 -or $updatedPolicies.WAU_UseWhiteList -eq 1) {
-                # Check if ListPath is set to a local or UNC path for whitelist
-                if (-not [string]::IsNullOrWhiteSpace($listPath) -and 
-                    $listPath -ne "AzureBlob" -and
-                    ($listPath -match '^[a-zA-Z]:\\' -or $listPath -match '^\\\\')) {
-                    
-                    # Use the external ListPath for whitelist
-                    $whiteListFile = Join-Path $listPath 'included_apps.txt'
-                    if (Test-Path $whiteListFile) {
-                        Start-PopUp "WAU included apps list opening..."
-                        Open-TextFile -FilePath $whiteListFile
-                    } else {
-                        [System.Windows.MessageBox]::Show("No included apps list found in external path ('$listPath\included_apps.txt')", "File Not Found", "OK", "Warning")
-                        return
-                    }
+
+            # Determine if we're working with whitelist or excluded list
+            $isWhiteList = ($updatedConfig.WAU_UseWhiteList -eq 1 -or $updatedPolicies.WAU_UseWhiteList -eq 1)
+            $listFileName = if ($isWhiteList) { 'included_apps.txt' } else { 'excluded_apps.txt' }
+            $listTypeText = if ($isWhiteList) { 'included apps list' } else { 'excluded apps list' }
+
+            # Check if list is managed directly in GPO registry (BlackList/WhiteList subkeys)
+            $gpoListType = if ($isWhiteList) { 'WhiteList' } else { 'BlackList' }
+            $gpoListPath = Join-Path $Script:WAU_POLICIES_PATH $gpoListType
+
+            if (Test-Path $gpoListPath) {
+                # Try to read apps from GPO registry subkey
+                $gpoApps = Get-GPOListItems -ListType $gpoListType
+
+                if ($gpoApps.Count -gt 0) {
+                    # GPO registry list exists - create temporary read-only file for viewing
+                    Start-PopUp "WAU $listTypeText opening (GPO Registry)..."
+
+                    $tempFile = Join-Path $env:TEMP "GPO_$($gpoListType)_ReadOnly.txt"
+                    $gpoApps -join "`r`n" | Out-File -FilePath $tempFile -Encoding utf8 -Force
+
+                    # Show info message before opening
+                    [System.Windows.MessageBox]::Show(
+                        "This list is managed by Group Policy (GPO) and stored in registry.`n`nOpening a READ-ONLY temporary file for viewing.`n`nChanges to this file will NOT be saved or applied.`n`nTo modify the list, update the GPO settings.",
+                        "GPO-Managed List (Read-Only)",
+                        "OK",
+                        "Information"
+                    )
+
+                    Open-TextFile -FilePath $tempFile
+
+                    # Update status to "Done"
+                    $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
+                    $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED
+
+                    # Create timer to reset status back to ready after standard wait time
+                    $window.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Background, [Action]{
+                        Start-Sleep -Milliseconds $Script:WAIT_TIME
+                        $controls.StatusBarText.Text = "$Script:STATUS_READY_TEXT"
+                        $controls.StatusBarText.Foreground = "$Script:COLOR_INACTIVE"
+                        Close-PopUp
+                    }) | Out-Null
+
+                    return
+                }
+            }
+
+            # Check if ListPath is accessible (local or UNC path, not URL)
+            if (-not [string]::IsNullOrWhiteSpace($listPath) -and
+                $listPath -notmatch '^https?://' -and
+                ($listPath -match '^[a-zA-Z]:\\' -or $listPath -match '^\\\\')) {
+
+                # Use the external ListPath
+                $listFile = Join-Path $listPath $listFileName
+                if (Test-Path $listFile) {
+                    Start-PopUp "WAU $listTypeText opening..."
+                    Open-TextFile -FilePath $listFile
                 } else {
-                    # Use the default WAU installation directory for whitelist
-                    $whiteListFile = Join-Path $installdir 'included_apps.txt'
-                    if (Test-Path $whiteListFile) {
-                        Start-PopUp "WAU included apps list opening..."
-                        Open-TextFile -FilePath $whiteListFile
-                    } else {
-                        [System.Windows.MessageBox]::Show("No included apps list found ('included_apps.txt')", "File Not Found", "OK", "Warning")
-                        return
-                    }
+                    [System.Windows.MessageBox]::Show("No $listTypeText found in external path ('$listPath\$listFileName')", "File Not Found", "OK", "Warning")
+                    return
                 }
             } else {
-                # Check if ListPath is set to a local or UNC path for excluded list
-                if (-not [string]::IsNullOrWhiteSpace($listPath) -and 
-                    $listPath -ne "AzureBlob" -and
-                    ($listPath -match '^[a-zA-Z]:\\' -or $listPath -match '^\\\\')) {
-                    
-                    # Use the external ListPath for excluded list
-                    $excludedFile = Join-Path $listPath 'excluded_apps.txt'
-                    if (Test-Path $excludedFile) {
-                        Start-PopUp "WAU excluded apps list opening..."
-                        Open-TextFile -FilePath $excludedFile
+                # Check if we should open default or show error for external path
+                if ([string]::IsNullOrWhiteSpace($listPath)) {
+                    # No external path set, use default location
+                    $listFile = Join-Path $installdir $listFileName
+                    if (Test-Path $listFile) {
+                        Start-PopUp "WAU $listTypeText opening..."
+                        Open-TextFile -FilePath $listFile
+                    } elseif (-not $isWhiteList) {
+                        # For excluded list, also check default file
+                        $defaultExcludedFile = Join-Path $installdir 'config\default_excluded_apps.txt'
+                        if (Test-Path $defaultExcludedFile) {
+                            Start-PopUp "WAU default excluded apps list opening..."
+                            Open-TextFile -FilePath $defaultExcludedFile
+                        } else {
+                            [System.Windows.MessageBox]::Show("No $listTypeText found ('$listFileName')", "File Not Found", "OK", "Warning")
+                            return
+                        }
                     } else {
-                        [System.Windows.MessageBox]::Show("No excluded apps list found in external path ('$listPath\excluded_apps.txt')", "File Not Found", "OK", "Warning")
+                        [System.Windows.MessageBox]::Show("No $listTypeText found ('$listFileName')", "File Not Found", "OK", "Warning")
                         return
                     }
                 } else {
-                    # Use the default WAU installation directory for excluded list
-                    $excludedFile = Join-Path $installdir 'excluded_apps.txt'
-                    $defaultExcludedFile = Join-Path $installdir 'config\default_excluded_apps.txt'
-                    if (Test-Path $excludedFile) {
-                        Start-PopUp "WAU excluded apps list opening..."
-                        Open-TextFile -FilePath $excludedFile
-                    } elseif (Test-Path $defaultExcludedFile) {
-                        Start-PopUp "WAU default excluded apps List opening..."
-                        Open-TextFile -FilePath $defaultExcludedFile
+                    # External path is set but cannot be opened (URL or AzureBlob) - ask to open local instead
+                    $result = [System.Windows.MessageBox]::Show(
+                        "External list path cannot be opened because it is a URL ('$listPath').`n`nDo you want to open the local list instead?`n`nNote: Any changes made there will be overwritten by WAU.",
+                        "Cannot Open External Path",
+                        "OKCancel",
+                        "Question"
+                    )
+                    if ($result -eq 'OK') {
+                        # Open the default local list
+                        $listFile = Join-Path $installdir $listFileName
+                        if (Test-Path $listFile) {
+                            Start-PopUp "WAU $listTypeText opening..."
+                            Open-TextFile -FilePath $listFile
+                        } elseif (-not $isWhiteList) {
+                            # For excluded list, also check default file
+                            $defaultExcludedFile = Join-Path $installdir 'config\default_excluded_apps.txt'
+                            if (Test-Path $defaultExcludedFile) {
+                                Start-PopUp "WAU default excluded apps list opening..."
+                                Open-TextFile -FilePath $defaultExcludedFile
+                            } else {
+                                [System.Windows.MessageBox]::Show("No $listTypeText found ('$listFileName')", "File Not Found", "OK", "Warning")
+                                return
+                            }
+                        } else {
+                            [System.Windows.MessageBox]::Show("No $listTypeText found ('$listFileName')", "File Not Found", "OK", "Warning")
+                            return
+                        }
                     } else {
-                        [System.Windows.MessageBox]::Show("No excluded apps list found (neither 'excluded_apps.txt' nor 'config\default_excluded_apps.txt').", "File Not Found", "OK", "Warning")
                         return
                     }
                 }
@@ -4989,7 +5166,7 @@ function Show-WAUSettingsGUI {
             # Update status to "Done"
             $controls.StatusBarText.Text = $Script:STATUS_DONE_TEXT
             $controls.StatusBarText.Foreground = $Script:COLOR_ENABLED
-            
+
             # Create timer to reset status back to ready after standard wait time
             $window.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Background, [Action]{
                 Start-Sleep -Milliseconds $Script:WAIT_TIME

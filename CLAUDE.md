@@ -27,7 +27,7 @@ WAU uses a two-layer registry system with precedence:
 1. **Local settings**: `HKLM:\SOFTWARE\Romanitho\Winget-AutoUpdate`
 2. **GPO policies**: `HKLM:\SOFTWARE\Policies\Romanitho\Winget-AutoUpdate` (takes precedence)
 
-Always read effective values using `Get-DisplayValue` which respects GPO > local precedence. When GPO-managed, most controls are disabled except shortcuts and `[gpo]` Dev Tool.
+Always read effective values using `Get-DisplayValue` which respects GPO > local precedence. When GPO-managed, most controls are disabled except shortcuts.
 
 ### Configuration Patterns
 
@@ -176,7 +176,7 @@ Three predefined scripts are saved to `wsb/` folder on first use when Windows Sa
 
 ## GPO Mode Behavior
 
-When WAU is GPO-managed, disable most controls except shortcuts and `[gpo]` Dev Tool:
+When WAU is GPO-managed, disable most controls except shortcuts:
 
 ```powershell
 Set-ControlsState -parentControl $window -enabled:$false -excludePattern "*Shortcut*"

@@ -3,8 +3,8 @@
 ;@Ahk2Exe-Set CompanyName, KnifMelti
 ;@Ahk2Exe-Set ProductName, WAU Settings GUI
 ;@Ahk2Exe-Set FileDescription, Modify every aspect of Winget-AutoUpdate (WAU)
-;@Ahk2Exe-Set FileVersion, 1.9.0.0
-;@Ahk2Exe-Set ProductVersion, 1.9.0.0
+;@Ahk2Exe-Set FileVersion, 1.9.0.1
+;@Ahk2Exe-Set ProductVersion, 1.9.0.1
 ;@Ahk2Exe-Set LegalCopyright, Copyright © 2025 KnifMelti
 ;@Ahk2Exe-Set LegalTrademarks, WAU Settings GUI
 ;@Ahk2Exe-Set InternalName, WAU-Settings-GUI
@@ -185,8 +185,6 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
                 localMsiPath := localMsiDir "\WAU-" wauVersion ".msi"  ; Keep "v" prefix for file name
                 
                 if (FileExist(localMsiPath)) {
-                    if !silent
-                        MsgBox("Found local MSI: " localMsiPath "`n`n(This dialog will close automatically in 5 seconds)", name_no_ext, "0x40 T5")  ; Information icon + 5 second timeout
                     ; Copy local MSI to %ProgramData%\Package Cache folder for MSI reinstall
                     cacheDir := A_AppDataCommon "\Package Cache\" wauGUID wauLongVersion "\Installers"
                     if !DirExist(cacheDir) {
@@ -209,8 +207,6 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
                         RunWait('msiexec /i "' cacheMsiPath '" /qn ' msiParams, , "Hide")
                     }
                 } else if (IsInternetAvailable()) {
-                    if !silent
-                        MsgBox("No local MSI found in: " localMsiDir ", downloading WAU.msi from GitHub.`n`n(This dialog will close automatically in 5 seconds)", name_no_ext, "0x40 T5")  ; Information icon + 5 second timeout
                     ; No local MSI found, download the original version and trigger MSI reinstall
                     downloadUrl := "https://github.com/Romanitho/Winget-AutoUpdate/releases/download/" wauVersion "/WAU.msi"
                     wauMsiPath := A_WorkingDir "\WAU.msi"
@@ -296,11 +292,6 @@ if fromPS {
             CreateUninstall(uninstPath, name_no_ext, A_WorkingDir)
         }
     }
-    MsgBox(
-        "UnInst.exe and registry uninstall entry`nhave been created successfully.`n`nRestarting the program to apply changes.`n`n(This dialog will close automatically in 5 seconds)",
-        name_no_ext,
-        "0x40 T5"  ; Information icon + 5 second timeout
-    )
 
     if FileExist(shortcutDesktop) && FileExist(shortcutStartMenu) {
         Run shortcutDesktop
@@ -383,11 +374,6 @@ if FileExist(shortcutDesktop) && FileExist(shortcutStartMenu) {
             uninstPath := targetDir "\UnInst.exe"
             FileCopy(targetDir "\" name_no_ext ".exe", uninstPath, 1)
             CreateUninstall(uninstPath, name_no_ext, targetDir)
-            MsgBox(
-                "Installation complete!`n`nRunning '" name_no_ext ".exe'`nfrom the installation folder.`n`n(This dialog will close automatically in 5 seconds)",
-                name_no_ext,
-                "0x40 T5"  ; Information icon + 5 second timeout
-            )
             Run targetDir "\" name_no_ext ".exe"
             ExitApp
         } else {
