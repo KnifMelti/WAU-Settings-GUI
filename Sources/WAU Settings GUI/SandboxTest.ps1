@@ -5,7 +5,6 @@ function SandboxTest {
         [string] $MapFolder,
         [string] $SandboxFolderName,
         [string] $WinGetVersion,
-        [string] $WinGetOptions,
         [switch] $Prerelease,
         [switch] $EnableExperimentalFeatures,
         [switch] $Clean,
@@ -31,10 +30,7 @@ function SandboxTest {
     
     .PARAMETER WinGetVersion
     The version of WinGet to use.
-    
-    .PARAMETER WinGetOptions
-    Additional options for WinGet.
-    
+
     .PARAMETER Prerelease
     Include prerelease versions of WinGet.
     
@@ -92,7 +88,6 @@ function SandboxTest {
     # Bind function parameters to script-scoped variables used later
     $script:Prerelease     = [bool]$Prerelease
     $script:WinGetVersion  = $WinGetVersion
-    $script:WinGetOptions  = $WinGetOptions
 
     # File Names
     $script:AppInstallerMsixFileName = "$script:AppInstallerPFN.msixbundle"

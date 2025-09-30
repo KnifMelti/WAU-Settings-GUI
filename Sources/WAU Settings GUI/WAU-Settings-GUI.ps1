@@ -94,7 +94,7 @@ Start-Process explorer.exe -ArgumentList "`"$env:USERPROFILE\Desktop\$SandboxFol
             # Create the main form
             $form = New-Object System.Windows.Forms.Form
             $form.Text = "Windows Sandbox Test Configuration"
-            $form.Size = New-Object System.Drawing.Size(450, 690)
+            $form.Size = New-Object System.Drawing.Size(450, 637)
             $form.StartPosition = "CenterScreen"
             $form.FormBorderStyle = "FixedDialog"
             $form.MaximizeBox = $false
@@ -205,20 +205,6 @@ Start-Process explorer.exe -ArgumentList "`"$env:USERPROFILE\Desktop\$SandboxFol
             $txtWinGetVersion.Location = New-Object System.Drawing.Point($leftMargin, ($y + $labelHeight))
             $txtWinGetVersion.Size = New-Object System.Drawing.Size($controlWidth, $controlHeight)
             $form.Controls.Add($txtWinGetVersion)
-
-            $y += $labelHeight + $controlHeight + $spacing
-
-            # WinGet Options
-            $lblWinGetOptions = New-Object System.Windows.Forms.Label
-            $lblWinGetOptions.Location = New-Object System.Drawing.Point($leftMargin, $y)
-            $lblWinGetOptions.Size = New-Object System.Drawing.Size(300, $labelHeight)
-            $lblWinGetOptions.Text = "WinGet Options (additional options):"
-            $form.Controls.Add($lblWinGetOptions)
-
-            $txtWinGetOptions = New-Object System.Windows.Forms.TextBox
-            $txtWinGetOptions.Location = New-Object System.Drawing.Point($leftMargin, ($y + $labelHeight))
-            $txtWinGetOptions.Size = New-Object System.Drawing.Size($controlWidth, $controlHeight)
-            $form.Controls.Add($txtWinGetOptions)
 
             $y += $labelHeight + $controlHeight + $spacing + 10
 
@@ -401,7 +387,6 @@ Start-Process explorer.exe -ArgumentList "`"$env:USERPROFILE\Desktop\$SandboxFol
                     MapFolder = $txtMapFolder.Text
                     SandboxFolderName = $txtSandboxFolderName.Text
                     WinGetVersion = $txtWinGetVersion.Text
-                    WinGetOptions = $txtWinGetOptions.Text
                     Prerelease = $chkPrerelease.Checked
                     EnableExperimentalFeatures = $chkEnableExperimentalFeatures.Checked
                     Clean = $chkClean.Checked
@@ -460,9 +445,6 @@ Start-Process explorer.exe -ArgumentList "`"$env:USERPROFILE\Desktop\$SandboxFol
         # Add optional parameters if they have values
         if (![string]::IsNullOrWhiteSpace($dialogResult.WinGetVersion)) {
             $sandboxParams.WinGetVersion = $dialogResult.WinGetVersion
-        }
-        if (![string]::IsNullOrWhiteSpace($dialogResult.WinGetOptions)) {
-            $sandboxParams.WinGetOptions = $dialogResult.WinGetOptions
         }
         if ($dialogResult.Prerelease) { $sandboxParams.Prerelease = $true }
         if ($dialogResult.EnableExperimentalFeatures) { $sandboxParams.EnableExperimentalFeatures = $true }

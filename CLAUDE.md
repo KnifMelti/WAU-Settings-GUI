@@ -156,7 +156,7 @@ KnifMelti.WAU-Settings-GUI
 The `[wsb]` Dev Tool creates a clean Windows Sandbox environment for testing WAU installations:
 - Generates `test.wsb` configuration
 - Copies install/uninstall scripts
-- Maps selected folder to `C:\WAU-Test` in sandbox
+- Maps current **WAU** version folder to `WAU-install` on sandbox desktop folder
 - Switches MSI from silent (`/qn`) to basic UI (`/qb`)
 - First run creates a **SandboxTest** shortcut in User Start Menu for advanced testing on first use when Windows Sandbox is installed
 
@@ -187,7 +187,7 @@ After path changes in GPO mode, regenerate shortcuts to match registry state.
 ## Important Notes
 
 - Must always run as Administrator (exe and shortcut has UAC flag set)
-- `SandboxTest` standalone shortcut ddoesn't require Administrator privilegies 
+- `SandboxTest` standalone shortcut doesn't require Administrator privilegies 
 - Executable is code-signed with KnifMelti Certificate
 - XAML files use string interpolation from `modules/config.psm1` variables
 - Comments should be in English
