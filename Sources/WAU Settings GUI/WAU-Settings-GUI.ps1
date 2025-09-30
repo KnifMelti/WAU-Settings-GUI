@@ -1167,7 +1167,8 @@ function Start-WAUGUIUpdate {
                     New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
                 }
                 
-                # Backup current files (exclude created directories)
+                # Backup current files (exclude created directories: ver, ver_*, msi, cfg)
+                # Includes wsb folder if it exists
                 Get-ChildItem -Path $Script:WorkingDir -Exclude "ver", "ver_*", "msi", "cfg" | ForEach-Object {
                     Copy-Item -Path $_.FullName -Destination $backupDir -Recurse -Force
                 }
