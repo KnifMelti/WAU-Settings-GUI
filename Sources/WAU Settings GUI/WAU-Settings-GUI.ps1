@@ -1290,13 +1290,14 @@ function Start-WAUGUIUpdate {
                     }
                 }
 
-                # Create/update the desktop shortcut AFTER copying files
+                # Create/update the desktop shortcut AFTER copying files (only if Start Menu shortcut doesn't exist)
                 if (-not $Script:PORTABLE_MODE) {
+                    $startMenuShortcut = "$Script:STARTMENU_WAU_DIR\$Script:GUI_TITLE.lnk"
                     $shortcutPath = $Script:DESKTOP_WAU_SETTINGS
                     $targetPath = Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'
                     $newIconPath = Join-Path $Script:WorkingDir "config\WAU Settings GUI.ico"
-                    
-                    if (Test-Path $targetPath) {
+
+                    if ((Test-Path $targetPath) -and -not (Test-Path $startMenuShortcut)) {
                         Add-Shortcut -Shortcut $shortcutPath `
                                 -Target $Script:CONHOST_EXE `
                                 -StartIn $Script:WorkingDir `
@@ -1452,13 +1453,14 @@ function Start-RestoreFromBackup {
             }
         }
 
-        # Create/update the desktop shortcut AFTER copying files (same as in Start-WAUGUIUpdate)
+        # Create/update the desktop shortcut AFTER copying files (only if Start Menu shortcut doesn't exist)
         if (-not $Script:PORTABLE_MODE) {
+            $startMenuShortcut = "$Script:STARTMENU_WAU_DIR\$Script:GUI_TITLE.lnk"
             $shortcutPath = $Script:DESKTOP_WAU_SETTINGS
             $targetPath = Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'
             $newIconPath = Join-Path $Script:WorkingDir "config\WAU Settings GUI.ico"
-            
-            if (Test-Path $targetPath) {
+
+            if ((Test-Path $targetPath) -and -not (Test-Path $startMenuShortcut)) {
                 Add-Shortcut -Shortcut $shortcutPath `
                         -Target $Script:CONHOST_EXE `
                         -StartIn $Script:WorkingDir `
