@@ -3648,7 +3648,7 @@ function Update-WAUGUIFromConfig {
     $Controls.InstallLocationLink.NavigateUri = $updatedConfig.InstallLocation
     
     # Check if GPO is managing the list
-    $wauGPOListPathEnabled = Get-WAUPoliciesStatus
+    $wauGPOListPathEnabled = ($null -ne $updatedPolicies -and $null -ne $updatedPolicies.WAU_ListPath)
     
     if ($wauGPOListPathEnabled) {
         $Controls.LocalListText.Inlines.Clear()
