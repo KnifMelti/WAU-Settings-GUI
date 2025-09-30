@@ -1563,6 +1563,90 @@ function Get-WAUPoliciesStatus {
     # 3. WhiteList subkey has values
     return ($null -ne $mainPolicies) -or ($null -ne $blackListItems) -or ($null -ne $whiteListItems)
 }
+function Get-WAUListPoliciesStatus {
+    # Check if list management is controlled by GPO
+    # Returns an object with:
+    #   IsManaged: $true if any list policy exists
+    #   ListType: 'BlackList' or 'WhiteList', determined by WAU_UseWhiteList setting
+    # This checks specifically for list-related policies:
+    # 1. WAU_ListPath property (external list path)
+    # 2. BlackList subkey (GPO-managed blacklist)
+    # 3. WhiteList subkey (GPO-managed whitelist)
+    # When both BlackList and WhiteList exist, WAU_UseWhiteList determines which is active
+
+    $result = @{
+        IsManaged = $false
+        ListType = $null
+    }
+
+    $policies = Get-ItemProperty -Path $Script:WAU_POLICIES_PATH -ErrorAction SilentlyContinue
+
+    # Check if WAU_ListPath property exists (external path takes precedence)
+    if ($null -ne $policies -and $null -ne $policies.WAU_ListPath) {
+        $result.IsManaged = $true
+        # Determine type based on WAU_UseWhiteList setting
+        if ($policies.WAU_UseWhiteList -eq 1) {
+            $result.ListType = 'WhiteList'
+        } else {
+            $result.ListType = 'BlackList'
+        }
+        return $result
+    }
+
+    # Check if BlackList or WhiteList subkeys exist
+    $blackListPath = Join-Path $Script:WAU_POLICIES_PATH "BlackList"
+    $whiteListPath = Join-Path $Script:WAU_POLICIES_PATH "WhiteList"
+
+    $hasBlackList = $false
+    $hasWhiteList = $false
+
+    # Check BlackList subkey
+    if (Test-Path $blackListPath) {
+        $blackListItems = Get-ItemProperty -Path $blackListPath -ErrorAction SilentlyContinue
+        if ($blackListItems) {
+            $blackListProps = $blackListItems.PSObject.Properties | Where-Object {
+                $_.Name -notin @('PSPath', 'PSParentPath', 'PSChildName', 'PSDrive', 'PSProvider')
+            }
+            if ($blackListProps.Count -gt 0) {
+                $hasBlackList = $true
+            }
+        }
+    }
+
+    # Check WhiteList subkey
+    if (Test-Path $whiteListPath) {
+        $whiteListItems = Get-ItemProperty -Path $whiteListPath -ErrorAction SilentlyContinue
+        if ($whiteListItems) {
+            $whiteListProps = $whiteListItems.PSObject.Properties | Where-Object {
+                $_.Name -notin @('PSPath', 'PSParentPath', 'PSChildName', 'PSDrive', 'PSProvider')
+            }
+            if ($whiteListProps.Count -gt 0) {
+                $hasWhiteList = $true
+            }
+        }
+    }
+
+    # If either list exists, determine which one is active
+    # IMPORTANT: The list type is determined by WAU_UseWhiteList setting
+    # - If WAU_UseWhiteList = 1: Only WhiteList is used (if it exists)
+    # - If WAU_UseWhiteList ≠ 1: Only BlackList is used (if it exists)
+    if ($hasBlackList -or $hasWhiteList) {
+        $useWhiteList = ($policies -and $policies.WAU_UseWhiteList -eq 1)
+
+        if ($useWhiteList -and $hasWhiteList) {
+            # UseWhiteList is enabled AND WhiteList exists
+            $result.IsManaged = $true
+            $result.ListType = 'WhiteList'
+        } elseif (-not $useWhiteList -and $hasBlackList) {
+            # UseWhiteList is disabled AND BlackList exists
+            $result.IsManaged = $true
+            $result.ListType = 'BlackList'
+        }
+        # If setting doesn't match available list, IsManaged stays false
+    }
+
+    return $result
+}
 function Get-DisplayValue {
     param (
         [string]$PropertyName,
@@ -3648,21 +3732,14 @@ function Update-WAUGUIFromConfig {
     $Controls.InstallLocationLink.NavigateUri = $updatedConfig.InstallLocation
     
     # Check if GPO is managing the list
-    $wauGPOListPathEnabled = ($null -ne $updatedPolicies -and $null -ne $updatedPolicies.WAU_ListPath)
-    
-    if ($wauGPOListPathEnabled) {
+    $listPolicyStatus = Get-WAUListPoliciesStatus
+
+    if ($listPolicyStatus.IsManaged) {
         $Controls.LocalListText.Inlines.Clear()
         $Controls.LocalListText.Inlines.Add("GPO Managed List: ")
-        
-        # Check if it's whitelist mode - ONLY based on WAU_UseWhiteList setting
-        $isWhitelistMode = $false
-        
-        # Only check WAU_UseWhiteList policy setting, ignore existence of entries
-        if ($updatedPolicies -and $updatedPolicies.WAU_UseWhiteList -eq 1) {
-            $isWhitelistMode = $true
-        }
-        
-        if ($isWhitelistMode) {
+
+        # Determine list type based on actual GPO configuration
+        if ($listPolicyStatus.ListType -eq 'WhiteList') {
             $run = New-Object System.Windows.Documents.Run("'GPO (Included Apps)'")
         } else {
             $run = New-Object System.Windows.Documents.Run("'GPO (Excluded Apps)'")
@@ -3672,7 +3749,9 @@ function Update-WAUGUIFromConfig {
     } else {
         try {
             $installdir = $updatedConfig.InstallLocation
-            if ($updatedConfig.WAU_UseWhiteList -eq 1) {
+            # Check WAU_UseWhiteList from both policies and config (GPO takes precedence)
+            $useWhiteList = [bool](Get-DisplayValue -PropertyName "WAU_UseWhiteList" -Config $updatedConfig -Policies $updatedPolicies)
+            if ($useWhiteList) {
                 $whiteListFile = Join-Path $installdir 'included_apps.txt'
                 if (Test-Path $whiteListFile) {
                     $Controls.LocalListText.Inlines.Clear()
