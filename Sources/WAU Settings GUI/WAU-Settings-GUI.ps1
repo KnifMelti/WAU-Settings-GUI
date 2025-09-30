@@ -2959,11 +2959,26 @@ function Start-WSBTesting {
             if ($result -eq 'Ok') {
                 # Create MST file using existing function
                 if (New-WAUTransformFile -controls $controls) {
-                    [System.Windows.MessageBox]::Show("MST file created successfully!`n`nYou can now use the WSB testing feature.", "MST Created", "OK", "Information")
+                    # MST file created successfully - now continue with WSB testing
+                    # Re-check for MST files after creation
+                    $mstFiles = Get-ChildItem -Path $msiDirectory -Filter "*.mst" -File
+                    if ($mstFiles.Count -gt 0) {
+                        # MST file now exists, continue with WSB testing by NOT returning here
+                        # The function will continue to the WSB testing logic below
+                    } else {
+                        # MST creation reported success but file still missing
+                        [System.Windows.MessageBox]::Show("MST file creation succeeded but file not found. Please try again.", "MST Creation Issue", "OK", "Warning")
+                        return $false
+                    }
+                } else {
+                    # MST creation failed
+                    return $false
                 }
+            } else {
+                # User cancelled MST creation
+                return $false
             }
-            return $false
-        }
+        }        
         
         Close-PopUp
         
