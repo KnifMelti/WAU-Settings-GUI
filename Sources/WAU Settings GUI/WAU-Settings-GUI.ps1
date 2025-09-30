@@ -2745,8 +2745,6 @@ function Install-WAU {
         # Check if installation was successful
         $Script:WAU_INSTALL_INFO = Test-InstalledWAU -DisplayName "Winget-AutoUpdate"
         if ($Script:WAU_INSTALL_INFO.Count -ge 1) {
-            [System.Windows.MessageBox]::Show("WAU installed successfully! Please configure the new installation.", "Installation Complete", "OK", "Information")
-
             # Get WAU installation info and store as constants
             $Script:WAU_VERSION = if ($Script:WAU_INSTALL_INFO.Count -ge 1) { $Script:WAU_INSTALL_INFO[0] } else { "Unknown" }
             $Script:WAU_GUID = if ($Script:WAU_INSTALL_INFO.Count -ge 2) { $Script:WAU_INSTALL_INFO[1] } else { $null }
