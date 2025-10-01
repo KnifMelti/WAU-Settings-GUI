@@ -1700,6 +1700,8 @@ function Get-WAUCurrentConfig {
         $wauGuiPath = Join-Path $Script:WorkingDir "$Script:WAU_GUI_NAME.exe"
         if (-not $Script:PORTABLE_MODE -and -not $Script:MainWindowStarted) {
             if (-not (Test-Path $firstRunFile) -or -not (Test-Path $installedFile) -or -not (Test-Path $uninstPath) -and (Test-Path $wauGuiPath)) {
+                # Only proceed if running from standard PowerShell console (not ISE, VSCode, etc.)
+                # to avoid loops and ensure proper GUI initialization
                 $currentProcess = Get-Process -Id $PID
                 $isRunningAsPowerShell = $currentProcess.ProcessName -eq "powershell" -or $currentProcess.ProcessName -eq "pwsh"
                 if ($isRunningAsPowerShell) {
