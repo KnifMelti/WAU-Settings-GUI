@@ -103,7 +103,7 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
 - Now incorporated (heavily modified) in **WAU Settings GUI** for testing the installation of **WAU** (with generated transform)
 - A **[SandboxTest](#sandboxtest-1)** shortcut is also created in the user **Start Menu** (the first time `[wsb]` is used with **WSB** installed) for more advanced testing, including recognition of files in the selected folder
 - 3 predefined scripts are included:
-    - **InstallWSB**: if the chosen folder contains files created from `[msi]`
+    - **InstallWSB**: if the chosen folder contains files created from `[wsb]`
     - **WinGetManifest**: if the chosen folder contains **WinGet** manifests
     - **Explorer**: a general script opening the selected mapped folder in **WSB**
 
