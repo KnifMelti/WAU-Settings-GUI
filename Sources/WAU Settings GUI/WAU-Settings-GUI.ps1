@@ -1290,25 +1290,6 @@ function Start-WAUGUIUpdate {
                     }
                 }
 
-                # Create/update the desktop shortcut AFTER copying files (only if Start Menu shortcut doesn't exist)
-                if (-not $Script:PORTABLE_MODE) {
-                    $startMenuShortcut = "$Script:STARTMENU_WAU_DIR\$Script:GUI_TITLE.lnk"
-                    $shortcutPath = $Script:DESKTOP_WAU_SETTINGS
-                    $targetPath = Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'
-                    $newIconPath = Join-Path $Script:WorkingDir "config\WAU Settings GUI.ico"
-
-                    if ((Test-Path $targetPath) -and -not (Test-Path $startMenuShortcut)) {
-                        Add-Shortcut -Shortcut $shortcutPath `
-                                -Target $Script:CONHOST_EXE `
-                                -StartIn $Script:WorkingDir `
-                                -Arguments "$Script:POWERSHELL_ARGS `"$targetPath`"" `
-                                -Icon $newIconPath `
-                                -Description "Configure Winget-AutoUpdate settings after installation" `
-                                -WindowStyle "Normal" `
-                                -RunAsAdmin $true
-                    }
-                }
-
                 # Clean up extraction directory AFTER copying files
                 Remove-Item -Path $extractPath -Recurse -Force -ErrorAction SilentlyContinue
                 
@@ -1447,25 +1428,6 @@ function Start-RestoreFromBackup {
                     }
                     throw
                 }
-            }
-        }
-
-        # Create/update the desktop shortcut AFTER copying files (only if Start Menu shortcut doesn't exist)
-        if (-not $Script:PORTABLE_MODE) {
-            $startMenuShortcut = "$Script:STARTMENU_WAU_DIR\$Script:GUI_TITLE.lnk"
-            $shortcutPath = $Script:DESKTOP_WAU_SETTINGS
-            $targetPath = Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'
-            $newIconPath = Join-Path $Script:WorkingDir "config\WAU Settings GUI.ico"
-
-            if ((Test-Path $targetPath) -and -not (Test-Path $startMenuShortcut)) {
-                Add-Shortcut -Shortcut $shortcutPath `
-                        -Target $Script:CONHOST_EXE `
-                        -StartIn $Script:WorkingDir `
-                        -Arguments "$Script:POWERSHELL_ARGS `"$targetPath`"" `
-                        -Icon $newIconPath `
-                        -Description "Configure Winget-AutoUpdate settings after installation" `
-                        -WindowStyle "Normal" `
-                        -RunAsAdmin $true
             }
         }
 
@@ -1705,29 +1667,33 @@ function Get-WAUCurrentConfig {
                 $currentProcess = Get-Process -Id $PID
                 $isRunningAsPowerShell = $currentProcess.ProcessName -eq "powershell" -or $currentProcess.ProcessName -eq "pwsh"
                 if ($isRunningAsPowerShell) {
-                Add-Shortcut $Script:DESKTOP_WAU_SETTINGS $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$((Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'))`"" "$Script:GUI_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
-                Set-Content -Path $firstRunFile -Value "WAU Settings GUI first run completed" -Force
-                Set-Content -Path $installedFile -Value "WAU Settings GUI installed" -Force
-                # Set file attributes to Hidden and System
-                try {
-                    $fileInfo = Get-Item -Path $firstRunFile
-                    $fileInfo.Attributes = 'Hidden,System'
-                    $fileInfo = Get-Item -Path $installedFile
-                    $fileInfo.Attributes = 'Hidden,System'
-                } catch {
-                    # Ignore attribute setting errors
-                }
-                # Remove incorrect subdirectories if present
-                $badModulesDir = Join-Path $Script:WorkingDir "modules\modules"
-                if (Test-Path $badModulesDir) {
-                    Remove-Item -Path $badModulesDir -Recurse -Force -ErrorAction SilentlyContinue
-                }
-                $badConfigDir = Join-Path $Script:WorkingDir "config\config"
-                if (Test-Path $badConfigDir) {
-                    Remove-Item -Path $badConfigDir -Recurse -Force -ErrorAction SilentlyContinue
-                }
-                Start-Process -FilePath $wauGuiPath -ArgumentList "/FROMPS"
-                exit
+                    # Only create desktop shortcut if Start Menu shortcut doesn't exist
+                    $startMenuShortcut = "$Script:STARTMENU_WAU_DIR\$Script:GUI_TITLE.lnk"
+                    if (-not (Test-Path $startMenuShortcut)) {
+                        Add-Shortcut $Script:DESKTOP_WAU_SETTINGS $Script:CONHOST_EXE "$($Script:WorkingDir)" "$Script:POWERSHELL_ARGS `"$((Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1'))`"" "$Script:GUI_ICON" "Configure Winget-AutoUpdate settings after installation" "Normal" $true
+                    }
+                    Set-Content -Path $firstRunFile -Value "WAU Settings GUI first run completed" -Force
+                    Set-Content -Path $installedFile -Value "WAU Settings GUI installed" -Force
+                    # Set file attributes to Hidden and System
+                    try {
+                        $fileInfo = Get-Item -Path $firstRunFile
+                        $fileInfo.Attributes = 'Hidden,System'
+                        $fileInfo = Get-Item -Path $installedFile
+                        $fileInfo.Attributes = 'Hidden,System'
+                    } catch {
+                        # Ignore attribute setting errors
+                    }
+                    # Remove incorrect subdirectories if present
+                    $badModulesDir = Join-Path $Script:WorkingDir "modules\modules"
+                    if (Test-Path $badModulesDir) {
+                        Remove-Item -Path $badModulesDir -Recurse -Force -ErrorAction SilentlyContinue
+                    }
+                    $badConfigDir = Join-Path $Script:WorkingDir "config\config"
+                    if (Test-Path $badConfigDir) {
+                        Remove-Item -Path $badConfigDir -Recurse -Force -ErrorAction SilentlyContinue
+                    }
+                    Start-Process -FilePath $wauGuiPath -ArgumentList "/FROMPS"
+                    exit
                 }
             }
         }
