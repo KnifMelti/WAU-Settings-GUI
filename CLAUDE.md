@@ -109,7 +109,7 @@ The Dev Tools panel provides quick access to system resources:
 - `[uid]` - GUID path exploration (MSI installation)
 - `[sys]` - WinGet system-wide app list
 - `[mod]` - WAU mods folder (for pre/post-install scripts)
-- `[lst]` - Current local list
+- `[lst]` - Current list
 - `[usr]` - Change colors/update schedule
 - `[msi]` - MSI transform creation with current config
 - `[wsb]` - Windows Sandbox test (requires Pro/Enterprise/Education)
@@ -158,7 +158,7 @@ The `[wsb]` Dev Tool creates a clean Windows Sandbox environment for testing WAU
 - Copies install/uninstall scripts
 - Maps current **WAU** version folder to `WAU-install` on sandbox desktop folder
 - Switches MSI from silent (`/qn`) to basic UI (`/qb`)
-- First run creates a **SandboxTest** shortcut in User Start Menu for advanced testing on first use when Windows Sandbox is installed
+- First run creates a **SandboxTest** shortcut in User Start Menu for advanced testing when Windows Sandbox is installed
 
 Three predefined scripts are saved to `wsb/` folder on first use when Windows Sandbox is installed:
 - **InstallWSB.ps1** - Recognizes files created from `[msi]` button

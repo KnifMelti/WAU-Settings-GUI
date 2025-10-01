@@ -1312,19 +1312,16 @@ function Start-WAUGUIUpdate {
                 # Clean up extraction directory AFTER copying files
                 Remove-Item -Path $extractPath -Recurse -Force -ErrorAction SilentlyContinue
                 
-                # Close popup and show success message AFTER everything is completed successfully
                 Close-PopUp
-                
-                # [System.Windows.MessageBox]::Show(
-                #     "Update installed successfully!`n`nThe application will now restart with the new version.",
-                #     "Update Complete",
-                #     "OK",
-                #     "Information"
-                # )
                 
                 # Restart the application with the new version
                 if (-not $Script:PORTABLE_MODE) {
-                    Start-Process -FilePath $Script:DESKTOP_WAU_SETTINGS
+                    $startMenuShortcut = "$Script:STARTMENU_WAU_DIR\$Script:GUI_TITLE.lnk"
+                    if (Test-Path $startMenuShortcut) {
+                        Start-Process -FilePath $startMenuShortcut
+                    } else {
+                        Start-Process -FilePath $Script:DESKTOP_WAU_SETTINGS
+                    }
                 } else {
                     Start-Process -FilePath "powershell.exe" -ArgumentList "-File `"$(Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1')`" -Portable"
                 }
@@ -1475,19 +1472,16 @@ function Start-RestoreFromBackup {
         # Clean up extraction directory AFTER copying files
         Remove-Item -Path $tempExtractDir -Recurse -Force -ErrorAction SilentlyContinue
         
-        # Close popup and show success message AFTER everything is completed successfully
         Close-PopUp
-        
-        # [System.Windows.MessageBox]::Show(
-        #     "Restore completed successfully!`n`nThe application will now restart with the restored version.",
-        #     "Restore Complete",
-        #     "OK",
-        #     "Information"
-        # )
         
         # Restart the application with the restored version
         if (-not $Script:PORTABLE_MODE) {
-            Start-Process -FilePath $Script:DESKTOP_WAU_SETTINGS
+            $startMenuShortcut = "$Script:STARTMENU_WAU_DIR\$Script:GUI_TITLE.lnk"
+            if (Test-Path $startMenuShortcut) {
+                Start-Process -FilePath $startMenuShortcut
+            } else {
+                Start-Process -FilePath $Script:DESKTOP_WAU_SETTINGS
+            }
         } else {
             Start-Process -FilePath "powershell.exe" -ArgumentList "-File `"$(Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1')`" -Portable"
         }
