@@ -1300,8 +1300,10 @@ function Start-WAUGUIUpdate {
                     $startMenuShortcut = "$Script:STARTMENU_WAU_DIR\$Script:GUI_TITLE.lnk"
                     if (Test-Path $startMenuShortcut) {
                         Start-Process -FilePath $startMenuShortcut
-                    } else {
+                    } elseif (Test-Path $Script:DESKTOP_WAU_SETTINGS) {
                         Start-Process -FilePath $Script:DESKTOP_WAU_SETTINGS
+                    } else {
+                        Start-Process -FilePath "powershell.exe" -ArgumentList "-File `"$(Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1')`""
                     }
                 } else {
                     Start-Process -FilePath "powershell.exe" -ArgumentList "-File `"$(Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1')`" -Portable"
@@ -1441,8 +1443,10 @@ function Start-RestoreFromBackup {
             $startMenuShortcut = "$Script:STARTMENU_WAU_DIR\$Script:GUI_TITLE.lnk"
             if (Test-Path $startMenuShortcut) {
                 Start-Process -FilePath $startMenuShortcut
-            } else {
+            } elseif (Test-Path $Script:DESKTOP_WAU_SETTINGS) {
                 Start-Process -FilePath $Script:DESKTOP_WAU_SETTINGS
+            } else {
+                Start-Process -FilePath "powershell.exe" -ArgumentList "-File `"$(Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1')`""
             }
         } else {
             Start-Process -FilePath "powershell.exe" -ArgumentList "-File `"$(Join-Path $Script:WorkingDir 'WAU-Settings-GUI.ps1')`" -Portable"
