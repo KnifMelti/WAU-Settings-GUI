@@ -1,3 +1,5 @@
+![GitHub all releases](https://img.shields.io/github/downloads/KnifMelti/WAU-Settings-GUI/total)
+![GitHub release (latest by date)](https://img.shields.io/github/downloads/KnifMelti/WAU-Settings-GUI/latest/total)
 <img src="Sources/assets/WAU%20Settings%20GUI.png" alt="WAU Settings GUI" width="128" align="right"><br><br>
 
 # WAU Settings GUI (for Winget-AutoUpdate)
@@ -120,6 +122,8 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
 - **WAU** will be automatically reinstalled afterward restoring the current showing configuration
   - Stores source in `%ProgramData%\Package Cache\[GUID][LONGVERSION]` (enables **WAU** `Repair` in **Programs and Features**)
 
+---
+
 ### Screenshots
 #### 🔒 KnifMelti Certificate
 ![image](Sources/assets/KnifMelti_Certificate.png)
@@ -138,7 +142,3 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
 ![image](Sources/assets/Screenshot_Uninstall.png)
 
 ---
-
-### GitHub Stats
-![GitHub all releases](https://img.shields.io/github/downloads/KnifMelti/WAU-Settings-GUI/total)
-![GitHub release (latest by date)](https://img.shields.io/github/downloads/KnifMelti/WAU-Settings-GUI/latest/total)
