@@ -104,7 +104,7 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
   - https://github.com/microsoft/winget-pkgs/blob/master/doc/README.md#in-windows-sandbox
 - Now incorporated (heavily modified) in **WAU Settings GUI** for testing the installation of **WAU** (with generated transform) and be able to test **WinGet** installations/updates with **WAU** in the virtual environment
 - A standalone **[SandboxTest](#sandboxtest-1)** shortcut is also created in the user **Start Menu** (the first time `[wsb]` is used with **WSB** installed) for more advanced testing, including recognition of files in the selected folder
-- A **Script Mapping Configuration** in `script-mappings.txt` determines what is chosen
+- A **Script Mapping Configuration** in `wsb\script-mappings.txt` determines what is chosen
 - 4 predefined scripts are included (create your own and save/load) chosen by recognition:
     - **InstallWSB**: if the chosen folder contains files created from `[wsb]`
     - **WinGetManifest**: if the chosen folder contains **WinGet** manifests
