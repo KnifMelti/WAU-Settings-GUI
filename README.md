@@ -110,6 +110,7 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
     - **WinGetManifest**: if the chosen folder contains **WinGet** manifests
     - **Installer**: if the chosen folder contains `install.*`
     - **Explorer**: a general script opening the selected mapped folder in **WSB**
+- A file browser for specifically selecting the file to run is also included
 
 ### Uninstallation
 - Use **[Programs and Features](#uninstallation-1)** in **Control Panel** to uninstall **KnifMelti WAU Settings GUI**
