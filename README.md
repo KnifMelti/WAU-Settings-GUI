@@ -42,7 +42,7 @@ Benefits from not having to manage the settings in several places when testing e
   - `[lst]` Open the **current local list**
   - `[usr]` **Change colors/update schedule** for **WAU Settings GUI**
   - `[msi]` **MSI** transform creation (using current showing configuration)
-  - `[wsb]` **Windows Sandbox (WSB)** installation/test of **WAU** installation
+  - `[wsb]` **[Windows Sandbox (WSB)](https://github.com/KnifMelti/WAU-Settings-GUI?tab=readme-ov-file#sandboxtest)** installation/test of **WAU** installation
     - A standalone **SandboxTest** shortcut for running advanced tests is created in **User Start Menu** the first time `[wsb]` is used with **WSB** installed
   - `[cfg]` **Configuration** backup/import (i.e. for sharing settings)
   - `[wau]` Reinstall **WAU** (with current showing configuration)
