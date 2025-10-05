@@ -52,6 +52,125 @@ if ($SandboxTest.IsPresent) {
     Add-Type -AssemblyName PresentationFramework
     . $WorkingDir\SandboxTest.ps1
     
+    function Get-ScriptMappings {
+        <#
+        .SYNOPSIS
+        Reads script mapping configuration from external file
+        
+        .DESCRIPTION
+        Loads script-to-pattern mappings from wsb\script-mappings.txt.
+        Format: Pattern = ScriptName.ps1
+        Example: InstallWSB.cmd = InstallWSB.ps1
+        #>
+        
+        $mappingFile = Join-Path $Script:WorkingDir "wsb\script-mappings.txt"
+        $mappings = @()
+        
+        # Create default mapping file if it doesn't exist
+        if (-not (Test-Path $mappingFile)) {
+            $wsbDir = Split-Path $mappingFile -Parent
+            if (-not (Test-Path $wsbDir)) {
+                New-Item -ItemType Directory -Path $wsbDir -Force | Out-Null
+            }
+            
+            $defaultContent = @"
+# Script Mapping Configuration for Windows Sandbox Testing
+# Format: FilePattern = ScriptToExecute.ps1
+#
+# Patterns are evaluated in order. First match wins.
+# Wildcards: * (any characters), ? (single character)
+# The *.* pattern at the end acts as fallback.
+
+InstallWSB.cmd = InstallWSB.ps1
+*.installer.yaml = WinGetManifest.ps1
+Install.* = Installer.ps1
+*.* = Explorer.ps1
+"@
+            Set-Content -Path $mappingFile -Value $defaultContent -Encoding ASCII
+        }
+        
+        # Read and parse mapping file
+        try {
+            $lines = Get-Content -Path $mappingFile -Encoding UTF8 -ErrorAction Stop
+            
+            foreach ($line in $lines) {
+                $line = $line.Trim()
+                
+                # Skip comments and empty lines
+                if ($line.StartsWith('#') -or [string]::IsNullOrWhiteSpace($line)) {
+                    continue
+                }
+                
+                # Parse: Pattern = Script.ps1
+                if ($line -match '^\s*(.+?)\s*=\s*(.+?)\s*$') {
+                    $pattern = $matches[1].Trim()
+                    $script = $matches[2].Trim()
+                    
+                    # Validate script name ends with .ps1
+                    if ($script -like "*.ps1") {
+                        $mappings += @{
+                            Pattern = $pattern
+                            Script = $script
+                        }
+                    }
+                }
+            }
+        }
+        catch {
+            Write-Warning "Failed to read script mappings: $($_.Exception.Message)"
+        }
+        
+        # Ensure fallback exists
+        if (-not ($mappings | Where-Object { $_.Pattern -eq "*.*" })) {
+            $mappings += @{
+                Pattern = "*.*"
+                Script = "Explorer.ps1"
+            }
+        }
+        
+        return $mappings
+    }
+
+    # Determine the appropriate script based on selected file or directory contents
+    function Find-MatchingScript {
+        param(
+            [string]$Path,
+            [string]$FileName = $null
+        )
+        
+        $mappings = Get-ScriptMappings
+        
+        # If specific file selected, test against patterns
+        if ($FileName) {
+            foreach ($mapping in $mappings) {
+                if ($FileName -like $mapping.Pattern) {
+                    return $mapping.Script
+                }
+            }
+        }
+        
+        # If no file or no match, scan directory for pattern matches
+        if (Test-Path $Path) {
+            # Exclude *.* fallback from directory scan
+            $scanMappings = $mappings | Where-Object { $_.Pattern -ne "*.*" }
+            
+            foreach ($mapping in $scanMappings) {
+                $matchingFiles = Get-ChildItem -Path $Path -Filter $mapping.Pattern -File -ErrorAction SilentlyContinue
+                if ($matchingFiles) {
+                    return $mapping.Script
+                }
+            }
+        }
+        
+        # Fallback to last mapping (should be *.*)
+        $fallback = $mappings | Where-Object { $_.Pattern -eq "*.*" } | Select-Object -First 1
+        if ($fallback) {
+            return $fallback.Script
+        } else {
+            return "Explorer.ps1"
+        }
+    }
+
     # Define the dialog function here since it's needed before the main functions section
     function Show-SandboxTestDialog {
         <#
@@ -63,38 +182,85 @@ if ($SandboxTest.IsPresent) {
         #>
 
         try {
-            # Define default scripts array
+            # Define default scripts array (no -f formatting; inject folder via regex replace)
             $defaultScripts = @{
                 "InstallWSB" = @'
-$SandboxFolderName = "{0}"
+$SandboxFolderName = "DefaultFolder"
 Start-Process cmd.exe -ArgumentList "/c del /Q `"$env:USERPROFILE\Desktop\$SandboxFolderName\*.log`" & `"$env:USERPROFILE\Desktop\$SandboxFolderName\InstallWSB.cmd`" && explorer `"$env:USERPROFILE\Desktop\$SandboxFolderName`""
 '@
                 "WinGetManifest" = @'
-$SandboxFolderName = "{0}"
+$SandboxFolderName = "DefaultFolder"
 Start-Process cmd.exe -ArgumentList "/k cd /d `"$env:USERPROFILE\Desktop\$SandboxFolderName`" && winget install --manifest . --accept-source-agreements --accept-package-agreements"
 '@
+                "Installer" = @'
+$SandboxFolderName = "DefaultFolder"
+$sandboxPath = "$env:USERPROFILE\Desktop\$SandboxFolderName"
+
+# Look for installer files (priority order)
+$installers = @(
+    "Install.cmd","install.cmd","INSTALL.CMD",
+    "Install.bat","install.bat","INSTALL.BAT",
+    "Setup.exe","setup.exe","SETUP.EXE",
+    "Install.exe","install.exe","INSTALL.EXE",
+    "Installer.exe","installer.exe","INSTALLER.EXE"
+)
+$found = $null
+foreach ($file in $installers) {
+    $path = Join-Path $sandboxPath $file
+    if (Test-Path $path) { $found = $file; break }
+}
+
+if ($found) {
+    if ($found -like "*.cmd" -or $found -like "*.bat") {
+        Start-Process cmd.exe -ArgumentList "/c cd /d `"$sandboxPath`" && `"$found`""
+    } else {
+        Start-Process "$sandboxPath\$found" -WorkingDirectory $sandboxPath
+    }
+} else {
+    Start-Process explorer.exe -ArgumentList "`"$sandboxPath`""
+}
+'@
                 "Explorer" = @'
-$SandboxFolderName = "{0}"
+$SandboxFolderName = "DefaultFolder"
 Start-Process explorer.exe -ArgumentList "`"$env:USERPROFILE\Desktop\$SandboxFolderName`""
 '@
             }
 
-            # Ensure wsb directory exists and create default scripts if needed
+            # Ensure wsb directory exists (+ script-mappings.txt) and create default scripts if needed
             $wsbDir = Join-Path $WorkingDir "wsb"
-            if (-not (Test-Path $wsbDir)) {
+            if (-not (Test-Path $wsbDir) -or -not (Test-Path (Join-Path $wsbDir "script-mappings.txt"))) {
                 New-Item -ItemType Directory -Path $wsbDir -Force | Out-Null
 
-                # Create default script files
+                # Create default script files (write as-is; no -f formatting)
                 foreach ($scriptName in $defaultScripts.Keys) {
                     $scriptPath = Join-Path $wsbDir "$scriptName.ps1"
-                    $defaultScripts[$scriptName] -f "DefaultFolder" | Out-File -FilePath $scriptPath -Encoding ASCII
+                    $defaultScripts[$scriptName] | Out-File -FilePath $scriptPath -Encoding ASCII
                 }
+            }
+
+            # Create script-mappings.txt if it doesn't exist (do this early)
+            $mappingFile = Join-Path $wsbDir "script-mappings.txt"
+            if (-not (Test-Path $mappingFile)) {
+                $defaultMappingContent = @"
+# Script Mapping Configuration for Windows Sandbox Testing
+# Format: FilePattern = ScriptToExecute.ps1
+#
+# Patterns are evaluated in order. First match wins.
+# Wildcards: * (any characters), ? (single character)
+# The *.* pattern at the end acts as fallback.
+
+InstallWSB.cmd = InstallWSB.ps1
+*.installer.yaml = WinGetManifest.ps1
+Install.* = Installer.ps1
+*.* = Explorer.ps1
+"@
+                Set-Content -Path $mappingFile -Value $defaultMappingContent -Encoding ASCII
             }
 
             # Create the main form
             $form = New-Object System.Windows.Forms.Form
             $form.Text = "Windows Sandbox Test Configuration"
-            $form.Size = New-Object System.Drawing.Size(450, 637)
+            $form.Size = New-Object System.Drawing.Size(450, 695)
             $form.StartPosition = "CenterScreen"
             $form.FormBorderStyle = "FixedDialog"
             $form.MaximizeBox = $false
@@ -109,57 +275,167 @@ Start-Process explorer.exe -ArgumentList "`"$env:USERPROFILE\Desktop\$SandboxFol
             $leftMargin = 20
             $controlWidth = 400
 
-            # Map Folder selection
+            # Mapped Folder selection
             $lblMapFolder = New-Object System.Windows.Forms.Label
             $lblMapFolder.Location = New-Object System.Drawing.Point($leftMargin, $y)
             $lblMapFolder.Size = New-Object System.Drawing.Size(150, $labelHeight)
-            $lblMapFolder.Text = "Map Folder:"
+            $lblMapFolder.Text = "Mapped Folder:"
             $form.Controls.Add($lblMapFolder)
 
             $txtMapFolder = New-Object System.Windows.Forms.TextBox
             $txtMapFolder.Location = New-Object System.Drawing.Point($leftMargin, ($y + $labelHeight))
-            $txtMapFolder.Size = New-Object System.Drawing.Size(($controlWidth - 80), $controlHeight)
-            # Set default path based on whether msi directory exists
+            $txtMapFolder.Size = New-Object System.Drawing.Size($controlWidth, $controlHeight)
+            # Set default path based on whether msi directory exists and find latest version
             $msiDir = Join-Path $WorkingDir "msi"
-            $txtMapFolder.Text = if (Test-Path $msiDir) { $msiDir } else { $WorkingDir }
+            if (Test-Path $msiDir) {
+                # Look for version directories (e.g., 2.6.1, 2.7.0) and get the latest one
+                $versionDirs = Get-ChildItem -Path $msiDir -Directory | Where-Object { 
+                    $_.Name -match '^\d+\.\d+\.\d+$' 
+                } | Sort-Object { [Version]$_.Name } -Descending
+                
+                if ($versionDirs) {
+                    $txtMapFolder.Text = $versionDirs[0].FullName
+                } else {
+                    $txtMapFolder.Text = $msiDir
+                }
+            } else {
+                $txtMapFolder.Text = $WorkingDir
+            }
             $form.Controls.Add($txtMapFolder)
 
+            $y += $labelHeight + $controlHeight + 5
+
+            # Folder browse button
             $btnBrowse = New-Object System.Windows.Forms.Button
-            $btnBrowse.Location = New-Object System.Drawing.Point(($leftMargin + $controlWidth - 75), ($y + $labelHeight))
-            $btnBrowse.Size = New-Object System.Drawing.Size(75, $controlHeight)
-            $btnBrowse.Text = "Browse..."
+            $btnBrowse.Location = New-Object System.Drawing.Point($leftMargin, $y)
+            $btnBrowse.Size = New-Object System.Drawing.Size(($controlWidth / 2 - 5), $controlHeight)
+            $btnBrowse.Text = "Folder..."
             $btnBrowse.Add_Click({
                 $folderDialog = New-Object System.Windows.Forms.FolderBrowserDialog
-                $folderDialog.Description = "Select folder to map to Windows Sandbox"
+                $folderDialog.Description = "Select folder to map in Windows Sandbox"
                 $folderDialog.SelectedPath = $txtMapFolder.Text
+                $folderDialog.ShowNewFolderButton = $false
+                
                 if ($folderDialog.ShowDialog() -eq "OK") {
-                    $txtMapFolder.Text = $folderDialog.SelectedPath
-
-                    # Update sandbox folder name based on whether WAU MSI exists in the new folder
-                    $msiFiles = Get-ChildItem -Path $folderDialog.SelectedPath -Filter "WAU*.msi" -File -ErrorAction SilentlyContinue
+                    $selectedDir = $folderDialog.SelectedPath
+                    
+                    # Folder selected - use directory logic
+                    $txtMapFolder.Text = $selectedDir
+                    
+                    # Update sandbox folder name
+                    $msiFiles = Get-ChildItem -Path $selectedDir -Filter "WAU*.msi" -File -ErrorAction SilentlyContinue
                     if ($msiFiles) {
                         $txtSandboxFolderName.Text = "WAU-install"
                     } else {
-                        $folderName = Split-Path $folderDialog.SelectedPath -Leaf
+                        $folderName = Split-Path $selectedDir -Leaf
                         if (![string]::IsNullOrWhiteSpace($folderName)) {
                             $txtSandboxFolderName.Text = $folderName
                         }
                     }
-
-                    # Update script based on folder contents
-                    $installWSBPath = Join-Path $folderDialog.SelectedPath "InstallWSB.cmd"
-                    $installerYamlFiles = Get-ChildItem -Path $folderDialog.SelectedPath -Filter "*.installer.yaml" -File -ErrorAction SilentlyContinue
-
-                    if (Test-Path $installWSBPath) {
-                        $txtScript.Text = $defaultScripts["InstallWSB"] -f $txtSandboxFolderName.Text
-                    } elseif ($installerYamlFiles) {
-                        $txtScript.Text = $defaultScripts["WinGetManifest"] -f $txtSandboxFolderName.Text
-                    } else {
-                        $txtScript.Text = $defaultScripts["Explorer"] -f $txtSandboxFolderName.Text
+                    
+                    # Find matching script from mappings
+                    $matchingScript = Find-MatchingScript -Path $selectedDir
+                    $scriptName = $matchingScript.Replace('.ps1', '')
+                    
+                    # Try to get script content from multiple sources
+                    $scriptContent = $null
+                    
+                    # 1. Check if the script exists in $defaultScripts (hardcoded)
+                    if ($defaultScripts.ContainsKey($scriptName)) {
+                        $scriptContent = $defaultScripts[$scriptName]
+                        # Inject chosen folder name
+                        $scriptContent = $scriptContent -replace '\$SandboxFolderName\s*=\s*"[^"]*"', "`$SandboxFolderName = `"$($txtSandboxFolderName.Text)`""
                     }
+                    # 2. Check if the .ps1 file exists in wsb\ directory
+                    elseif (Test-Path (Join-Path $wsbDir $matchingScript)) {
+                        $scriptFilePath = Join-Path $wsbDir $matchingScript
+                        try {
+                            $scriptContent = Get-Content -Path $scriptFilePath -Raw -Encoding UTF8
+                            # Replace placeholder with actual folder name
+                            $scriptContent = $scriptContent -replace '\$SandboxFolderName\s*=\s*"[^"]*"', "`$SandboxFolderName = `"$($txtSandboxFolderName.Text)`""
+                        }
+                        catch {
+                            Write-Warning "Failed to load script from $scriptFilePath`: $($_.Exception.Message)"
+                            $scriptContent = $null
+                        }
+                    }
+                    
+                    # 3. Fallback to Explorer if script not found anywhere
+                    if ([string]::IsNullOrWhiteSpace($scriptContent)) {
+                        $scriptContent = $defaultScripts["Explorer"]
+                        $scriptContent = $scriptContent -replace '\$SandboxFolderName\s*=\s*"[^"]*"', "`$SandboxFolderName = `"$($txtSandboxFolderName.Text)`""
+                        $lblStatus.Text = "Status: Mapping fallback to Explorer.ps1"
+                    } else {
+                        $lblStatus.Text = "Status: Mapping -> $matchingScript"
+                    }
+                    
+                    $txtScript.Text = $scriptContent
                 }
             })
             $form.Controls.Add($btnBrowse)
+            
+            # File browse button
+            $btnBrowseFile = New-Object System.Windows.Forms.Button
+            $btnBrowseFile.Location = New-Object System.Drawing.Point(($leftMargin + $controlWidth / 2 + 5), $y)
+            $btnBrowseFile.Size = New-Object System.Drawing.Size(($controlWidth / 2 - 5), $controlHeight)
+            $btnBrowseFile.Text = "File..."
+            $btnBrowseFile.Add_Click({
+                $fileDialog = New-Object System.Windows.Forms.OpenFileDialog
+                $fileDialog.Title = "Select file to run in Windows Sandbox"
+                $fileDialog.Filter = "Executable Files (*.exe;*.cmd;*.bat;*.ps1)|*.exe;*.cmd;*.bat;*.ps1|All Files (*.*)|*.*"
+                $fileDialog.InitialDirectory = $txtMapFolder.Text
+                
+                if ($fileDialog.ShowDialog() -eq "OK") {
+                    $selectedPath = $fileDialog.FileName
+                    $selectedDir = [System.IO.Path]::GetDirectoryName($selectedPath)
+                    $selectedFile = [System.IO.Path]::GetFileName($selectedPath)
+                    
+                    # File selected - use its directory
+                    $txtMapFolder.Text = $selectedDir
+                    
+                    # Update sandbox folder name based on directory only (no WAU detection)
+                    $folderName = Split-Path $selectedDir -Leaf
+                    if (![string]::IsNullOrWhiteSpace($folderName)) {
+                        $txtSandboxFolderName.Text = $folderName
+                    }
+                    
+                    # Generate script for selected file directly (no folder content detection)
+                    $extension = [System.IO.Path]::GetExtension($selectedFile).ToLower()
+                    
+                    # Build appropriate command based on file type
+                    if ($extension -eq '.exe') {
+                        # EXE: Direct execution from sandbox folder
+                        $txtScript.Text = @"
+`$SandboxFolderName = "$($txtSandboxFolderName.Text)"
+Start-Process "`$env:USERPROFILE\Desktop\`$SandboxFolderName\$selectedFile" -WorkingDirectory "`$env:USERPROFILE\Desktop\`$SandboxFolderName"
+"@
+                    }
+                    elseif ($extension -in @('.cmd', '.bat')) {
+                        # CMD/BAT: Execute via cmd.exe /c with proper working directory
+                        $txtScript.Text = @"
+`$SandboxFolderName = "$($txtSandboxFolderName.Text)"
+Start-Process cmd.exe -ArgumentList "/c cd /d ```"`$env:USERPROFILE\Desktop\`$SandboxFolderName```" && ```"$selectedFile```""
+"@
+                    }
+                    elseif ($extension -eq '.ps1') {
+                        # PS1: Execute via powershell.exe with full path
+                        $txtScript.Text = @"
+`$SandboxFolderName = "$($txtSandboxFolderName.Text)"
+Start-Process powershell.exe -ArgumentList "-File ```"`$env:USERPROFILE\Desktop\`$SandboxFolderName\$selectedFile```""
+"@
+                    }
+                    else {
+                        # Default: Try to run directly using Start-Process with file association
+                        $txtScript.Text = @"
+`$SandboxFolderName = "$($txtSandboxFolderName.Text)"
+Start-Process "`$env:USERPROFILE\Desktop\`$SandboxFolderName\$selectedFile" -WorkingDirectory "`$env:USERPROFILE\Desktop\`$SandboxFolderName"
+"@
+                    }
+
+                    $lblStatus.Text = "Status: File selected -> $selectedFile ($extension)"
+                }
+            })
+            $form.Controls.Add($btnBrowseFile)
 
             $y += $labelHeight + $controlHeight + $spacing
 
@@ -283,7 +559,7 @@ Start-Process explorer.exe -ArgumentList "`"$env:USERPROFILE\Desktop\$SandboxFol
 
                 if ($openFileDialog.ShowDialog() -eq "OK") {
                     try {
-                        $scriptContent = Get-Content -Path $openFileDialog.FileName -Raw -Encoding ASCII
+                        $scriptContent = Get-Content -Path $openFileDialog.FileName -Raw -Encoding UTF8
                         $txtScript.Text = $scriptContent
 
                         # Extract SandboxFolderName from the loaded script
@@ -359,17 +635,33 @@ Start-Process explorer.exe -ArgumentList "`"$env:USERPROFILE\Desktop\$SandboxFol
             # Set default script based on folder contents
             $installWSBPath = Join-Path $txtMapFolder.Text "InstallWSB.cmd"
             $installerYamlFiles = Get-ChildItem -Path $txtMapFolder.Text -Filter "*.installer.yaml" -File -ErrorAction SilentlyContinue
+            # Use mapping on initial folder to detect Installer.ps1 scenario
+            $matchingScriptInit = Find-MatchingScript -Path $txtMapFolder.Text
 
             if (Test-Path $installWSBPath) {
-                $txtScript.Text = $defaultScripts["InstallWSB"] -f $txtSandboxFolderName.Text
+                $txtScript.Text = ($defaultScripts["InstallWSB"] -replace '\$SandboxFolderName\s*=\s*"[^"]*"', "`$SandboxFolderName = `"$($txtSandboxFolderName.Text)`"")
+                $initialStatus = "Auto default: InstallWSB.ps1 (InstallWSB.cmd found)"
             } elseif ($installerYamlFiles) {
-                $txtScript.Text = $defaultScripts["WinGetManifest"] -f $txtSandboxFolderName.Text
+                $txtScript.Text = ($defaultScripts["WinGetManifest"] -replace '\$SandboxFolderName\s*=\s*"[^"]*"', "`$SandboxFolderName = `"$($txtSandboxFolderName.Text)`"")
+                $initialStatus = "Auto default: WinGetManifest.ps1 (*.installer.yaml found)"
+            } elseif ($matchingScriptInit -eq 'Installer.ps1') {
+                $txtScript.Text = ($defaultScripts["Installer"] -replace '\$SandboxFolderName\s*=\s*"[^\"]*"', "`$SandboxFolderName = `"$($txtSandboxFolderName.Text)`"")
+                $initialStatus = "Auto default: Installer.ps1 (mapping matched)"
             } else {
-                $txtScript.Text = $defaultScripts["Explorer"] -f $txtSandboxFolderName.Text
+                $txtScript.Text = ($defaultScripts["Explorer"] -replace '\$SandboxFolderName\s*=\s*"[^"]*"', "`$SandboxFolderName = `"$($txtSandboxFolderName.Text)`"")
+                $initialStatus = "Auto default: Explorer.ps1"
             }
             $form.Controls.Add($txtScript)
 
-            $y += $labelHeight + 5 + 120 + $spacing + 20
+            # Status label (mapping/result info)
+            $y += $labelHeight + 5 + 120 + 5
+            $lblStatus = New-Object System.Windows.Forms.Label
+            $lblStatus.Location = New-Object System.Drawing.Point($leftMargin, $y)
+            $lblStatus.Size = New-Object System.Drawing.Size($controlWidth, $labelHeight)
+            $lblStatus.Text = "Status: $initialStatus"
+            $form.Controls.Add($lblStatus)
+
+            $y += $labelHeight + $spacing + 10
 
             # Buttons
             $btnOK = New-Object System.Windows.Forms.Button
@@ -5031,7 +5323,7 @@ function Show-WAUSettingsGUI {
                     Start-PopUp "WAU $listTypeText opening (GPO Registry)..."
 
                     $tempFile = Join-Path $env:TEMP "GPO_$($gpoListType)_ReadOnly.txt"
-                    $gpoApps -join "`r`n" | Out-File -FilePath $tempFile -Encoding utf8 -Force
+                    $gpoApps -join "`r`n" | Out-File -FilePath $tempFile -Encoding ASCII -Force
 
                     # Show info message before opening
                     [System.Windows.MessageBox]::Show(
@@ -5329,7 +5621,7 @@ function Show-WAUSettingsGUI {
             }
             
             # Save filtered content to final backup file
-            Set-Content -Path $backupFile -Value $filteredContent -Encoding UTF8
+            Set-Content -Path $backupFile -Value $filteredContent -Encoding UTF8 -Force
             
             # Remove temporary file
             Remove-Item -Path $tempBackupFile -Force -ErrorAction SilentlyContinue
