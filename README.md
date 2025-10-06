@@ -100,7 +100,7 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
   - A repair is automatically performed if files are corrupted/missing when starting
 
 ### SandboxTest
-- **Microsoft** have developed a script for prepping and starting a **Windows Sandbox (WSB)** environment for installing/validating local manifests:
+- **Microsoft** have developed a script for prepping and starting a **Windows Sandbox (WSB)** environment for installing/validating local **WinGet** manifests:
   - https://github.com/microsoft/winget-pkgs/blob/master/doc/README.md#in-windows-sandbox
 - Sandbox requirements: Windows 10/11 Pro/Enterprise/Education (Win10: version 1903+)/Virtualization enabled in BIOS (Intel VT-x or AMD-V)/Minimum 4 GB RAM, 2 CPU cores
 - Now incorporated (heavily modified) in **WAU Settings GUI** for testing the installation of **WAU** (with generated transform) and be able to fully test **WinGet** installations/updates via **WAU** in the virtual environment
