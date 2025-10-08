@@ -148,6 +148,6 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
 ---
 <p align="center">
   <a href="https://github.com/KnifMelti/WAU-Settings-GUI/wiki/KnifMelti-Brand" title="KnifMelti Brand">
-    <img src="Sources/assets/KnifMelti.png" alt="KnifMelti">
+    <img src="Sources/assets/KnifMelti.png" alt="KnifMelti" width="72">
   </a>
 </p>
