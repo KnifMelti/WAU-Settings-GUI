@@ -146,3 +146,6 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
 ![image](Sources/assets/Screenshot_Uninstall.png)
 
 ---
+<div align="center">
+  <img src="Sources/assets/KnifMelti.png" alt="KnifMelti">
+</div>
