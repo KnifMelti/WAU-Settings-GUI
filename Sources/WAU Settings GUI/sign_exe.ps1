@@ -2,7 +2,18 @@ param([Parameter(Mandatory)]$ExePath)
 
 $certSHA1 = "349C0D33B7934F917AA0A36B1340A288AB56179E"
 $timestampUrl = "http://timestamp.digicert.com" 
-$signtool = "C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\signtool.exe"
+$signtool = (Get-ChildItem -Path "${env:ProgramFiles(x86)}\Windows Kits\10\bin\" -Filter signtool.exe -Recurse | 
+    Where-Object { $_.FullName -match "\\x64\\" } |
+    ForEach-Object {
+        if ($_.FullName -match "\\bin\\(?<version>[0-9\.]+)\\") {
+            [PSCustomObject]@{
+                Path = $_.FullName
+                Version = [Version]$matches['version']
+            }
+        }
+    } |
+    Sort-Object Version -Descending |
+    Select-Object -First 1).Path
 
 if (-not (Test-Path $ExePath)) {
     Write-Host "[ERROR] File not found: $ExePath" -ForegroundColor Red
