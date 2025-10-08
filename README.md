@@ -146,6 +146,8 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
 ![image](Sources/assets/Screenshot_Uninstall.png)
 
 ---
-<div align="center">
-  <img src="Sources/assets/KnifMelti.png" alt="KnifMelti">
-</div>
+<p align="center">
+  <a href="https://github.com/KnifMelti/WAU-Settings-GUI/wiki/KnifMelti-Brand" title="KnifMelti Brand">
+    <img src="Sources/assets/KnifMelti.png" alt="KnifMelti">
+  </a>
+</p>
