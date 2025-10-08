@@ -4,15 +4,8 @@ $inputPath = $InputFile
 $outputPath = $InputFile -replace '\.ahk$', '.exe'
 $signScript = Join-Path (Split-Path $InputFile -Parent) "sign_exe.ps1"
 
-# Find AutoHotkey compiler
-$possiblePaths = @(
-    "C:\Program Files\AutoHotkey\v2\Compiler\Ahk2Exe.exe",
-    "C:\Program Files\AutoHotkey\Compiler\Ahk2Exe.exe",
-    "C:\Program Files (x86)\AutoHotkey\v2\Compiler\Ahk2Exe.exe",
-    "C:\Program Files (x86)\AutoHotkey\Compiler\Ahk2Exe.exe"
-)
-
-$ahk2exe = $possiblePaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+# AutoHotkey compiler
+$ahk2exe = "${env:ProgramFiles}\AutoHotkey\Compiler\Ahk2Exe.exe"
 
 if (-not $ahk2exe) {
     Write-Host "[ERROR] AutoHotkey compiler not found!" -ForegroundColor Red
