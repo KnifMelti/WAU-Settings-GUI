@@ -29,6 +29,54 @@ WAU uses a two-layer registry system with precedence:
 
 Always read effective values using `Get-DisplayValue` which respects GPO > local precedence. When GPO-managed, most controls are disabled except shortcuts.
 
+### Pending WAU ProgramData Migration
+
+**Status**: Planned by upstream (not yet implemented)
+
+WAU maintainer (Romanitho) plans to migrate data files from Program Files to ProgramData following Windows best practices:
+
+**Files being moved:**
+- `logs/` folder
+- `mods/` folder
+- `config/` folder (except WAU-MSI_Actions.ps1)
+- `excluded_apps.txt`
+- `included_apps.txt`
+- `icons/` folder (customization)
+
+**Expected structure:**
+- **Program Files**: WAU binaries (read-only) - `C:\Program Files\Winget-AutoUpdate\`
+- **ProgramData**: Data files - `C:\ProgramData\Winget-AutoUpdate\`
+
+**Current GUI implementation:**
+
+All paths dynamically constructed using `InstallLocation` from registry:
+```powershell
+$logsPath = Join-Path $currentConfig.InstallLocation "logs"
+$modsPath = Join-Path $currentConfig.InstallLocation "mods"
+$configPath = Join-Path $currentConfig.InstallLocation "config"
+$excludedFile = Join-Path $currentConfig.InstallLocation "excluded_apps.txt"
+```
+
+**Migration approach when WAU implements this:**
+
+1. Add `WAU_DATA_PATH = "C:\ProgramData\Winget-AutoUpdate"` to [modules/config.psm1](Sources/WAU Settings GUI/modules/config.psm1)
+2. Create helper function `Get-WAUDataPath` that returns data path with fallback to `InstallLocation` for backward compatibility
+3. Replace approximately 35 path references from `Join-Path $InstallLocation` to `Join-Path (Get-WAUDataPath)`
+4. Update shortcuts to point to new log locations
+
+**Affected code locations in WAU-Settings-GUI.ps1:**
+- Shortcut creation (logs shortcuts): lines 2412-2430
+- Dev Tools buttons `[mod]`, `[lst]`, `[sys]`: lines 5227+
+- Open Logs button: lines 5985+
+- List file management: lines 4245+
+- Status display: lines 4053+
+- Config file access: lines 4069, 4247, 5195, 5378
+
+**Documentation updates needed:**
+- [WAU-Settings-GUI.ahk](Sources/WAU Settings GUI/WAU-Settings-GUI.ahk) line 34: Update comment path from `C:\Program Files\` to `C:\ProgramData\`
+
+**Reference**: https://github.com/Romanitho/Winget-AutoUpdate/issues/1060
+
 ### Configuration Patterns
 
 ```powershell
