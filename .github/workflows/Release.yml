@@ -1,24 +1,32 @@
 name: Create Release
-
 on:
   release:
     types: [published]
-
 permissions:
   contents: write
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
     
+    - name: Check if asset already exists
+      id: check_asset
+      run: |
+        ASSET_NAME="WAU-Settings-GUI-${{ github.event.release.tag_name }}.zip"
+        EXISTING=$(gh release view ${{ github.event.release.tag_name }} --json assets --jq ".assets[].name" | grep -c "^${ASSET_NAME}$" || echo "0")
+        echo "exists=$EXISTING" >> $GITHUB_OUTPUT
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
     - name: Create zip from subdirectory
+      if: steps.check_asset.outputs.exists == '0'
       run: |
         cd "Sources/WAU Settings GUI"
         zip -r "../../WAU-Settings-GUI-${{ github.event.release.tag_name }}.zip" . -x "compile_and_sign.ps1" "sign_exe.ps1"
         
     - name: Upload Release Asset
+      if: steps.check_asset.outputs.exists == '0'
       uses: softprops/action-gh-release@v1
       with:
         files: ./WAU-Settings-GUI-${{ github.event.release.tag_name }}.zip
