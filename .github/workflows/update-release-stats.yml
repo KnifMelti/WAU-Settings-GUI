@@ -33,20 +33,15 @@ jobs:
             current_body=$(echo "$release_data" | jq -r '.body // ""')
             total_downloads=$(echo "$release_data" | jq '[.assets[].download_count] | add // 0')
             
-            # Remove stats section - simple approach: take everything before "## " followed by "Download Statistics"
-            clean_body=$(echo "$current_body" | grep -B 10000 "## .*Download Statistics" | head -n -1 || echo "$current_body")
+            # Remove stats section - take everything before the statistics header
+            clean_body=$(echo "$current_body" | sed '/## .*Download Statistics/,$d' | sed -e :a -e '/^\s*$/N;$!ba' -e 's/\s*$//')
             
-            # Trim trailing whitespace
-            clean_body=$(echo "$clean_body" | sed -e :a -e '/^\s*$/d' -e 'N;$!ba')
+            # Build new body with proper line breaks
+            stats_section=$'\n\n'"## 📥 Download Statistics"$'\n\n'"Early Swedish Mornings Totals **(ESMT): ${total_downloads}**"
+            new_body="${clean_body}${stats_section}"
             
-            # Create update JSON
-            update_json=$(jq -n \
-              --arg body "$clean_body
-
-## 📥 Download Statistics
-
-Early Swedish Mornings Totals **(ESMT): $total_downloads**" \
-              '{body: $body}')
+            # Create JSON with proper escaping
+            update_json=$(jq -n --arg body "$new_body" '{body: $body}')
             
             # Update release
             curl -s -X PATCH \
