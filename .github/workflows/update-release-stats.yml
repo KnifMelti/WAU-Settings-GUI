@@ -17,9 +17,12 @@ jobs:
         shell: bash
         run: |
           releases=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
-            "https://api.github.com/repos/${{ github.repository }}/releases?per_page=10")
+            "https://api.github.com/repos/${{ github.repository }}/releases?per_page=20")
           
-          echo "$releases" | jq -c '.[]' | while read -r release; do
+          # Deduplicate releases by ID before processing
+          unique_releases=$(echo "$releases" | jq 'unique_by(.id)')
+          
+          echo "$unique_releases" | jq -c '.[]' | while read -r release; do
             release_id=$(echo "$release" | jq -r '.id')
             tag_name=$(echo "$release" | jq -r '.tag_name')
             current_body=$(echo "$release" | jq -r '.body // ""')
@@ -27,13 +30,13 @@ jobs:
             total_downloads=$(echo "$release" | jq '[.assets[].download_count] | add // 0')
             
             # More robust cleaning - remove everything from statistics marker to end
-            clean_body=$(echo "$current_body" | sed '/## 📥 Download Statistics/,$d')
+            clean_body=$(echo "$current_body" | sed '/## ðŸ“¥ Download Statistics/,$d')
             
             # Remove trailing whitespace
             clean_body=$(echo "$clean_body" | sed 's/[[:space:]]*$//')
             
             # Build the new body
-            stats_section=$(printf "\n\n## 📥 Download Statistics\n\nEarly Swedish Mornings Totals **(ESMT): %s**" "$total_downloads")
+            stats_section=$(printf "\n\n## ðŸ“¥ Download Statistics\n\nEarly Swedish Mornings Totals **(ESMT): %s**" "$total_downloads")
             
             new_body="${clean_body}${stats_section}"
             escaped_body=$(printf '%s' "$new_body" | jq -Rs .)
