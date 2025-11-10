@@ -29,26 +29,23 @@ jobs:
             
             total_downloads=$(echo "$release" | jq '[.assets[].download_count] | add // 0')
             
-            # Remove any existing statistics section (handles both ASCII and Unicode variants)
-            # This uses a more flexible pattern that works with encoding issues
-            clean_body=$(echo "$current_body" | sed -E '/## .* Download Statistics/,$d')
+            # Remove existing statistics section - look for either emoji or text pattern
+            # This removes from the statistics marker to the end
+            clean_body=$(echo "$current_body" | awk '/## .*Download Statistics/{exit} {print}' | sed -e :a -e '/^\s*$/N;$!ba' -e 's/\n*$//')
             
-            # Remove trailing whitespace and newlines
-            clean_body=$(echo "$clean_body" | sed -e :a -e '/^\s*$/d;N;ba')
+            # Build new body with statistics using jq to handle proper JSON encoding
+            new_body=$(jq -n \
+              --arg body "$clean_body" \
+              --arg downloads "$total_downloads" \
+              '$body + "\n\n## 📥 Download Statistics\n\nEarly Swedish Mornings Totals **(ESMT): " + $downloads + "**"')
             
-            # Build the new body with proper statistics section
-            stats_section="\n\n## ðŸ“¥ Download Statistics\n\nEarly Swedish Mornings Totals **(ESMT): $total_downloads**"
-            
-            # Combine and escape for JSON
-            new_body="${clean_body}${stats_section}"
-            escaped_body=$(printf '%s' "$new_body" | jq -Rs .)
-            
-            # Update the release
+            # Update the release with properly escaped JSON
             curl -s -X PATCH \
               -H "Authorization: Bearer $GITHUB_TOKEN" \
               -H "Content-Type: application/json" \
+              -H "Accept: application/vnd.github+json" \
               "https://api.github.com/repos/${{ github.repository }}/releases/$release_id" \
-              -d "{\"body\":$escaped_body}"
+              -d "{\"body\":$new_body}"
             
             echo "Updated $tag_name (Downloads: $total_downloads)"
           done
