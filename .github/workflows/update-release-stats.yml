@@ -52,8 +52,17 @@ jobs:
               # Calculate total downloads
               total_downloads = sum(asset['download_count'] for asset in release.get('assets', []))
               
-              # Remove existing statistics section using regex
-              clean_body = re.split(r'## .*Download Statistics', current_body)[0].rstrip()
+              # Remove existing statistics section - look for the exact header pattern
+              # This will match both emoji and text variations
+              if '## ' in current_body and 'Download Statistics' in current_body:
+                  # Find the position of the statistics section
+                  match = re.search(r'\n## [^\n]*Download Statistics', current_body)
+                  if match:
+                      clean_body = current_body[:match.start()].rstrip()
+                  else:
+                      clean_body = current_body.rstrip()
+              else:
+                  clean_body = current_body.rstrip()
               
               # Build new body
               new_body = f"{clean_body}\n\n## 📥 Download Statistics\n\nEarly Swedish Mornings Totals **(ESMT): {total_downloads}**"
