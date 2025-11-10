@@ -16,36 +16,46 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          releases=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
-            "https://api.github.com/repos/${{ github.repository }}/releases?per_page=20")
+          # Get unique release IDs only
+          release_ids=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/releases?per_page=20" \
+            | jq -r 'unique_by(.id) | .[].id')
           
-          # Deduplicate releases by ID before processing
-          unique_releases=$(echo "$releases" | jq 'unique_by(.id)')
-          
-          echo "$unique_releases" | jq -c '.[]' | while read -r release; do
-            release_id=$(echo "$release" | jq -r '.id')
-            tag_name=$(echo "$release" | jq -r '.tag_name')
-            current_body=$(echo "$release" | jq -r '.body // ""')
+          # Process each unique release
+          for release_id in $release_ids; do
+            echo "Processing release ID: $release_id"
             
-            total_downloads=$(echo "$release" | jq '[.assets[].download_count] | add // 0')
+            # Get release details
+            release_data=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+              "https://api.github.com/repos/${{ github.repository }}/releases/$release_id")
             
-            # Remove existing statistics section - look for either emoji or text pattern
-            # This removes from the statistics marker to the end
-            clean_body=$(echo "$current_body" | awk '/## .*Download Statistics/{exit} {print}' | sed -e :a -e '/^\s*$/N;$!ba' -e 's/\n*$//')
+            tag_name=$(echo "$release_data" | jq -r '.tag_name')
+            current_body=$(echo "$release_data" | jq -r '.body // ""')
+            total_downloads=$(echo "$release_data" | jq '[.assets[].download_count] | add // 0')
             
-            # Build new body with statistics using jq to handle proper JSON encoding
-            new_body=$(jq -n \
-              --arg body "$clean_body" \
-              --arg downloads "$total_downloads" \
-              '$body + "\n\n## 📥 Download Statistics\n\nEarly Swedish Mornings Totals **(ESMT): " + $downloads + "**"')
+            # Remove stats section - simple approach: take everything before "## " followed by "Download Statistics"
+            clean_body=$(echo "$current_body" | grep -B 10000 "## .*Download Statistics" | head -n -1 || echo "$current_body")
             
-            # Update the release with properly escaped JSON
+            # Trim trailing whitespace
+            clean_body=$(echo "$clean_body" | sed -e :a -e '/^\s*$/d' -e 'N;$!ba')
+            
+            # Create update JSON
+            update_json=$(jq -n \
+              --arg body "$clean_body
+
+## 📥 Download Statistics
+
+Early Swedish Mornings Totals **(ESMT): $total_downloads**" \
+              '{body: $body}')
+            
+            # Update release
             curl -s -X PATCH \
               -H "Authorization: Bearer $GITHUB_TOKEN" \
               -H "Content-Type: application/json" \
-              -H "Accept: application/vnd.github+json" \
               "https://api.github.com/repos/${{ github.repository }}/releases/$release_id" \
-              -d "{\"body\":$new_body}"
+              -d "$update_json" > /dev/null
             
-            echo "Updated $tag_name (Downloads: $total_downloads)"
+            echo "✓ Updated $tag_name (Downloads: $total_downloads)"
           done
+          
+          echo "Done!"
