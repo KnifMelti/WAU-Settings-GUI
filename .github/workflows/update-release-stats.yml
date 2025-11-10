@@ -29,18 +29,21 @@ jobs:
             
             total_downloads=$(echo "$release" | jq '[.assets[].download_count] | add // 0')
             
-            # More robust cleaning - remove everything from statistics marker to end
-            clean_body=$(echo "$current_body" | sed '/## ðŸ“¥ Download Statistics/,$d')
+            # Remove any existing statistics section (handles both ASCII and Unicode variants)
+            # This uses a more flexible pattern that works with encoding issues
+            clean_body=$(echo "$current_body" | sed -E '/## .* Download Statistics/,$d')
             
-            # Remove trailing whitespace
-            clean_body=$(echo "$clean_body" | sed 's/[[:space:]]*$//')
+            # Remove trailing whitespace and newlines
+            clean_body=$(echo "$clean_body" | sed -e :a -e '/^\s*$/d;N;ba')
             
-            # Build the new body
-            stats_section=$(printf "\n\n## ðŸ“¥ Download Statistics\n\nEarly Swedish Mornings Totals **(ESMT): %s**" "$total_downloads")
+            # Build the new body with proper statistics section
+            stats_section="\n\n## ðŸ“¥ Download Statistics\n\nEarly Swedish Mornings Totals **(ESMT): $total_downloads**"
             
+            # Combine and escape for JSON
             new_body="${clean_body}${stats_section}"
             escaped_body=$(printf '%s' "$new_body" | jq -Rs .)
             
+            # Update the release
             curl -s -X PATCH \
               -H "Authorization: Bearer $GITHUB_TOKEN" \
               -H "Content-Type: application/json" \
