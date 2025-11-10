@@ -64,6 +64,13 @@ jobs:
               else:
                   clean_body = current_body.rstrip()
               
+              # Clean up any escaped newlines and markdown artifacts
+              clean_body = clean_body.replace('\\n\\n', '\n\n')
+              clean_body = clean_body.replace('\\n', '\n')
+              # Remove trailing underscores and escaped sequences at the end
+              clean_body = re.sub(r'(__)+\s*$', '', clean_body)
+              clean_body = clean_body.rstrip()
+              
               # Build new body
               new_body = f"{clean_body}\n\n## 📥 Download Statistics\n\nEarly Swedish Mornings Totals **(ESMT): {total_downloads}**"
               
