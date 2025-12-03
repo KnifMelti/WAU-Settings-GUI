@@ -10,6 +10,24 @@ WAU Settings GUI is a portable standalone Windows application that provides a us
 
 ## Architecture
 
+### Directory Structure
+
+```
+Sources/WAU Settings GUI/
+├── WAU-Settings-GUI.ahk         # AHK v2 wrapper (creates elevated EXE)
+├── WAU-Settings-GUI.ps1         # Main PowerShell script (~6,365 lines)
+├── WAU-Settings-GUI.exe         # Compiled executable (signed)
+├── SandboxTest.ps1              # Standalone Windows Sandbox testing
+├── config_user.psm1             # User-configurable overrides
+├── compile_and_sign.ps1         # Build script (excludes from release)
+├── sign_exe.ps1                 # Code signing script (excludes from release)
+├── config/
+│   ├── settings-window.xaml    # Main WPF window definition
+│   └── settings-popup.xaml     # Modal progress popup
+└── modules/
+    └── config.psm1              # Global config (colors, paths, registry keys)
+```
+
 ### Core Components
 
 - **WAU-Settings-GUI.ahk** - AutoHotkey v2 wrapper that creates the elevated executable
@@ -133,6 +151,10 @@ From `Sources/WAU Settings GUI/`:
 .\WAU-Settings-GUI.ps1 -SandboxTest # Windows Sandbox test mode
 ```
 
+**Parameters**:
+- `-Portable` - Runs in portable mode without creating shortcuts or registry entries
+- `-SandboxTest` - Launches the Windows Sandbox testing interface directly
+
 ### Building the EXE
 
 Use VS Code task "Compile and Sign WAU Settings GUI" (Ctrl+Shift+B) or:
@@ -208,19 +230,57 @@ The `[wsb]` Dev Tool creates a clean Windows Sandbox environment for testing WAU
 - Switches MSI from silent (`/qn`) to basic UI (`/qb`)
 - First run creates a **SandboxTest** shortcut in User Start Menu for advanced testing when Windows Sandbox is installed
 
-Three predefined scripts are saved to `wsb/` folder on first use when Windows Sandbox is installed:
+### Script Mapping System
+
+Four predefined scripts are saved to `wsb/` folder on first use:
 - **InstallWSB.ps1** - Recognizes files created from `[msi]` button
-- **WinGetManifest.ps1** - Recognizes WinGet manifest files
+- **WinGetManifest.ps1** - Recognizes WinGet manifest files (`.yaml` manifests)
+- **Installer.ps1** - Recognizes folders containing `install.*` files
 - **Explorer.ps1** - General script to open mapped folder
+
+Script selection is controlled by `wsb\script-mappings.txt` configuration file using pattern matching. Users can create custom scripts and mappings for specialized testing scenarios.
+
+## Screenshot Functionality (F11)
+
+Press **F11** to capture a window screenshot with automatic sensitive data masking:
+- Masks notification email addresses
+- Masks ModsPath URLs (except AzureBlob literal)
+- Masks SAS URLs and tokens
+- Copies to clipboard automatically
+- Ideal for sharing configuration without exposing credentials
+- Function: `New-WindowScreenshot` with `Hide-SensitiveText` helper
 
 ## Key Functions
 
+### Configuration Management
 - `Get-DisplayValue` - Read effective config value (respects GPO precedence)
-- `Set-WAUConfig` - Write settings to registry atomically
+- `Set-WAUConfig` - Write settings to registry atomically (only changed keys)
+- `Get-WAUCurrentConfig` - Retrieve current WAU configuration from registry
+- `Import-WAUSettingsFromFile` - Import configuration from backup files
+
+### Validation and Testing
 - `Test-PathValue` - Validate local/UNC/HTTP paths
+- `Test-Administrator` - Verify running with admin privileges
+- `Test-InstalledWAU` - Check if WAU is installed
+- `Test-LocalMSIVersion` - Verify local MSI version matches expected
+
+### WAU Operations
+- `Install-WAU` - Install WAU with specified configuration
+- `Uninstall-WAU` - Uninstall WAU and restore settings
+- `Start-WAUManually` - Trigger WAU task execution
+- `Update-WAUScheduledTask` - Update task scheduler configuration
+
+### UI and Controls
 - `Set-ControlsState` - Bulk enable/disable controls (with exclusion patterns)
 - `Start-PopUp` / `Close-PopUp` - Modal progress indicators
-- `SandboxTest` - Launch Windows Sandbox with WinGet configured
+- `New-WindowScreenshot` - Capture window with sensitive data masking (F11)
+- `Hide-SensitiveText` - Mask sensitive information in screenshots
+
+### Development Tools
+- `New-MSITransformFromControls` - Generate MSI transform from current config
+- `Start-WSBTesting` - Launch Windows Sandbox test environment
+- `Get-WAUMsi` - Download WAU MSI installer
+- `Repair-WAUSettingsFiles` - Auto-repair corrupted/missing files
 
 ## GPO Mode Behavior
 
@@ -232,11 +292,74 @@ Set-ControlsState -parentControl $window -enabled:$false -excludePattern "*Short
 
 After path changes in GPO mode, regenerate shortcuts to match registry state.
 
+## Keyboard Shortcuts
+
+- **F5** - Refresh status display (shows version details, last run times, configuration state)
+- **F11** - Take screenshot with automatic masking of sensitive data
+- **F12** - Toggle Dev Tools panel (also available by clicking logo)
+- **Double-click logo** - Open WAU Settings GUI repository on GitHub
+
+## Release Workflow
+
+The project uses GitHub Actions for automated releases:
+
+### Workflows
+- **Release.yml** - Creates release ZIP from `Sources/WAU Settings GUI/` (excludes build scripts)
+- **WinGet Releaser.yml** - Submits new versions to WinGet community repository
+- **update-release-stats.yml** - Updates release download statistics
+
+### Release Process
+1. Create and publish a GitHub release with tag (e.g., `v1.2.3.4`)
+2. Release workflow packages the source directory into a ZIP
+3. WinGet Releaser automatically creates/updates the WinGet manifest
+4. Users receive updates via built-in updater (weekly check) or WinGet
+
+## Coding Conventions
+
+### PowerShell Best Practices
+- **Compatibility**: PowerShell 5.1 only (no PowerShell 7+ features like null coalescing)
+- **Comments**: Always write comments in English
+- **Error Handling**: Use try-catch blocks for external operations (file I/O, registry, network)
+- **Scope**: Use `$Script:` prefix for module-level variables
+- **Functions**: Use verb-noun naming convention (e.g., `Get-WAUConfig`, `Set-ControlsState`)
+
+### UI Responsiveness
+Always use dispatcher for UI updates during long operations:
+```powershell
+$window.Dispatcher.Invoke([Action]{ $controls.StatusBarText.Text = "Processing..." })
+```
+
+### Registry Operations
+- Always check GPO precedence using `Get-DisplayValue`
+- Write only changed values with `Set-WAUConfig`
+- Use atomic operations to prevent partial updates
+
+### Path Handling
+- Validate all paths with `Test-PathValue` before saving
+- Support local paths, UNC paths, and HTTP(S) URLs
+- Use `Join-Path` for all path construction (prepare for ProgramData migration)
+
 ## Important Notes
 
 - Must always run as Administrator (exe and shortcut has UAC flag set)
-- `SandboxTest` standalone shortcut doesn't require Administrator privilegies 
+- `SandboxTest` standalone shortcut doesn't require Administrator privileges
 - Executable is code-signed with KnifMelti Certificate
 - XAML files use string interpolation from `modules/config.psm1` variables
 - Comments should be in English
 - PowerShell 5.1 compatible code required (no PowerShell 7 features)
+- Main script is ~6,365 lines (as of latest version)
+- Auto-repair functionality runs on startup if files are corrupted/missing
+
+## Troubleshooting
+
+### Common Issues
+- **File locks during update**: Use WAU preinstall mod to close GUI before updating
+- **Missing shortcuts**: Toggle shortcut options and save to regenerate
+- **GPO mode limitations**: Most controls disabled except shortcuts (by design)
+- **Sandbox requirements**: Requires Windows Pro/Enterprise/Education with virtualization enabled
+
+### Development Tips
+- Use `-Verbose` parameter to enable detailed logging
+- Test GPO scenarios using registry policies path
+- Use `[cfg]` Dev Tool to backup/restore configurations during testing
+- Leverage `Repair-WAUSettingsFiles` for automatic file recovery
