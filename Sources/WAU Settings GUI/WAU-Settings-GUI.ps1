@@ -1167,12 +1167,9 @@ function Test-InstalledWAU {
 
     # Try up to 3 times to find WAU installation (handles timing issues with self-updates)
     for ($attempt = 1; $attempt -le 3; $attempt++) {
-        $uninstallKeys = @(
-            "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
-            "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
-        )
+        $uninstallKeys = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
         $matchingApps = @()
-
+        
         foreach ($key in $uninstallKeys) {
             try {
                 $subKeys = Get-ChildItem -Path $key -ErrorAction Stop
