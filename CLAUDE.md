@@ -142,18 +142,20 @@ Close-PopUp
 
 ### Running for Development
 
+**IMPORTANT**: WAU-Settings-GUI.ps1 should NOT be run directly from PowerShell (except for `-SandboxTest`). The application must be launched via:
+- The compiled `.exe` file
+- Desktop/Start Menu shortcuts created during installation
+
+**For development/testing only**:
+
 From `Sources/WAU Settings GUI/`:
 
 ```powershell
-.\WAU-Settings-GUI.ps1              # Normal mode
-.\WAU-Settings-GUI.ps1 -Verbose     # Debug mode
-.\WAU-Settings-GUI.ps1 -Portable    # No shortcuts/registry artifacts
-.\WAU-Settings-GUI.ps1 -SandboxTest # Windows Sandbox test mode
+.\WAU-Settings-GUI.ps1 -SandboxTest # Windows Sandbox test mode (standalone)
 ```
 
 **Parameters**:
-- `-Portable` - Runs in portable mode without creating shortcuts or registry entries
-- `-SandboxTest` - Launches the Windows Sandbox testing interface directly
+- `-SandboxTest` - Launches the Windows Sandbox testing interface directly (does not require the main GUI)
 
 ### Building the EXE
 
