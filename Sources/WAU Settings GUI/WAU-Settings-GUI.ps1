@@ -171,6 +171,41 @@ Install.* = Installer.ps1
         }
     }
 
+    # Helper function to fetch stable WinGet versions from GitHub
+    function Get-StableWinGetVersions {
+        <#
+        .SYNOPSIS
+        Fetches the 10 most recent stable WinGet versions from GitHub
+        
+        .DESCRIPTION
+        Queries the GitHub API for microsoft/winget-cli releases and returns
+        the tag names of the 10 most recent stable (non-prerelease) versions
+        
+        .OUTPUTS
+        Array of version strings (e.g., "v1.7.10514", "v1.7.10582")
+        #>
+        try {
+            $releasesApiUrl = 'https://api.github.com/repos/microsoft/winget-cli/releases?per_page=100'
+            Write-Verbose "Fetching WinGet releases from GitHub API..."
+            
+            # Fetch releases from GitHub API
+            $releases = Invoke-RestMethod -Uri $releasesApiUrl -ErrorAction Stop
+            
+            # Filter to only stable releases (not prerelease) and get top 10
+            $stableReleases = $releases | Where-Object { -not $_.prerelease } | Select-Object -First 10
+            
+            # Extract tag names (e.g., "v1.7.10514")
+            $versions = $stableReleases | ForEach-Object { $_.tag_name }
+            
+            Write-Verbose "Found $($versions.Count) stable WinGet versions"
+            return $versions
+        }
+        catch {
+            Write-Warning "Failed to fetch WinGet versions from GitHub: $($_.Exception.Message)"
+            return @()
+        }
+    }
+
     # Define the dialog function here since it's needed before the main functions section
     function Show-SandboxTestDialog {
         <#
@@ -500,17 +535,34 @@ Start-Process "`$env:USERPROFILE\Desktop\`$SandboxFolderName\$selectedFile" -Wor
 
             $y += $labelHeight + $controlHeight + $spacing
 
-            # WinGet Version
+            # WinGet Version - using ComboBox with fetched versions
             $lblWinGetVersion = New-Object System.Windows.Forms.Label
             $lblWinGetVersion.Location = New-Object System.Drawing.Point($leftMargin, $y)
             $lblWinGetVersion.Size = New-Object System.Drawing.Size(300, $labelHeight)
             $lblWinGetVersion.Text = "WinGet Version (leave empty for latest):"
             $form.Controls.Add($lblWinGetVersion)
 
-            $txtWinGetVersion = New-Object System.Windows.Forms.TextBox
-            $txtWinGetVersion.Location = New-Object System.Drawing.Point($leftMargin, ($y + $labelHeight))
-            $txtWinGetVersion.Size = New-Object System.Drawing.Size($controlWidth, $controlHeight)
-            $form.Controls.Add($txtWinGetVersion)
+            $cmbWinGetVersion = New-Object System.Windows.Forms.ComboBox
+            $cmbWinGetVersion.Location = New-Object System.Drawing.Point($leftMargin, ($y + $labelHeight))
+            $cmbWinGetVersion.Size = New-Object System.Drawing.Size($controlWidth, $controlHeight)
+            $cmbWinGetVersion.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDown
+            
+            # Fetch and populate WinGet versions
+            Write-Verbose "Fetching stable WinGet versions for dropdown..."
+            $stableVersions = Get-StableWinGetVersions
+            
+            # Add empty option first (for "latest")
+            $cmbWinGetVersion.Items.Add("") | Out-Null
+            
+            # Add fetched versions to the dropdown
+            foreach ($version in $stableVersions) {
+                $cmbWinGetVersion.Items.Add($version) | Out-Null
+            }
+            
+            # Set default selection to empty (latest)
+            $cmbWinGetVersion.SelectedIndex = 0
+            
+            $form.Controls.Add($cmbWinGetVersion)
 
             $y += $labelHeight + $controlHeight + $spacing + 10
 
@@ -699,7 +751,7 @@ Start-Process "`$env:USERPROFILE\Desktop\`$SandboxFolderName\$selectedFile" -Wor
                     DialogResult = 'OK'
                     MapFolder = $txtMapFolder.Text
                     SandboxFolderName = $txtSandboxFolderName.Text
-                    WinGetVersion = $txtWinGetVersion.Text
+                    WinGetVersion = $cmbWinGetVersion.Text
                     Prerelease = $chkPrerelease.Checked
                     Clean = $chkClean.Checked
                     Async = $chkAsync.Checked
