@@ -13,9 +13,15 @@ jobs:
     - name: Check if asset already exists
       id: check_asset
       run: |
+        set -euo pipefail
         ASSET_NAME="WAU-Settings-GUI-${{ github.event.release.tag_name }}.zip"
-        EXISTING=$(gh release view ${{ github.event.release.tag_name }} --json assets --jq ".assets[].name" | grep -c "^${ASSET_NAME}$" || echo "0")
-        echo "exists=$EXISTING" >> $GITHUB_OUTPUT
+        # Query release assets; if gh fails or there are no assets, treat as not existing
+        EXISTING=$(gh release view "${{ github.event.release.tag_name }}" --json assets --jq ".assets[].name" 2>/dev/null | grep -cFx "${ASSET_NAME}" || true)
+        EXISTING=${EXISTING:-0}
+        # Use the file-command here-doc format to safely set the output
+        printf '%s\n' "exists<<EOF" >> "$GITHUB_OUTPUT"
+        printf '%s\n' "$EXISTING" >> "$GITHUB_OUTPUT"
+        printf '%s\n' "EOF" >> "$GITHUB_OUTPUT"
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     
