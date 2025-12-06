@@ -560,10 +560,11 @@ Start-Process "`$env:USERPROFILE\Desktop\`$SandboxFolderName\$selectedFile" -Wor
             $cmbWinGetVersion.Tag = $false
             
             $cmbWinGetVersion.Add_DropDown({
-                if (-not $cmbWinGetVersion.Tag) {
+                # Use $this to reference the ComboBox safely within the event handler
+                if (-not $this.Tag) {
                     # Show loading indicator
-                    $originalText = $cmbWinGetVersion.Text
-                    $cmbWinGetVersion.Text = "Loading versions..."
+                    $originalText = $this.Text
+                    $this.Text = "Loading versions..."
                     [System.Windows.Forms.Application]::DoEvents()  # Force UI update
                     
                     try {
@@ -572,7 +573,7 @@ Start-Process "`$env:USERPROFILE\Desktop\`$SandboxFolderName\$selectedFile" -Wor
                         
                         # Add fetched versions to the dropdown
                         foreach ($version in $stableVersions) {
-                            [void]$cmbWinGetVersion.Items.Add($version)
+                            [void]$this.Items.Add($version)
                         }
                         
                         Write-Verbose "WinGet version dropdown populated with $($stableVersions.Count) stable versions"
@@ -582,12 +583,9 @@ Start-Process "`$env:USERPROFILE\Desktop\`$SandboxFolderName\$selectedFile" -Wor
                     }
                     finally {
                         # Always restore original text and mark as loaded, even if API call failed
-                        if ($originalText -ne "Loading versions...") {
-                            $cmbWinGetVersion.Text = $originalText
-                        } else {
-                            $cmbWinGetVersion.Text = ""
-                        }
-                        $cmbWinGetVersion.Tag = $true
+                        # Restore to original text (typically empty string on first open)
+                        $this.Text = $originalText
+                        $this.Tag = $true
                     }
                 }
             })
