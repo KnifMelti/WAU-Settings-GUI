@@ -6,7 +6,6 @@ function SandboxTest {
         [string] $SandboxFolderName,
         [string] $WinGetVersion,
         [switch] $Prerelease,
-        [switch] $EnableExperimentalFeatures,
         [switch] $Clean,
         [switch] $Async
     )
@@ -33,18 +32,15 @@ function SandboxTest {
 
     .PARAMETER Prerelease
     Include prerelease versions of WinGet.
-    
-    .PARAMETER EnableExperimentalFeatures
-    Enable experimental features in WinGet.
-    
+
     .PARAMETER Clean
     Clean existing cached dependencies before starting.
     
     .EXAMPLE
     SandboxTest -Script { Start-Process cmd.exe -ArgumentList "/c del /Q ""$env:USERPROFILE\Desktop\WAU-install\*.log"" & ""$env:USERPROFILE\Desktop\WAU-install\InstallWSB.cmd"" && explorer ""$env:USERPROFILE\Desktop\WAU-install""" } -Verbose
-    
+
     .EXAMPLE
-    SandboxTest -MapFolder "D:\WAU Settings GUI\msi\2.8.0" -EnableExperimentalFeatures
+    SandboxTest -MapFolder "D:\WAU Settings GUI\msi\2.8.0"
     #>
     
 
@@ -127,7 +123,25 @@ function SandboxTest {
 
     # Sandbox Settings
     $script:SandboxDesktopFolder = 'C:\Users\WDAGUtilityAccount\Desktop'
-    $sandboxLeaf = if ($SandboxFolderName) { $SandboxFolderName } elseif ($script:PrimaryMappedFolder) { ($script:PrimaryMappedFolder | Split-Path -Leaf) } else { '' }
+    $sandboxLeaf = if ($SandboxFolderName) {
+        $SandboxFolderName
+    } elseif ($script:PrimaryMappedFolder) {
+        $leaf = $script:PrimaryMappedFolder | Split-Path -Leaf
+        # Check if it's a root drive (contains : or is a path like D:\)
+        if (![string]::IsNullOrWhiteSpace($leaf) -and $leaf -notmatch ':' -and $leaf -ne '\') {
+            $leaf
+        } else {
+            # Root drive selected (e.g., D:\) - extract drive letter
+            $driveLetter = $script:PrimaryMappedFolder.TrimEnd('\').Replace(':', '')
+            if (![string]::IsNullOrWhiteSpace($driveLetter)) {
+                "Drive_$driveLetter"
+            } else {
+                'MappedFolder'
+            }
+        }
+    } else {
+        ''
+    }
     $script:SandboxWorkingDirectory = if ($script:PrimaryMappedFolder) { Join-Path -Path $script:SandboxDesktopFolder -ChildPath $sandboxLeaf } else { $script:SandboxDesktopFolder }
     $script:SandboxTestDataFolder = Join-Path -Path $script:SandboxDesktopFolder -ChildPath $($script:TestDataFolder | Split-Path -Leaf)
     $script:SandboxBootstrapFile = Join-Path -Path $script:SandboxTestDataFolder -ChildPath "$script:ScriptName.ps1"
@@ -141,27 +155,12 @@ function SandboxTest {
     $script:HttpClient = New-Object System.Net.Http.HttpClient
     $script:CleanupPaths = @()
 
-    # The experimental features get updated later based on a switch that is set
     $script:SandboxWinGetSettings = @{
-        '$schema'            = 'https://aka.ms/winget-settings.schema.json'
-        logging              = @{
+        '$schema' = 'https://aka.ms/winget-settings.schema.json'
+        logging   = @{
             level = 'verbose'
         }
-        experimentalFeatures = @{
-            fonts = $false
-        }
     }
-
-    # Default list of experimental features to enable when -EnableExperimentalFeatures is used.
-    # Note: Winget will ignore unknown keys based on the active schema. This list is conservative and safe.
-    $script:ExperimentalFeaturesList = @(
-        'fonts',              # Already present; improves font handling scenarios
-        'dependencies',       # Enable dependency support in manifests
-        'directMSI',          # Allow direct MSI handling improvements
-        'unpackagedInstall',  # Support for unpackaged installers
-        'restSource',         # Enable REST source (newer source protocol)
-        'zipInstall'          # Allow zip-based installer flows
-    )
 
     # Helper Functions
     function Invoke-CleanExit {
@@ -480,15 +479,6 @@ $ Enable-WindowsOptionalFeature -Online -FeatureName 'Containers-DisposableClien
         if (!(Initialize-Folder $script:TestDataFolder)) { throw 'Could not create folder for mapping files into the sandbox' }
         if (!(Initialize-Folder $script:DependenciesCacheFolder)) { throw 'Could not create folder for caching dependencies' }
 
-        if ($EnableExperimentalFeatures) {
-            Write-Debug 'Setting Experimental Features to Enabled'
-            foreach ($feature in $script:ExperimentalFeaturesList) {
-                # Ensure the key exists and is set to true in the JSON that will be copied into the Sandbox
-                $script:SandboxWinGetSettings.experimentalFeatures[$feature] = $true
-            }
-            Write-Verbose ("Enabled experimental features: {0}" -f ($script:ExperimentalFeaturesList -join ', '))
-        }
-
         Write-Verbose "Copying assets into $script:TestDataFolder"
         $script:SandboxWinGetSettings | ConvertTo-Json | Out-File -FilePath (Join-Path -Path $script:TestDataFolder -ChildPath 'settings.json') -Encoding ascii
         foreach ($dependency in $script:AppInstallerDependencies) { 
@@ -497,9 +487,106 @@ $ Enable-WindowsOptionalFeature -Online -FeatureName 'Containers-DisposableClien
             }
         }
 
+        # Define sandbox initialization code - split into pre-install and post-install
+        $sandboxPreInstallScript = @'
+#Function to create shortcuts
+function Add-Shortcut ($Target, $Shortcut, $Arguments, $Icon, $Description) {
+    $WScriptShell = New-Object -ComObject WScript.Shell
+    $Shortcut = $WScriptShell.CreateShortcut($Shortcut)
+    $Shortcut.TargetPath = $Target
+    if ($Arguments) { $Shortcut.Arguments = $Arguments }
+    if ($Icon) { $Shortcut.IconLocation = $Icon }
+    if ($Description) { $Shortcut.Description = $Description }
+    $Shortcut.Save()
+}
+
+# Create non-WAU shortcuts
+Add-Shortcut "${env:SystemRoot}\System32\WindowsPowerShell\v1.0\powershell.exe" "${env:Public}\Desktop\CTT Windows Utility.lnk" "-ExecutionPolicy Bypass -Command `"Start-Process powershell.exe -verb runas -ArgumentList 'irm https://christitus.com/win | iex'`"" "${env:SystemRoot}\System32\SHELL32.dll,43" "Chris Titus Tech Windows Utility"
+Add-Shortcut "${env:windir}\regedit.exe" "${env:Public}\Desktop\Registry.lnk"
+
+# Configure Explorer settings
+reg.exe add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v HideFileExt /t REG_DWORD /d 0 /f | Out-Null
+reg.exe add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v Hidden /t REG_DWORD /d 1 /f | Out-Null
+
+# Set execution policy for LocalMachine scope (wrap in Invoke-Command to suppress all output)
+Invoke-Command -ScriptBlock {
+    Set-ExecutionPolicy -Scope 'LocalMachine' -ExecutionPolicy 'Bypass' -Force
+} -ErrorAction SilentlyContinue -WarningAction SilentlyContinue 2>$null | Out-Null
+
+# Refresh Explorer windows and desktop icons
+Get-Process explorer -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Sleep -Milliseconds 500
+ie4uinit.exe -Show
+
+'@
+
+        $sandboxPostInstallScript = @'
+# Post-install initialization (after WAU installation)
+
+# Create WAU-specific shortcuts and registry settings (Add-Shortcut function already defined in Pre-Install)
+Add-Shortcut "C:\Program Files\Winget-AutoUpdate" "${env:Public}\Desktop\WAU InstallDir.lnk" "" "" "WAU InstallDir"
+
+reg.exe add "HKCU\Software\Microsoft\Windows\CurrentVersion\Applets\Regedit" /v LastKey /t REG_SZ /d Computer\HKEY_LOCAL_MACHINE\SOFTWARE\Romanitho\Winget-AutoUpdate /f | Out-Null
+reg.exe add "HKCU\Software\Microsoft\Windows\CurrentVersion\Applets\Regedit\Favorites" /v WAU /t REG_SZ /d Computer\HKEY_LOCAL_MACHINE\SOFTWARE\Romanitho\Winget-AutoUpdate /f | Out-Null
+
+'@
+
         if ($Script) {
-            Write-Verbose "Creating script file from 'Script' argument"
-            $Script.ToString() | Out-File -FilePath (Join-Path $script:TestDataFolder -ChildPath 'BoundParameterScript.ps1')
+            Write-Verbose "Creating script file from 'Script' argument with initialization code"
+
+            # Detect if script contains InstallWSB.cmd
+            $scriptText = $Script.ToString()
+            $containsWAUInstall = $scriptText -match 'InstallWSB\.cmd'
+
+            if ($containsWAUInstall) {
+                Write-Verbose "Detected WAU installation - post-install initialization will run after user script"
+
+                # Modify user script to wait for WAU installation to complete
+                $modifiedUserScript = @'
+# User Script (modified to wait for WAU installation)
+
+'@ + $scriptText + "`r`n" + @'
+
+# Wait for WAU installation to complete by polling for installation directory
+Write-Host ""
+Write-Host "Waiting for WAU installation to complete..." -ForegroundColor Yellow
+
+$timeout = 300  # 5 minutes max
+$elapsed = 0
+$checkInterval = 2
+
+while ((Test-Path "C:\Program Files\Winget-AutoUpdate\Winget-Upgrade.ps1") -eq $false -and $elapsed -lt $timeout) {
+    Start-Sleep -Seconds $checkInterval
+    $elapsed += $checkInterval
+    Write-Host "." -NoNewline -ForegroundColor Yellow
+}
+
+Write-Host ""
+
+if (Test-Path "C:\Program Files\Winget-AutoUpdate\Winget-Upgrade.ps1") {
+    Write-Host "WAU installation completed successfully!" -ForegroundColor Green -BackgroundColor DarkGreen
+    Start-Sleep -Seconds 2
+} else {
+    Write-Host "Timeout: WAU installation did not complete within $timeout seconds" -ForegroundColor Red
+}
+
+'@
+
+                # Combine: pre-install + user script + post-install
+                $fullScript = "# Pre-Install Initialization`r`n" + $sandboxPreInstallScript +
+                              "`r`n" + $modifiedUserScript +
+                              "`r`n# Post-Install Initialization`r`n" + $sandboxPostInstallScript
+            }
+            else {
+                Write-Verbose "No WAU installation detected - pre-install initialization only"
+
+                # Combine: pre-install + user script (no post-install needed)
+                $fullScript = "# Pre-Install Initialization`r`n" + $sandboxPreInstallScript +
+                              "`r`n# User Script`r`n" + $scriptText
+            }
+
+            # Write combined script to BoundParameterScript.ps1
+            $fullScript | Out-File -FilePath (Join-Path $script:TestDataFolder -ChildPath 'BoundParameterScript.ps1') -Encoding UTF8
         }
 
         Write-Verbose 'Creating the script for bootstrapping the sandbox'
@@ -516,20 +603,39 @@ function Update-EnvironmentVariables {
 }
 
 Push-Location $($script:SandboxTestDataFolder)
-Write-Host @'
---> Installing WinGet
-'@
-`$ProgressPreference = 'SilentlyContinue'
+
+Write-Host '================================================' -ForegroundColor Cyan
+Write-Host '--> Installing WinGet' -ForegroundColor Yellow
+Write-Host '================================================' -ForegroundColor Cyan
 
 try {
     if ($([int]$script:UsePowerShellModuleForInstall)) { throw }
-    Get-ChildItem -Filter '*.zip' | Expand-Archive
+    Write-Host '    [1/3] Extracting packages...' -ForegroundColor Cyan
+    `$ProgressPreference = 'SilentlyContinue'
+
+    # Only extract if not already extracted (saves time)
+    `$zipFiles = Get-ChildItem -Filter '*.zip'
+    foreach (`$zip in `$zipFiles) {
+        `$extractedFolder = Join-Path `$PWD.Path (`$zip.BaseName)
+        if (-not (Test-Path `$extractedFolder)) {
+            Expand-Archive -Path `$zip.FullName -DestinationPath `$PWD.Path -Force
+        }
+    }
+
+    Write-Host '    [2/3] Installing dependencies...' -ForegroundColor Cyan
     Get-ChildItem -Recurse -Filter '*.appx' | Where-Object {`$_.FullName -match 'x64'} | Add-AppxPackage -ErrorAction Stop
+    Write-Host '    [3/3] Installing WinGet...' -ForegroundColor Cyan
     Add-AppxPackage './$($script:AppInstallerPFN).msixbundle' -ErrorAction Stop
+    Write-Host '    WinGet installed successfully!' -ForegroundColor Green -BackgroundColor DarkGreen
 } catch {
-  Write-Host -ForegroundColor Red 'Could not install from cached packages. Falling back to Repair-WinGetPackageManager cmdlet'
+  Write-Host ''
+  Write-Host '    Package installation failed. Using fallback method...' -ForegroundColor Yellow
+  Write-Host ''
   try {
+    Write-Host '    [1/3] Installing NuGet package provider...' -ForegroundColor Cyan
+    `$ProgressPreference = 'SilentlyContinue'
     Install-PackageProvider -Name NuGet -Force | Out-Null
+    Write-Host '    [2/3] Installing Microsoft.WinGet.Client module...' -ForegroundColor Cyan
     Install-Module -Name Microsoft.WinGet.Client -Force -Repository PSGallery | Out-Null
   } catch {
     throw "Microsoft.Winget.Client was not installed successfully"
@@ -538,42 +644,52 @@ try {
       throw "Microsoft.Winget.Client was not found. Check that the Windows Package Manager PowerShell module was installed correctly."
     }
   }
+  Write-Host '    [3/3] Repairing WinGet Package Manager...' -ForegroundColor Cyan
   Repair-WinGetPackageManager -Version $($script:AppInstallerReleaseTag)
+  Write-Host '    WinGet installed successfully!' -ForegroundColor Green -BackgroundColor DarkGreen
 }
 
-Write-Host @'
---> Disabling safety warning when running installers
-'@
-New-Item -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Policies\Associations' | Out-Null
-New-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Policies\Associations' -Name 'ModRiskFileTypes' -Type 'String' -Value '.bat;.exe;.reg;.vbs;.chm;.msi;.js;.cmd' | Out-Null
+Write-Host ''
+Write-Host '================================================' -ForegroundColor Cyan
+Write-Host '--> Configuring Windows Sandbox' -ForegroundColor Yellow
+Write-Host '================================================' -ForegroundColor Cyan
 
-Write-Host @'
-Tip: you can type 'Update-EnvironmentVariables' to update your environment variables, such as after installing a new software.
-'@
+Write-Host '    [1/2] Disabling safety warnings for installers...' -ForegroundColor Cyan
+New-Item -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Policies\Associations' -ErrorAction SilentlyContinue | Out-Null
+New-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Policies\Associations' -Name 'ModRiskFileTypes' -Type 'String' -Value '.bat;.exe;.reg;.vbs;.chm;.msi;.js;.cmd' -Force | Out-Null
 
-Write-Host @'
-
---> Configuring Winget
-'@
+Write-Host '    [2/2] Applying WinGet settings...' -ForegroundColor Cyan
 # Apply settings.json first so subsequent CLI toggles persist and are not overwritten
-Get-ChildItem -Filter 'settings.json' | Copy-Item -Destination C:\Users\WDAGUtilityAccount\AppData\Local\Packages\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe\LocalState\settings.json
-winget settings --Enable LocalManifestFiles
-winget settings --Enable LocalArchiveMalwareScanOverride
+Get-ChildItem -Filter 'settings.json' | Copy-Item -Destination C:\Users\WDAGUtilityAccount\AppData\Local\Packages\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe\LocalState\settings.json -ErrorAction SilentlyContinue
+winget settings --Enable LocalManifestFiles | Out-Null
+winget settings --Enable LocalArchiveMalwareScanOverride | Out-Null
 Set-WinHomeLocation -GeoID $($script:HostGeoID)
+Write-Host '    Configuration completed!' -ForegroundColor Green -BackgroundColor DarkGreen
+
+Write-Host ''
+Write-Host '================================================' -ForegroundColor Cyan
+Write-Host 'Tip: Type "Update-EnvironmentVariables" to refresh' -ForegroundColor Gray
+Write-Host 'environment variables after installing software.' -ForegroundColor Gray
+Write-Host '================================================' -ForegroundColor Cyan
+Write-Host ''
 
 `$BoundParameterScript = Get-ChildItem -Filter 'BoundParameterScript.ps1'
 if (`$BoundParameterScript) {
-    Write-Host @'
-
---> Running the following script: {
-`$(Get-Content -Path `$BoundParameterScript.FullName)
-}
-
-'@
-& `$BoundParameterScript.FullName
+    Write-Host ""
+    Write-Host "--> Running BoundParameterScript.ps1" -ForegroundColor Yellow
+    Write-Host ""
+    & `$BoundParameterScript.FullName
 }
 
 Pop-Location
+
+Write-Host ""
+Write-Host "================================================" -ForegroundColor Cyan
+Write-Host "Script execution completed!" -ForegroundColor Green
+Write-Host "================================================" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "Press any key to close this window..." -ForegroundColor Yellow
+`$null = `$Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
 "@ | Out-File -FilePath $(Join-Path -Path $script:TestDataFolder -ChildPath "$script:ScriptName.ps1")
 
                 Write-Verbose 'Creating WSB file for launching the sandbox'
@@ -603,7 +719,7 @@ Pop-Location
 $mappedFolders
   </MappedFolders>
   <LogonCommand>
-  <Command>PowerShell Start-Process PowerShell -WindowStyle Hidden -WorkingDirectory '$($script:SandboxWorkingDirectory)' -ArgumentList '-ExecutionPolicy Bypass -File $($script:SandboxBootstrapFile)'</Command>
+  <Command>PowerShell Start-Process PowerShell -WindowStyle Maximized -WorkingDirectory '$($script:SandboxWorkingDirectory)' -ArgumentList '-ExecutionPolicy Bypass -File $($script:SandboxBootstrapFile)'</Command>
   </LogonCommand>
 </Configuration>
 "@ | Out-File -FilePath $script:ConfigurationFile
