@@ -550,24 +550,29 @@ Start-Process "`$env:USERPROFILE\Desktop\`$SandboxFolderName\$selectedFile" -Wor
             $cmbWinGetVersion.Size = New-Object System.Drawing.Size($controlWidth, $controlHeight)
             $cmbWinGetVersion.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDown
             
-            # Fetch and populate WinGet versions
-            # Note: This makes a synchronous API call which may take 1-2 seconds
-            # If the call fails or times out, the dropdown will simply remain empty (user can still type manually)
-            Write-Verbose "Fetching stable WinGet versions for dropdown..."
-            $stableVersions = Get-StableWinGetVersions
-            
-            # Add empty option first (for "latest")
+            # Add empty option first (for "latest") - only item initially
             [void]$cmbWinGetVersion.Items.Add("")
-            
-            # Add fetched versions to the dropdown
-            foreach ($version in $stableVersions) {
-                [void]$cmbWinGetVersion.Items.Add($version)
-            }
-            
-            # Set default selection to empty (latest)
             $cmbWinGetVersion.SelectedIndex = 0
             
-            Write-Verbose "WinGet version dropdown populated with $($stableVersions.Count) stable versions"
+            # Use a flag to track if versions have been loaded
+            $script:versionsLoaded = $false
+            
+            # Lazy load versions only when user opens the dropdown
+            # This avoids unnecessary API calls when users just want the latest version
+            $cmbWinGetVersion.Add_DropDown({
+                if (-not $script:versionsLoaded) {
+                    Write-Verbose "Fetching stable WinGet versions for dropdown..."
+                    $stableVersions = Get-StableWinGetVersions
+                    
+                    # Add fetched versions to the dropdown
+                    foreach ($version in $stableVersions) {
+                        [void]$cmbWinGetVersion.Items.Add($version)
+                    }
+                    
+                    Write-Verbose "WinGet version dropdown populated with $($stableVersions.Count) stable versions"
+                    $script:versionsLoaded = $true
+                }
+            })
             
             $form.Controls.Add($cmbWinGetVersion)
 
