@@ -564,6 +564,7 @@ Start-Process "`$env:USERPROFILE\Desktop\`$SandboxFolderName\$selectedFile" -Wor
                     # Show loading indicator
                     $originalText = $cmbWinGetVersion.Text
                     $cmbWinGetVersion.Text = "Loading versions..."
+                    [System.Windows.Forms.Application]::DoEvents()  # Force UI update
                     
                     Write-Verbose "Fetching stable WinGet versions for dropdown..."
                     $stableVersions = Get-StableWinGetVersions
