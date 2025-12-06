@@ -6,7 +6,6 @@ function SandboxTest {
         [string] $SandboxFolderName,
         [string] $WinGetVersion,
         [switch] $Prerelease,
-        [switch] $EnableExperimentalFeatures,
         [switch] $Clean,
         [switch] $Async
     )
@@ -33,18 +32,15 @@ function SandboxTest {
 
     .PARAMETER Prerelease
     Include prerelease versions of WinGet.
-    
-    .PARAMETER EnableExperimentalFeatures
-    Enable experimental features in WinGet.
-    
+
     .PARAMETER Clean
     Clean existing cached dependencies before starting.
     
     .EXAMPLE
     SandboxTest -Script { Start-Process cmd.exe -ArgumentList "/c del /Q ""$env:USERPROFILE\Desktop\WAU-install\*.log"" & ""$env:USERPROFILE\Desktop\WAU-install\InstallWSB.cmd"" && explorer ""$env:USERPROFILE\Desktop\WAU-install""" } -Verbose
-    
+
     .EXAMPLE
-    SandboxTest -MapFolder "D:\WAU Settings GUI\msi\2.8.0" -EnableExperimentalFeatures
+    SandboxTest -MapFolder "D:\WAU Settings GUI\msi\2.8.0"
     #>
     
 
@@ -127,7 +123,25 @@ function SandboxTest {
 
     # Sandbox Settings
     $script:SandboxDesktopFolder = 'C:\Users\WDAGUtilityAccount\Desktop'
-    $sandboxLeaf = if ($SandboxFolderName) { $SandboxFolderName } elseif ($script:PrimaryMappedFolder) { ($script:PrimaryMappedFolder | Split-Path -Leaf) } else { '' }
+    $sandboxLeaf = if ($SandboxFolderName) {
+        $SandboxFolderName
+    } elseif ($script:PrimaryMappedFolder) {
+        $leaf = $script:PrimaryMappedFolder | Split-Path -Leaf
+        # Check if it's a root drive (contains : or is a path like D:\)
+        if (![string]::IsNullOrWhiteSpace($leaf) -and $leaf -notmatch ':' -and $leaf -ne '\') {
+            $leaf
+        } else {
+            # Root drive selected (e.g., D:\) - extract drive letter
+            $driveLetter = $script:PrimaryMappedFolder.TrimEnd('\').Replace(':', '')
+            if (![string]::IsNullOrWhiteSpace($driveLetter)) {
+                "Drive_$driveLetter"
+            } else {
+                'MappedFolder'
+            }
+        }
+    } else {
+        ''
+    }
     $script:SandboxWorkingDirectory = if ($script:PrimaryMappedFolder) { Join-Path -Path $script:SandboxDesktopFolder -ChildPath $sandboxLeaf } else { $script:SandboxDesktopFolder }
     $script:SandboxTestDataFolder = Join-Path -Path $script:SandboxDesktopFolder -ChildPath $($script:TestDataFolder | Split-Path -Leaf)
     $script:SandboxBootstrapFile = Join-Path -Path $script:SandboxTestDataFolder -ChildPath "$script:ScriptName.ps1"
@@ -141,27 +155,12 @@ function SandboxTest {
     $script:HttpClient = New-Object System.Net.Http.HttpClient
     $script:CleanupPaths = @()
 
-    # The experimental features get updated later based on a switch that is set
     $script:SandboxWinGetSettings = @{
-        '$schema'            = 'https://aka.ms/winget-settings.schema.json'
-        logging              = @{
+        '$schema' = 'https://aka.ms/winget-settings.schema.json'
+        logging   = @{
             level = 'verbose'
         }
-        experimentalFeatures = @{
-            fonts = $false
-        }
     }
-
-    # Default list of experimental features to enable when -EnableExperimentalFeatures is used.
-    # Note: Winget will ignore unknown keys based on the active schema. This list is conservative and safe.
-    $script:ExperimentalFeaturesList = @(
-        'fonts',              # Already present; improves font handling scenarios
-        'dependencies',       # Enable dependency support in manifests
-        'directMSI',          # Allow direct MSI handling improvements
-        'unpackagedInstall',  # Support for unpackaged installers
-        'restSource',         # Enable REST source (newer source protocol)
-        'zipInstall'          # Allow zip-based installer flows
-    )
 
     # Helper Functions
     function Invoke-CleanExit {
@@ -479,15 +478,6 @@ $ Enable-WindowsOptionalFeature -Online -FeatureName 'Containers-DisposableClien
 
         if (!(Initialize-Folder $script:TestDataFolder)) { throw 'Could not create folder for mapping files into the sandbox' }
         if (!(Initialize-Folder $script:DependenciesCacheFolder)) { throw 'Could not create folder for caching dependencies' }
-
-        if ($EnableExperimentalFeatures) {
-            Write-Debug 'Setting Experimental Features to Enabled'
-            foreach ($feature in $script:ExperimentalFeaturesList) {
-                # Ensure the key exists and is set to true in the JSON that will be copied into the Sandbox
-                $script:SandboxWinGetSettings.experimentalFeatures[$feature] = $true
-            }
-            Write-Verbose ("Enabled experimental features: {0}" -f ($script:ExperimentalFeaturesList -join ', '))
-        }
 
         Write-Verbose "Copying assets into $script:TestDataFolder"
         $script:SandboxWinGetSettings | ConvertTo-Json | Out-File -FilePath (Join-Path -Path $script:TestDataFolder -ChildPath 'settings.json') -Encoding ascii

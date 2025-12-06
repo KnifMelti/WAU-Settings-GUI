@@ -260,7 +260,7 @@ Install.* = Installer.ps1
             # Create the main form
             $form = New-Object System.Windows.Forms.Form
             $form.Text = "Windows Sandbox Test Configuration"
-            $form.Size = New-Object System.Drawing.Size(450, 695)
+            $form.Size = New-Object System.Drawing.Size(450, 665)
             $form.StartPosition = "CenterScreen"
             $form.FormBorderStyle = "FixedDialog"
             $form.MaximizeBox = $false
@@ -328,8 +328,17 @@ Install.* = Installer.ps1
                         $txtSandboxFolderName.Text = "WAU-install"
                     } else {
                         $folderName = Split-Path $selectedDir -Leaf
-                        if (![string]::IsNullOrWhiteSpace($folderName)) {
+                        # Check if it's a root drive (contains : or is a path like D:\)
+                        if (![string]::IsNullOrWhiteSpace($folderName) -and $folderName -notmatch ':' -and $folderName -ne '\') {
                             $txtSandboxFolderName.Text = $folderName
+                        } else {
+                            # Root drive selected (e.g., D:\) - use drive letter as folder name
+                            $driveLetter = $selectedDir.TrimEnd('\').Replace(':', '')
+                            if (![string]::IsNullOrWhiteSpace($driveLetter)) {
+                                $txtSandboxFolderName.Text = "Drive_$driveLetter"
+                            } else {
+                                $txtSandboxFolderName.Text = "MappedFolder"
+                            }
                         }
                     }
                     
@@ -395,8 +404,17 @@ Install.* = Installer.ps1
                     
                     # Update sandbox folder name based on directory only (no WAU detection)
                     $folderName = Split-Path $selectedDir -Leaf
-                    if (![string]::IsNullOrWhiteSpace($folderName)) {
+                    # Check if it's a root drive (contains : or is a path like D:\)
+                    if (![string]::IsNullOrWhiteSpace($folderName) -and $folderName -notmatch ':' -and $folderName -ne '\') {
                         $txtSandboxFolderName.Text = $folderName
+                    } else {
+                        # Root drive selected (e.g., D:\) - use drive letter as folder name
+                        $driveLetter = $selectedDir.TrimEnd('\').Replace(':', '')
+                        if (![string]::IsNullOrWhiteSpace($driveLetter)) {
+                            $txtSandboxFolderName.Text = "Drive_$driveLetter"
+                        } else {
+                            $txtSandboxFolderName.Text = "MappedFolder"
+                        }
                     }
                     
                     # Generate script for selected file directly (no folder content detection)
@@ -454,7 +472,19 @@ Start-Process "`$env:USERPROFILE\Desktop\`$SandboxFolderName\$selectedFile" -Wor
             if ($msiFiles) {
                 $txtSandboxFolderName.Text = "WAU-install"
             } else {
-                $txtSandboxFolderName.Text = Split-Path $txtMapFolder.Text -Leaf
+                $initialFolderName = Split-Path $txtMapFolder.Text -Leaf
+                # Check if it's a root drive (contains : or is a path like D:\)
+                if (![string]::IsNullOrWhiteSpace($initialFolderName) -and $initialFolderName -notmatch ':' -and $initialFolderName -ne '\') {
+                    $txtSandboxFolderName.Text = $initialFolderName
+                } else {
+                    # Root drive - extract drive letter
+                    $driveLetter = $txtMapFolder.Text.TrimEnd('\').Replace(':', '')
+                    if (![string]::IsNullOrWhiteSpace($driveLetter)) {
+                        $txtSandboxFolderName.Text = "Drive_$driveLetter"
+                    } else {
+                        $txtSandboxFolderName.Text = "MappedFolder"
+                    }
+                }
             }
 
             # Add event handler to update script when folder name changes
@@ -490,15 +520,6 @@ Start-Process "`$env:USERPROFILE\Desktop\`$SandboxFolderName\$selectedFile" -Wor
             $chkPrerelease.Size = New-Object System.Drawing.Size(200, $labelHeight)
             $chkPrerelease.Text = "Prerelease (of WinGet)"
             $form.Controls.Add($chkPrerelease)
-
-            $y += $labelHeight + 5
-
-            $chkEnableExperimentalFeatures = New-Object System.Windows.Forms.CheckBox
-            $chkEnableExperimentalFeatures.Location = New-Object System.Drawing.Point($leftMargin, $y)
-            $chkEnableExperimentalFeatures.Size = New-Object System.Drawing.Size(250, $labelHeight)
-            $chkEnableExperimentalFeatures.Text = "Enable Experimental Features (in WinGet)"
-            $chkEnableExperimentalFeatures.Checked = $true
-            $form.Controls.Add($chkEnableExperimentalFeatures)
 
             $y += $labelHeight + 5
 
@@ -680,7 +701,6 @@ Start-Process "`$env:USERPROFILE\Desktop\`$SandboxFolderName\$selectedFile" -Wor
                     SandboxFolderName = $txtSandboxFolderName.Text
                     WinGetVersion = $txtWinGetVersion.Text
                     Prerelease = $chkPrerelease.Checked
-                    EnableExperimentalFeatures = $chkEnableExperimentalFeatures.Checked
                     Clean = $chkClean.Checked
                     Async = $chkAsync.Checked
                     Verbose = $chkVerbose.Checked
@@ -739,7 +759,6 @@ Start-Process "`$env:USERPROFILE\Desktop\`$SandboxFolderName\$selectedFile" -Wor
             $sandboxParams.WinGetVersion = $dialogResult.WinGetVersion
         }
         if ($dialogResult.Prerelease) { $sandboxParams.Prerelease = $true }
-        if ($dialogResult.EnableExperimentalFeatures) { $sandboxParams.EnableExperimentalFeatures = $true }
         if ($dialogResult.Clean) { $sandboxParams.Clean = $true }
         if ($dialogResult.Async) { $sandboxParams.Async = $true }
         if ($dialogResult.Verbose) { $sandboxParams.Verbose = $true }
@@ -3305,7 +3324,7 @@ function Start-WSBTesting {
                 . $WorkingDir\SandboxTest.ps1
 
                 # Call the function
-                SandboxTest -MapFolder $msiDirectory -SandboxFolderName "WAU-install" -EnableExperimentalFeatures -Script {
+                SandboxTest -MapFolder $msiDirectory -SandboxFolderName "WAU-install" -Script {
                     $SandboxFolderName = "WAU-install"
                     Start-Process cmd.exe -ArgumentList "/c del /Q `"$env:USERPROFILE\Desktop\$SandboxFolderName\*.log`" & `"$env:USERPROFILE\Desktop\$SandboxFolderName\InstallWSB.cmd`" && explorer `"$env:USERPROFILE\Desktop\$SandboxFolderName`""
                 } -Async -Verbose
