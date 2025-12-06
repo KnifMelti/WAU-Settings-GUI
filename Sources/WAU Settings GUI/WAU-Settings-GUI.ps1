@@ -186,11 +186,13 @@ Install.* = Installer.ps1
         #>
         try {
             # Request 30 releases to ensure we get 10 stable ones after filtering pre-releases
+            # Assumption: Among the 30 most recent releases, at least 10 will be stable (non-prerelease)
+            # This is typically true for the winget-cli repository which has regular stable releases
             $releasesApiUrl = 'https://api.github.com/repos/microsoft/winget-cli/releases?per_page=30'
             Write-Verbose "Fetching WinGet releases from GitHub API..."
             
-            # Fetch releases from GitHub API
-            $releases = Invoke-RestMethod -Uri $releasesApiUrl -ErrorAction Stop
+            # Fetch releases from GitHub API with timeout and User-Agent header
+            $releases = Invoke-RestMethod -Uri $releasesApiUrl -TimeoutSec 10 -UserAgent "WAU-Settings-GUI" -ErrorAction Stop
             
             # Filter to only stable releases (not prerelease) and get top 10
             $stableReleases = $releases | Where-Object { -not $_.prerelease } | Select-Object -First 10
@@ -549,6 +551,8 @@ Start-Process "`$env:USERPROFILE\Desktop\`$SandboxFolderName\$selectedFile" -Wor
             $cmbWinGetVersion.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDown
             
             # Fetch and populate WinGet versions
+            # Note: This makes a synchronous API call which may take 1-2 seconds
+            # If the call fails or times out, the dropdown will simply remain empty (user can still type manually)
             Write-Verbose "Fetching stable WinGet versions for dropdown..."
             $stableVersions = Get-StableWinGetVersions
             
@@ -562,6 +566,8 @@ Start-Process "`$env:USERPROFILE\Desktop\`$SandboxFolderName\$selectedFile" -Wor
             
             # Set default selection to empty (latest)
             $cmbWinGetVersion.SelectedIndex = 0
+            
+            Write-Verbose "WinGet version dropdown populated with $($stableVersions.Count) stable versions"
             
             $form.Controls.Add($cmbWinGetVersion)
 
