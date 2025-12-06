@@ -5270,7 +5270,7 @@ function Show-WAUSettingsGUI {
                 } else {
                     # External path is set but cannot be opened (URL or AzureBlob) - ask to open local instead
                     $result = [System.Windows.MessageBox]::Show(
-                        "External mods path cannot be opened because it is a URL or AzureBlob ('$modsPath').`n`nDo you want to open the local mods folder instead?`n`nNote: Any changes made there will be overwritten by WAU.",
+                        "External mods path cannot be opened because it is a URL or AzureBlob ('$modsPath').`n`nDo you want to open the local mods folder instead?`n`nNote: Any changes made there will be overwritten by WAU (if newer external)!",
                         "Cannot Open External Path",
                         "OKCancel",
                         "Question"
@@ -5409,7 +5409,7 @@ function Show-WAUSettingsGUI {
                 } else {
                     # External path is set but cannot be opened (URL or AzureBlob) - ask to open local instead
                     $result = [System.Windows.MessageBox]::Show(
-                        "External list path cannot be opened because it is a URL ('$listPath').`n`nDo you want to open the local list instead?`n`nNote: Any changes made there will be overwritten by WAU.",
+                        "External list path cannot be opened because it is a URL ('$listPath').`n`nDo you want to open the local list instead?`n`nNote: Any changes made there will be overwritten by WAU (if newer external)!",
                         "Cannot Open External Path",
                         "OKCancel",
                         "Question"
