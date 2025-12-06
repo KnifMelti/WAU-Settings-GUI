@@ -566,23 +566,29 @@ Start-Process "`$env:USERPROFILE\Desktop\`$SandboxFolderName\$selectedFile" -Wor
                     $cmbWinGetVersion.Text = "Loading versions..."
                     [System.Windows.Forms.Application]::DoEvents()  # Force UI update
                     
-                    Write-Verbose "Fetching stable WinGet versions for dropdown..."
-                    $stableVersions = Get-StableWinGetVersions
-                    
-                    # Add fetched versions to the dropdown
-                    foreach ($version in $stableVersions) {
-                        [void]$cmbWinGetVersion.Items.Add($version)
+                    try {
+                        Write-Verbose "Fetching stable WinGet versions for dropdown..."
+                        $stableVersions = Get-StableWinGetVersions
+                        
+                        # Add fetched versions to the dropdown
+                        foreach ($version in $stableVersions) {
+                            [void]$cmbWinGetVersion.Items.Add($version)
+                        }
+                        
+                        Write-Verbose "WinGet version dropdown populated with $($stableVersions.Count) stable versions"
                     }
-                    
-                    # Restore original text or clear if it was "Loading versions..."
-                    if ($originalText -ne "Loading versions...") {
-                        $cmbWinGetVersion.Text = $originalText
-                    } else {
-                        $cmbWinGetVersion.Text = ""
+                    catch {
+                        Write-Warning "Failed to populate WinGet versions dropdown: $($_.Exception.Message)"
                     }
-                    
-                    Write-Verbose "WinGet version dropdown populated with $($stableVersions.Count) stable versions"
-                    $cmbWinGetVersion.Tag = $true
+                    finally {
+                        # Always restore original text and mark as loaded, even if API call failed
+                        if ($originalText -ne "Loading versions...") {
+                            $cmbWinGetVersion.Text = $originalText
+                        } else {
+                            $cmbWinGetVersion.Text = ""
+                        }
+                        $cmbWinGetVersion.Tag = $true
+                    }
                 }
             })
             
