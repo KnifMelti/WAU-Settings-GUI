@@ -554,13 +554,17 @@ Start-Process "`$env:USERPROFILE\Desktop\`$SandboxFolderName\$selectedFile" -Wor
             [void]$cmbWinGetVersion.Items.Add("")
             $cmbWinGetVersion.SelectedIndex = 0
             
-            # Use a flag to track if versions have been loaded
-            $script:versionsLoaded = $false
-            
             # Lazy load versions only when user opens the dropdown
             # This avoids unnecessary API calls when users just want the latest version
+            # Use Tag property to track if versions have been loaded (avoids script-scope issues)
+            $cmbWinGetVersion.Tag = $false
+            
             $cmbWinGetVersion.Add_DropDown({
-                if (-not $script:versionsLoaded) {
+                if (-not $cmbWinGetVersion.Tag) {
+                    # Show loading indicator
+                    $originalText = $cmbWinGetVersion.Text
+                    $cmbWinGetVersion.Text = "Loading versions..."
+                    
                     Write-Verbose "Fetching stable WinGet versions for dropdown..."
                     $stableVersions = Get-StableWinGetVersions
                     
@@ -569,8 +573,15 @@ Start-Process "`$env:USERPROFILE\Desktop\`$SandboxFolderName\$selectedFile" -Wor
                         [void]$cmbWinGetVersion.Items.Add($version)
                     }
                     
+                    # Restore original text or clear if it was "Loading versions..."
+                    if ($originalText -ne "Loading versions...") {
+                        $cmbWinGetVersion.Text = $originalText
+                    } else {
+                        $cmbWinGetVersion.Text = ""
+                    }
+                    
                     Write-Verbose "WinGet version dropdown populated with $($stableVersions.Count) stable versions"
-                    $script:versionsLoaded = $true
+                    $cmbWinGetVersion.Tag = $true
                 }
             })
             
