@@ -185,7 +185,8 @@ Install.* = Installer.ps1
         Array of version strings (e.g., "v1.7.10514", "v1.7.10582")
         #>
         try {
-            $releasesApiUrl = 'https://api.github.com/repos/microsoft/winget-cli/releases?per_page=100'
+            # Request 30 releases to ensure we get 10 stable ones after filtering pre-releases
+            $releasesApiUrl = 'https://api.github.com/repos/microsoft/winget-cli/releases?per_page=30'
             Write-Verbose "Fetching WinGet releases from GitHub API..."
             
             # Fetch releases from GitHub API
@@ -552,11 +553,11 @@ Start-Process "`$env:USERPROFILE\Desktop\`$SandboxFolderName\$selectedFile" -Wor
             $stableVersions = Get-StableWinGetVersions
             
             # Add empty option first (for "latest")
-            $cmbWinGetVersion.Items.Add("") | Out-Null
+            [void]$cmbWinGetVersion.Items.Add("")
             
             # Add fetched versions to the dropdown
             foreach ($version in $stableVersions) {
-                $cmbWinGetVersion.Items.Add($version) | Out-Null
+                [void]$cmbWinGetVersion.Items.Add($version)
             }
             
             # Set default selection to empty (latest)
