@@ -605,7 +605,7 @@ function Update-EnvironmentVariables {
 Push-Location $($script:SandboxTestDataFolder)
 
 Write-Host '================================================' -ForegroundColor Cyan
-Write-Host '--> Installing WinGet' -ForegroundColor Yellow
+Write-Host '--> Installing WinGet $($script:AppInstallerReleaseTag)' -ForegroundColor Yellow
 Write-Host '================================================' -ForegroundColor Cyan
 
 try {
