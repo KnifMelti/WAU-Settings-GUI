@@ -112,6 +112,7 @@ This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **
       - **Installer**: if the chosen folder contains `install.*`
       - **Explorer**: a general script opening the selected mapped folder in **WSB**
 - A file browser for specifically selecting the file to run is also included
+- The preconfigured **Windows Sandbox (WSB)** started is in my opinion a perfect platform with downloadable tools for testing anything as a developer
 
 ### Uninstallation
 - Use **[Programs and Features](#uninstallation-1)** in **Control Panel** to uninstall **KnifMelti WAU Settings GUI**
