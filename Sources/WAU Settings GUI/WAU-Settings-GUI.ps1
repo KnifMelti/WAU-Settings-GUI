@@ -175,27 +175,27 @@ Install.* = Installer.ps1
     function Get-StableWinGetVersions {
         <#
         .SYNOPSIS
-        Fetches the 10 most recent stable WinGet versions from GitHub
+        Fetches the 25 most recent stable WinGet versions from GitHub
         
         .DESCRIPTION
         Queries the GitHub API for microsoft/winget-cli releases and returns
-        the tag names of the 10 most recent stable (non-prerelease) versions
+        the tag names of the 25 most recent stable (non-prerelease) versions
         
         .OUTPUTS
         Array of version strings (e.g., "v1.7.10514", "v1.7.10582")
         #>
         try {
-            # Request 30 releases to ensure we get 10 stable ones after filtering pre-releases
-            # Assumption: Among the 30 most recent releases, at least 10 will be stable (non-prerelease)
+            # Request 100 releases to ensure we get 25 stable ones after filtering pre-releases
+            # Assumption: Among the 100 most recent releases, at least 25 will be stable (non-prerelease)
             # This is typically true for the winget-cli repository which has regular stable releases
-            $releasesApiUrl = 'https://api.github.com/repos/microsoft/winget-cli/releases?per_page=30'
+            $releasesApiUrl = 'https://api.github.com/repos/microsoft/winget-cli/releases?per_page=100'
             Write-Verbose "Fetching WinGet releases from GitHub API..."
             
             # Fetch releases from GitHub API with timeout and User-Agent header
             $releases = Invoke-RestMethod -Uri $releasesApiUrl -TimeoutSec 10 -UserAgent "WAU-Settings-GUI" -ErrorAction Stop
             
-            # Filter to only stable releases (not prerelease) and get top 10
-            $stableReleases = $releases | Where-Object { -not $_.prerelease } | Select-Object -First 10
+            # Filter to only stable releases (not prerelease) and get top 25
+            $stableReleases = $releases | Where-Object { -not $_.prerelease } | Select-Object -First 25
             
             # Extract tag names (e.g., "v1.7.10514")
             $versions = $stableReleases | ForEach-Object { $_.tag_name }
@@ -206,6 +206,58 @@ Install.* = Installer.ps1
         catch {
             Write-Warning "Failed to fetch WinGet versions from GitHub: $($_.Exception.Message)"
             return @()
+        }
+    }
+    
+    # Helper function to validate WinGet version exists
+    function Test-WinGetVersionExists {
+        <#
+        .SYNOPSIS
+        Validates if a WinGet version exists in the GitHub repository
+        
+        .PARAMETER Version
+        The version string to validate (e.g., "1.23", "v1.7.10514")
+        
+        .PARAMETER IncludePrerelease
+        Include prerelease versions in the search
+        
+        .OUTPUTS
+        Boolean indicating if the version exists
+        #>
+        param(
+            [Parameter(Mandatory = $true)]
+            [string]$Version,
+            
+            [Parameter(Mandatory = $false)]
+            [bool]$IncludePrerelease = $false
+        )
+        
+        try {
+            $releasesApiUrl = 'https://api.github.com/repos/microsoft/winget-cli/releases?per_page=100'
+            Write-Verbose "Validating WinGet version: $Version"
+            
+            $releases = Invoke-RestMethod -Uri $releasesApiUrl -TimeoutSec 10 -UserAgent "WAU-Settings-GUI" -ErrorAction Stop
+            
+            if (-not $IncludePrerelease) {
+                $releases = $releases | Where-Object { -not $_.prerelease }
+            }
+            
+            # Check if version matches any tag_name (with or without 'v' prefix)
+            $versionPattern = '^v?' + [regex]::Escape($Version)
+            $matchingRelease = $releases | Where-Object { $_.tag_name -match $versionPattern } | Select-Object -First 1
+            
+            if ($matchingRelease) {
+                Write-Verbose "Found matching release: $($matchingRelease.tag_name)"
+                return $true
+            } else {
+                Write-Verbose "No matching release found for version: $Version"
+                return $false
+            }
+        }
+        catch {
+            Write-Warning "Failed to validate WinGet version: $($_.Exception.Message)"
+            # On error, assume version might be valid (fail open)
+            return $true
         }
     }
 
@@ -827,6 +879,31 @@ Start-Process "`$env:USERPROFILE\Desktop\`$SandboxFolderName\$selectedFile" -Wor
     # Show configuration dialog
     $dialogResult = Show-SandboxTestDialog
     if ($dialogResult.DialogResult -eq 'OK') {
+        # Validate WinGet version if one was specified
+        if (![string]::IsNullOrWhiteSpace($dialogResult.WinGetVersion)) {
+            Write-Verbose "Validating WinGet version: $($dialogResult.WinGetVersion)"
+            $versionExists = Test-WinGetVersionExists -Version $dialogResult.WinGetVersion -IncludePrerelease $dialogResult.Prerelease
+            
+            if (-not $versionExists) {
+                $result = [System.Windows.Forms.MessageBox]::Show(
+                    "The specified WinGet version '$($dialogResult.WinGetVersion)' was not found in the GitHub repository.`n`nDo you want to try anyway?`n`nClick 'OK' to return to the configuration dialog and change the version.`nClick 'Cancel' to exit.",
+                    "Invalid WinGet Version",
+                    [System.Windows.Forms.MessageBoxButtons]::OKCancel,
+                    [System.Windows.Forms.MessageBoxIcon]::Warning
+                )
+                
+                if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
+                    # Return to the dialog by recursively calling the function
+                    # This allows the user to correct the version
+                    . $MyInvocation.MyCommand.Path -SandboxTest
+                    return
+                } else {
+                    # User chose Cancel - exit the script
+                    exit
+                }
+            }
+        }
+        
         # Build parameters for SandboxTest
         $sandboxParams = @{
             MapFolder = $dialogResult.MapFolder
