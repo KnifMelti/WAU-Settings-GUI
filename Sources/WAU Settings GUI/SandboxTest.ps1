@@ -511,11 +511,26 @@ function Add-Shortcut ($Target, $Shortcut, $Arguments, $Icon, $Description, $Win
     $Shortcut.Save()
 }
 
+# Create NirSoft shortcut folder on desktop with custom icon
+$nirSoftFolder = "${env:Public}\Desktop\NirSoft Utilities"
+if (!(Test-Path $nirSoftFolder)) {
+    New-Item -Path $nirSoftFolder -ItemType Directory -Force | Out-Null
+    
+    # Set custom folder icon using desktop.ini
+    $desktopIniPath = Join-Path $nirSoftFolder "desktop.ini"
+    "[.ShellClassInfo]`r`nIconResource=${env:SystemRoot}\System32\SHELL32.dll,14`r`nInfoTip=Download and run NirSoft utilities" | Out-File -FilePath $desktopIniPath -Encoding ASCII -Force
+    
+    # Use attrib.exe to set attributes (more reliable in Sandbox)
+    & attrib.exe +H +S "$desktopIniPath" 2>$null
+    & attrib.exe +R "$nirSoftFolder" 2>$null
+}
+
 # Create non-WAU shortcuts
-Add-Shortcut "${env:SystemRoot}\System32\WindowsPowerShell\v1.0\powershell.exe" "${env:Public}\Desktop\CTT Windows Utility.lnk" "-ExecutionPolicy Bypass -Command `"Start-Process powershell.exe -verb runas -ArgumentList 'irm https://christitus.com/win | iex'`"" "${env:SystemRoot}\System32\SHELL32.dll,43" "Chris Titus Tech Windows Utility"
-Add-Shortcut "${env:SystemRoot}\System32\WindowsPowerShell\v1.0\powershell.exe" "${env:Public}\Desktop\Uninstall View.lnk" "-ExecutionPolicy Bypass -WindowStyle Hidden -Command `"if(!(Test-Path '${env:TEMP}\UninstallView\UninstallView.exe')){Invoke-WebRequest -Uri 'https://www.nirsoft.net/utils/uninstallview-x64.zip' -OutFile '${env:TEMP}\uninstallview-x64.zip' -UseBasicParsing;Expand-Archive -Path '${env:TEMP}\uninstallview-x64.zip' -DestinationPath '${env:TEMP}\UninstallView' -Force};ie4uinit.exe -Show;Start-Process '${env:TEMP}\UninstallView\UninstallView.exe' -Verb RunAs`"" "${env:TEMP}\UninstallView\UninstallView.exe,0" "NirSoft UninstallView" "Minimized"
-Add-Shortcut "${env:SystemRoot}\System32\WindowsPowerShell\v1.0\powershell.exe" "${env:Public}\Desktop\Advanced Run.lnk" "-ExecutionPolicy Bypass -WindowStyle Hidden -Command `"if(!(Test-Path '${env:TEMP}\AdvancedRun\AdvancedRun.exe')){Invoke-WebRequest -Uri 'https://www.nirsoft.net/utils/advancedrun-x64.zip' -OutFile '${env:TEMP}\advancedrun-x64.zip' -UseBasicParsing;Expand-Archive -Path '${env:TEMP}\advancedrun-x64.zip' -DestinationPath '${env:TEMP}\AdvancedRun' -Force};ie4uinit.exe -Show;Start-Process '${env:TEMP}\AdvancedRun\AdvancedRun.exe' -Verb RunAs`"" "${env:TEMP}\AdvancedRun\AdvancedRun.exe,0" "NirSoft AdvancedRun" "Minimized"
-Add-Shortcut "${env:windir}\regedit.exe" "${env:Public}\Desktop\Registry Editor.lnk"
+Add-Shortcut "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe" "${env:Public}\Desktop\Sysinternals Live.lnk" "https://live.sysinternals.com/" "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe,5" "Download and run from Sysinternals Live" "Normal"
+Add-Shortcut "${env:SystemRoot}\System32\WindowsPowerShell\v1.0\powershell.exe" "${env:Public}\Desktop\CTT Windows Utility.lnk" "-ExecutionPolicy Bypass -Command `"Start-Process powershell.exe -verb runas -ArgumentList 'irm https://christitus.com/win | iex'`"" "${env:SystemRoot}\System32\SHELL32.dll,43" "Run Chris Titus Tech's Windows Utility"
+Add-Shortcut "${env:SystemRoot}\System32\WindowsPowerShell\v1.0\powershell.exe" "$nirSoftFolder\UninstallView.lnk" "-ExecutionPolicy Bypass -WindowStyle Hidden -Command `"if(!(Test-Path '${env:TEMP}\UninstallView\UninstallView.exe')){Invoke-WebRequest -Uri 'https://www.nirsoft.net/utils/uninstallview-x64.zip' -OutFile '${env:TEMP}\uninstallview-x64.zip' -UseBasicParsing;Expand-Archive -Path '${env:TEMP}\uninstallview-x64.zip' -DestinationPath '${env:TEMP}\UninstallView' -Force};[System.Windows.Forms.SendKeys]::SendWait('{F5}');Start-Process '${env:TEMP}\UninstallView\UninstallView.exe' -Verb RunAs`"" "${env:TEMP}\UninstallView\UninstallView.exe,0" "Download and run UninstallView" "Minimized"
+Add-Shortcut "${env:SystemRoot}\System32\WindowsPowerShell\v1.0\powershell.exe" "$nirSoftFolder\AdvancedRun.lnk" "-ExecutionPolicy Bypass -WindowStyle Hidden -Command `"if(!(Test-Path '${env:TEMP}\AdvancedRun\AdvancedRun.exe')){Invoke-WebRequest -Uri 'https://www.nirsoft.net/utils/advancedrun-x64.zip' -OutFile '${env:TEMP}\advancedrun-x64.zip' -UseBasicParsing;Expand-Archive -Path '${env:TEMP}\advancedrun-x64.zip' -DestinationPath '${env:TEMP}\AdvancedRun' -Force};[System.Windows.Forms.SendKeys]::SendWait('{F5}');Start-Process '${env:TEMP}\AdvancedRun\AdvancedRun.exe' -Verb RunAs`"" "${env:TEMP}\AdvancedRun\AdvancedRun.exe,0" "Download and run AdvancedRun" "Minimized"
+Add-Shortcut "${env:windir}\regedit.exe" "${env:Public}\Desktop\Registry Editor.lnk" "" "" "Open Registry Editor" "Normal"
 
 # Configure Explorer settings
 reg.exe add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v HideFileExt /t REG_DWORD /d 0 /f | Out-Null
