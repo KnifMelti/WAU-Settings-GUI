@@ -513,8 +513,8 @@ function Add-Shortcut ($Target, $Shortcut, $Arguments, $Icon, $Description, $Win
 
 # Create non-WAU shortcuts
 Add-Shortcut "${env:SystemRoot}\System32\WindowsPowerShell\v1.0\powershell.exe" "${env:Public}\Desktop\CTT Windows Utility.lnk" "-ExecutionPolicy Bypass -Command `"Start-Process powershell.exe -verb runas -ArgumentList 'irm https://christitus.com/win | iex'`"" "${env:SystemRoot}\System32\SHELL32.dll,43" "Chris Titus Tech Windows Utility"
-Add-Shortcut "${env:SystemRoot}\System32\WindowsPowerShell\v1.0\powershell.exe" "${env:Public}\Desktop\Uninstall View.lnk" "-ExecutionPolicy Bypass -WindowStyle Hidden -Command `"if(!(Test-Path '${env:TEMP}\UninstallView\UninstallView.exe')){Invoke-WebRequest -Uri 'https://www.nirsoft.net/utils/uninstallview-x64.zip' -OutFile '${env:TEMP}\uninstallview-x64.zip' -UseBasicParsing;Expand-Archive -Path '${env:TEMP}\uninstallview-x64.zip' -DestinationPath '${env:TEMP}\UninstallView' -Force};Start-Process '${env:TEMP}\UninstallView\UninstallView.exe' -Verb RunAs`"" "${env:TEMP}\UninstallView\UninstallView.exe,0" "NirSoft UninstallView" "Minimized"
-Add-Shortcut "${env:SystemRoot}\System32\WindowsPowerShell\v1.0\powershell.exe" "${env:Public}\Desktop\Advanced Run.lnk" "-ExecutionPolicy Bypass -WindowStyle Hidden -Command `"if(!(Test-Path '${env:TEMP}\AdvancedRun\AdvancedRun.exe')){Invoke-WebRequest -Uri 'https://www.nirsoft.net/utils/advancedrun-x64.zip' -OutFile '${env:TEMP}\advancedrun-x64.zip' -UseBasicParsing;Expand-Archive -Path '${env:TEMP}\advancedrun-x64.zip' -DestinationPath '${env:TEMP}\AdvancedRun' -Force};Start-Process '${env:TEMP}\AdvancedRun\AdvancedRun.exe' -Verb RunAs`"" "${env:TEMP}\AdvancedRun\AdvancedRun.exe,0" "NirSoft AdvancedRun" "Minimized"
+Add-Shortcut "${env:SystemRoot}\System32\WindowsPowerShell\v1.0\powershell.exe" "${env:Public}\Desktop\Uninstall View.lnk" "-ExecutionPolicy Bypass -WindowStyle Hidden -Command `"if(!(Test-Path '${env:TEMP}\UninstallView\UninstallView.exe')){Invoke-WebRequest -Uri 'https://www.nirsoft.net/utils/uninstallview-x64.zip' -OutFile '${env:TEMP}\uninstallview-x64.zip' -UseBasicParsing;Expand-Archive -Path '${env:TEMP}\uninstallview-x64.zip' -DestinationPath '${env:TEMP}\UninstallView' -Force};ie4uinit.exe -Show;Start-Process '${env:TEMP}\UninstallView\UninstallView.exe' -Verb RunAs`"" "${env:TEMP}\UninstallView\UninstallView.exe,0" "NirSoft UninstallView" "Minimized"
+Add-Shortcut "${env:SystemRoot}\System32\WindowsPowerShell\v1.0\powershell.exe" "${env:Public}\Desktop\Advanced Run.lnk" "-ExecutionPolicy Bypass -WindowStyle Hidden -Command `"if(!(Test-Path '${env:TEMP}\AdvancedRun\AdvancedRun.exe')){Invoke-WebRequest -Uri 'https://www.nirsoft.net/utils/advancedrun-x64.zip' -OutFile '${env:TEMP}\advancedrun-x64.zip' -UseBasicParsing;Expand-Archive -Path '${env:TEMP}\advancedrun-x64.zip' -DestinationPath '${env:TEMP}\AdvancedRun' -Force};ie4uinit.exe -Show;Start-Process '${env:TEMP}\AdvancedRun\AdvancedRun.exe' -Verb RunAs`"" "${env:TEMP}\AdvancedRun\AdvancedRun.exe,0" "NirSoft AdvancedRun" "Minimized"
 Add-Shortcut "${env:windir}\regedit.exe" "${env:Public}\Desktop\Registry Editor.lnk"
 
 # Configure Explorer settings
@@ -531,6 +531,16 @@ Get-Process explorer -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorA
 Start-Sleep -Milliseconds 500
 ie4uinit.exe -Show
 
+# Create UninstallView configuration folder and config file
+$uninstallViewFolder = "${env:TEMP}\UninstallView"
+if (!(Test-Path $uninstallViewFolder)) {
+    New-Item -Path $uninstallViewFolder -ItemType Directory -Force | Out-Null
+}
+
+# Create UninstallView.cfg with configuration
+$uninstallViewConfig = "[General]`r`nMarkOddEvenRows=1`r`nShowGridLines=1`r`nShowInfoTip=1`r`nUseQuickFilter=1`r`nQuickFilterColumnsMode=1`r`nQuickFilterFindMode=1`r`nQuickFilterShowHide=1`r`nLoadFrom=1`r`nLoadingSpeed=1`r`nShowSystemComponents=1`r`nRegEditOpenMode=1`r`nAddExportHeaderLine=1`r`nSort=4099"
+$uninstallViewConfig | Out-File -FilePath (Join-Path $uninstallViewFolder "UninstallView.cfg") -Encoding ASCII -Force
+
 '@
 
         $sandboxPostInstallScript = @'
@@ -539,8 +549,19 @@ ie4uinit.exe -Show
 # Create WAU-specific shortcuts and registry settings (Add-Shortcut function already defined in Pre-Install)
 Add-Shortcut "C:\Program Files\Winget-AutoUpdate" "${env:Public}\Desktop\WAU InstallDir.lnk" "" "" "WAU InstallDir"
 
+# Configure Regedit settings
 reg.exe add "HKCU\Software\Microsoft\Windows\CurrentVersion\Applets\Regedit" /v LastKey /t REG_SZ /d Computer\HKEY_LOCAL_MACHINE\SOFTWARE\Romanitho\Winget-AutoUpdate /f | Out-Null
 reg.exe add "HKCU\Software\Microsoft\Windows\CurrentVersion\Applets\Regedit\Favorites" /v WAU /t REG_SZ /d Computer\HKEY_LOCAL_MACHINE\SOFTWARE\Romanitho\Winget-AutoUpdate /f | Out-Null
+
+# Create AdvancedRun configuration folder and config file
+$advancedRunFolder = "${env:TEMP}\AdvancedRun"
+if (!(Test-Path $advancedRunFolder)) {
+    New-Item -Path $advancedRunFolder -ItemType Directory -Force | Out-Null
+}
+
+# Create AdvancedRun.cfg with WAU test configuration
+$configContent = "[General]`r`nCommandLine=`"-NoProfile -ExecutionPolicy bypass -File `"C:\Program Files\Winget-AutoUpdate\Winget-Install.ps1`" -AppIDs Notepad++.Notepad++`"`r`nStartDirectory=`r`nRunAs=4`r`nEnvironmentVariablesMode=1`r`nUseSearchPath=1`r`nRunMode=4`r`nCommandWindowMode=1"
+$configContent | Out-File -FilePath (Join-Path $advancedRunFolder "AdvancedRun.cfg") -Encoding ASCII -Force
 
 '@
 
