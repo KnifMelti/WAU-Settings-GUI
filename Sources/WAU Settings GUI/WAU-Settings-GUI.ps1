@@ -650,7 +650,20 @@ Start-Process "`$env:USERPROFILE\Desktop\`$SandboxFolderName\$selectedFile" -Wor
             $chkPrerelease = New-Object System.Windows.Forms.CheckBox
             $chkPrerelease.Location = New-Object System.Drawing.Point($leftMargin, $y)
             $chkPrerelease.Size = New-Object System.Drawing.Size(200, $labelHeight)
-            $chkPrerelease.Text = "Prerelease (of WinGet)"
+            $chkPrerelease.Text = "Pre-release (of WinGet)"
+            
+            # Add event handler to disable/enable version field when Pre-release is checked
+            $chkPrerelease.Add_CheckedChanged({
+                if ($chkPrerelease.Checked) {
+                    # Disable version field when Pre-release is checked
+                    $cmbWinGetVersion.Enabled = $false
+                    $cmbWinGetVersion.Text = ""
+                } else {
+                    # Enable version field when Pre-release is unchecked
+                    $cmbWinGetVersion.Enabled = $true
+                }
+            })
+            
             $form.Controls.Add($chkPrerelease)
 
             $y += $labelHeight + 5
@@ -885,15 +898,15 @@ Start-Process "`$env:USERPROFILE\Desktop\`$SandboxFolderName\$selectedFile" -Wor
             exit
         }
         
-        # Validate WinGet version if one was specified
+        # Validate WinGet version if one was specified (skip validation if Pre-release is checked)
         $versionValid = $true
-        if (![string]::IsNullOrWhiteSpace($dialogResult.WinGetVersion)) {
+        if (![string]::IsNullOrWhiteSpace($dialogResult.WinGetVersion) -and -not $dialogResult.Prerelease) {
             Write-Verbose "Validating WinGet version: $($dialogResult.WinGetVersion)"
             $versionExists = Test-WinGetVersionExists -Version $dialogResult.WinGetVersion -IncludePrerelease $dialogResult.Prerelease
             
             if (-not $versionExists) {
                 $result = [System.Windows.Forms.MessageBox]::Show(
-                    "The specified WinGet version '$($dialogResult.WinGetVersion)' was not found in the GitHub repository.`n`nPlease choose an action:`n`n• Click 'OK' to return to the configuration dialog and select a different version.`n• Click 'Cancel' to exit the application.",
+                    "The specified WinGet version '$($dialogResult.WinGetVersion)' was not found in the GitHub repository.`n`nPlease choose an action:`n`nClick 'OK' to return to the configuration dialog and select a different version.`nClick 'Cancel' to exit the application.",
                     "Invalid WinGet Version",
                     [System.Windows.Forms.MessageBoxButtons]::OKCancel,
                     [System.Windows.Forms.MessageBoxIcon]::Warning
