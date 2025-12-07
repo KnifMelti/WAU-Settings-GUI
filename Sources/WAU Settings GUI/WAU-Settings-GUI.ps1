@@ -180,13 +180,15 @@ Install.* = Installer.ps1
         .DESCRIPTION
         Queries the GitHub API for microsoft/winget-cli releases and returns
         the tag names of the 25 most recent stable (non-prerelease) versions
+        that have assets available. Excludes releases without assets to prevent
+        installation failures.
         
         .OUTPUTS
         Array of version strings (e.g., "v1.7.10514", "v1.7.10582")
         #>
         try {
-            # Request 100 releases to ensure we get 25 stable ones after filtering pre-releases
-            # Assumption: Among the 100 most recent releases, at least 25 will be stable (non-prerelease)
+            # Request 100 releases to ensure we get 25 stable ones after filtering pre-releases and checking assets
+            # Assumption: Among the 100 most recent releases, at least 25 will be stable (non-prerelease) with assets
             # This is typically true for the winget-cli repository which has regular stable releases
             $releasesApiUrl = 'https://api.github.com/repos/microsoft/winget-cli/releases?per_page=100'
             Write-Verbose "Fetching WinGet releases from GitHub API..."
@@ -194,13 +196,17 @@ Install.* = Installer.ps1
             # Fetch releases from GitHub API with timeout and User-Agent header
             $releases = Invoke-RestMethod -Uri $releasesApiUrl -TimeoutSec 10 -UserAgent "WAU-Settings-GUI" -ErrorAction Stop
             
-            # Filter to only stable releases (not prerelease) and get top 25
-            $stableReleases = $releases | Where-Object { -not $_.prerelease } | Select-Object -First 25
+            # Filter to only stable releases (not prerelease) that have assets and get top 25
+            $stableReleases = $releases | Where-Object { 
+                (-not $_.prerelease) -and 
+                ($_.assets) -and 
+                ($_.assets.Count -gt 0) 
+            } | Select-Object -First 25
             
             # Extract tag names (e.g., "v1.7.10514")
             $versions = $stableReleases | ForEach-Object { $_.tag_name }
             
-            Write-Verbose "Found $($versions.Count) stable WinGet versions"
+            Write-Verbose "Found $($versions.Count) stable WinGet versions with assets"
             return $versions
         }
         catch {
