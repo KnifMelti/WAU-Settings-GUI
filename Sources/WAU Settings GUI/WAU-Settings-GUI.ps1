@@ -171,6 +171,96 @@ Install.* = Installer.ps1
         }
     }
 
+    # Helper function to fetch stable WinGet versions from GitHub
+    function Get-StableWinGetVersions {
+        <#
+        .SYNOPSIS
+        Fetches the 25 most recent stable WinGet versions from GitHub
+        
+        .DESCRIPTION
+        Queries the GitHub API for microsoft/winget-cli releases and returns
+        the tag names of the 25 most recent stable (non-prerelease) versions
+        
+        .OUTPUTS
+        Array of version strings (e.g., "v1.7.10514", "v1.7.10582")
+        #>
+        try {
+            # Request 100 releases to ensure we get 25 stable ones after filtering pre-releases
+            # Assumption: Among the 100 most recent releases, at least 25 will be stable (non-prerelease)
+            # This is typically true for the winget-cli repository which has regular stable releases
+            $releasesApiUrl = 'https://api.github.com/repos/microsoft/winget-cli/releases?per_page=100'
+            Write-Verbose "Fetching WinGet releases from GitHub API..."
+            
+            # Fetch releases from GitHub API with timeout and User-Agent header
+            $releases = Invoke-RestMethod -Uri $releasesApiUrl -TimeoutSec 10 -UserAgent "WAU-Settings-GUI" -ErrorAction Stop
+            
+            # Filter to only stable releases (not prerelease) and get top 25
+            $stableReleases = $releases | Where-Object { -not $_.prerelease } | Select-Object -First 25
+            
+            # Extract tag names (e.g., "v1.7.10514")
+            $versions = $stableReleases | ForEach-Object { $_.tag_name }
+            
+            Write-Verbose "Found $($versions.Count) stable WinGet versions"
+            return $versions
+        }
+        catch {
+            Write-Warning "Failed to fetch WinGet versions from GitHub: $($_.Exception.Message)"
+            return @()
+        }
+    }
+    
+    # Helper function to validate WinGet version exists
+    function Test-WinGetVersionExists {
+        <#
+        .SYNOPSIS
+        Validates if a WinGet version exists in the GitHub repository
+        
+        .PARAMETER Version
+        The version string to validate (e.g., "1.23", "v1.7.10514")
+        
+        .PARAMETER IncludePrerelease
+        Include prerelease versions in the search
+        
+        .OUTPUTS
+        Boolean indicating if the version exists
+        #>
+        param(
+            [Parameter(Mandatory = $true)]
+            [string]$Version,
+            
+            [Parameter(Mandatory = $false)]
+            [bool]$IncludePrerelease = $false
+        )
+        
+        try {
+            $releasesApiUrl = 'https://api.github.com/repos/microsoft/winget-cli/releases?per_page=100'
+            Write-Verbose "Validating WinGet version: $Version"
+            
+            $releases = Invoke-RestMethod -Uri $releasesApiUrl -TimeoutSec 10 -UserAgent "WAU-Settings-GUI" -ErrorAction Stop
+            
+            if (-not $IncludePrerelease) {
+                $releases = $releases | Where-Object { -not $_.prerelease }
+            }
+            
+            # Check if version matches any tag_name (with or without 'v' prefix)
+            $versionPattern = '^v?' + [regex]::Escape($Version)
+            $matchingRelease = $releases | Where-Object { $_.tag_name -match $versionPattern } | Select-Object -First 1
+            
+            if ($matchingRelease) {
+                Write-Verbose "Found matching release: $($matchingRelease.tag_name)"
+                return $true
+            } else {
+                Write-Verbose "No matching release found for version: $Version"
+                return $false
+            }
+        }
+        catch {
+            Write-Warning "Failed to validate WinGet version: $($_.Exception.Message)"
+            # On error, assume version might be valid (fail open)
+            return $true
+        }
+    }
+
     # Define the dialog function here since it's needed before the main functions section
     function Show-SandboxTestDialog {
         <#
@@ -500,17 +590,59 @@ Start-Process "`$env:USERPROFILE\Desktop\`$SandboxFolderName\$selectedFile" -Wor
 
             $y += $labelHeight + $controlHeight + $spacing
 
-            # WinGet Version
+            # WinGet Version - using ComboBox with fetched versions
             $lblWinGetVersion = New-Object System.Windows.Forms.Label
             $lblWinGetVersion.Location = New-Object System.Drawing.Point($leftMargin, $y)
             $lblWinGetVersion.Size = New-Object System.Drawing.Size(300, $labelHeight)
             $lblWinGetVersion.Text = "WinGet Version (leave empty for latest):"
             $form.Controls.Add($lblWinGetVersion)
 
-            $txtWinGetVersion = New-Object System.Windows.Forms.TextBox
-            $txtWinGetVersion.Location = New-Object System.Drawing.Point($leftMargin, ($y + $labelHeight))
-            $txtWinGetVersion.Size = New-Object System.Drawing.Size($controlWidth, $controlHeight)
-            $form.Controls.Add($txtWinGetVersion)
+            $cmbWinGetVersion = New-Object System.Windows.Forms.ComboBox
+            $cmbWinGetVersion.Location = New-Object System.Drawing.Point($leftMargin, ($y + $labelHeight))
+            $cmbWinGetVersion.Size = New-Object System.Drawing.Size($controlWidth, $controlHeight)
+            $cmbWinGetVersion.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDown
+            
+            # Add empty option first (for "latest") - only item initially
+            [void]$cmbWinGetVersion.Items.Add("")
+            $cmbWinGetVersion.SelectedIndex = 0
+            
+            # Lazy load versions only when user opens the dropdown
+            # This avoids unnecessary API calls when users just want the latest version
+            # Use Tag property to track if versions have been loaded (avoids script-scope issues)
+            $cmbWinGetVersion.Tag = $false
+            
+            $cmbWinGetVersion.Add_DropDown({
+                # Use $this to reference the ComboBox safely within the event handler
+                if (-not $this.Tag) {
+                    # Show loading indicator
+                    $originalText = $this.Text
+                    $this.Text = "Loading versions..."
+                    [System.Windows.Forms.Application]::DoEvents()  # Force UI update
+                    
+                    try {
+                        Write-Verbose "Fetching stable WinGet versions for dropdown..."
+                        $stableVersions = Get-StableWinGetVersions
+                        
+                        # Add fetched versions to the dropdown
+                        foreach ($version in $stableVersions) {
+                            [void]$this.Items.Add($version)
+                        }
+                        
+                        Write-Verbose "WinGet version dropdown populated with $($stableVersions.Count) stable versions"
+                    }
+                    catch {
+                        Write-Warning "Failed to populate WinGet versions dropdown: $($_.Exception.Message)"
+                    }
+                    finally {
+                        # Always restore original text and mark as loaded, even if API call failed
+                        # Restore to original text (typically empty string on first open)
+                        $this.Text = $originalText
+                        $this.Tag = $true
+                    }
+                }
+            })
+            
+            $form.Controls.Add($cmbWinGetVersion)
 
             $y += $labelHeight + $controlHeight + $spacing + 10
 
@@ -518,8 +650,23 @@ Start-Process "`$env:USERPROFILE\Desktop\`$SandboxFolderName\$selectedFile" -Wor
             $chkPrerelease = New-Object System.Windows.Forms.CheckBox
             $chkPrerelease.Location = New-Object System.Drawing.Point($leftMargin, $y)
             $chkPrerelease.Size = New-Object System.Drawing.Size(200, $labelHeight)
-            $chkPrerelease.Text = "Prerelease (of WinGet)"
+            $chkPrerelease.Text = "Pre-release (of WinGet)"
             $form.Controls.Add($chkPrerelease)
+            
+            # Add event handler after both controls are added to form
+            # Store reference to combo box in checkbox's Tag for safe access
+            $chkPrerelease.Tag = $cmbWinGetVersion
+            $chkPrerelease.Add_CheckedChanged({
+                $comboBox = $this.Tag
+                if ($this.Checked) {
+                    # Disable version field when Pre-release is checked
+                    $comboBox.Enabled = $false
+                    $comboBox.Text = ""
+                } else {
+                    # Enable version field when Pre-release is unchecked
+                    $comboBox.Enabled = $true
+                }
+            })
 
             $y += $labelHeight + 5
 
@@ -699,7 +846,7 @@ Start-Process "`$env:USERPROFILE\Desktop\`$SandboxFolderName\$selectedFile" -Wor
                     DialogResult = 'OK'
                     MapFolder = $txtMapFolder.Text
                     SandboxFolderName = $txtSandboxFolderName.Text
-                    WinGetVersion = $txtWinGetVersion.Text
+                    WinGetVersion = $cmbWinGetVersion.Text
                     Prerelease = $chkPrerelease.Checked
                     Clean = $chkClean.Checked
                     Async = $chkAsync.Checked
@@ -744,34 +891,70 @@ Start-Process "`$env:USERPROFILE\Desktop\`$SandboxFolderName\$selectedFile" -Wor
         }
     }
 
-    # Show configuration dialog
-    $dialogResult = Show-SandboxTestDialog
-    if ($dialogResult.DialogResult -eq 'OK') {
-        # Build parameters for SandboxTest
-        $sandboxParams = @{
-            MapFolder = $dialogResult.MapFolder
-            SandboxFolderName = $dialogResult.SandboxFolderName
-            Script = $dialogResult.Script
+    # Show configuration dialog in a loop to allow re-entry if version is invalid
+    while ($true) {
+        $dialogResult = Show-SandboxTestDialog
+        
+        if ($dialogResult.DialogResult -ne 'OK') {
+            # User cancelled the dialog
+            exit
         }
-
-        # Add optional parameters if they have values
-        if (![string]::IsNullOrWhiteSpace($dialogResult.WinGetVersion)) {
-            $sandboxParams.WinGetVersion = $dialogResult.WinGetVersion
+        
+        # Validate WinGet version if one was specified (skip validation if Pre-release is checked)
+        $versionValid = $true
+        if (![string]::IsNullOrWhiteSpace($dialogResult.WinGetVersion) -and -not $dialogResult.Prerelease) {
+            Write-Verbose "Validating WinGet version: $($dialogResult.WinGetVersion)"
+            $versionExists = Test-WinGetVersionExists -Version $dialogResult.WinGetVersion -IncludePrerelease $dialogResult.Prerelease
+            
+            if (-not $versionExists) {
+                $result = [System.Windows.Forms.MessageBox]::Show(
+                    "The specified WinGet version '$($dialogResult.WinGetVersion)' was not found in the GitHub repository.`n`nPlease choose an action:`n`nClick 'OK' to return to the configuration dialog and select a different version.`nClick 'Cancel' to exit the application.",
+                    "Invalid WinGet Version",
+                    [System.Windows.Forms.MessageBoxButtons]::OKCancel,
+                    [System.Windows.Forms.MessageBoxIcon]::Warning
+                )
+                
+                if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
+                    # Continue the loop to show the dialog again
+                    $versionValid = $false
+                } else {
+                    # User chose Cancel - exit the script
+                    exit
+                }
+            }
         }
-        if ($dialogResult.Prerelease) { $sandboxParams.Prerelease = $true }
-        if ($dialogResult.Clean) { $sandboxParams.Clean = $true }
-        if ($dialogResult.Async) { $sandboxParams.Async = $true }
-        if ($dialogResult.Verbose) { $sandboxParams.Verbose = $true }
-
-        # Call SandboxTest with collected parameters
-        SandboxTest @sandboxParams
-
-        # Wait for key press if requested
-        if ($dialogResult.Wait) {
-            Write-Host "`nPress any key to exit..." -ForegroundColor Yellow
-            $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+        
+        # If version is valid (or not specified), proceed with SandboxTest
+        if ($versionValid) {
+            break
         }
     }
+    
+    # Build parameters for SandboxTest
+    $sandboxParams = @{
+        MapFolder = $dialogResult.MapFolder
+        SandboxFolderName = $dialogResult.SandboxFolderName
+        Script = $dialogResult.Script
+    }
+
+    # Add optional parameters if they have values
+    if (![string]::IsNullOrWhiteSpace($dialogResult.WinGetVersion)) {
+        $sandboxParams.WinGetVersion = $dialogResult.WinGetVersion
+    }
+    if ($dialogResult.Prerelease) { $sandboxParams.Prerelease = $true }
+    if ($dialogResult.Clean) { $sandboxParams.Clean = $true }
+    if ($dialogResult.Async) { $sandboxParams.Async = $true }
+    if ($dialogResult.Verbose) { $sandboxParams.Verbose = $true }
+
+    # Call SandboxTest with collected parameters
+    SandboxTest @sandboxParams
+
+    # Wait for key press if requested
+    if ($dialogResult.Wait) {
+        Write-Host "`nPress any key to exit..." -ForegroundColor Yellow
+        $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+    }
+    
     exit
 }
 
