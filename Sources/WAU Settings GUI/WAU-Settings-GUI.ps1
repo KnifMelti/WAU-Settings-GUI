@@ -651,20 +651,22 @@ Start-Process "`$env:USERPROFILE\Desktop\`$SandboxFolderName\$selectedFile" -Wor
             $chkPrerelease.Location = New-Object System.Drawing.Point($leftMargin, $y)
             $chkPrerelease.Size = New-Object System.Drawing.Size(200, $labelHeight)
             $chkPrerelease.Text = "Pre-release (of WinGet)"
+            $form.Controls.Add($chkPrerelease)
             
-            # Add event handler to disable/enable version field when Pre-release is checked
+            # Add event handler after both controls are added to form
+            # Store reference to combo box in checkbox's Tag for safe access
+            $chkPrerelease.Tag = $cmbWinGetVersion
             $chkPrerelease.Add_CheckedChanged({
-                if ($chkPrerelease.Checked) {
+                $comboBox = $this.Tag
+                if ($this.Checked) {
                     # Disable version field when Pre-release is checked
-                    $cmbWinGetVersion.Enabled = $false
-                    $cmbWinGetVersion.Text = ""
+                    $comboBox.Enabled = $false
+                    $comboBox.Text = ""
                 } else {
                     # Enable version field when Pre-release is unchecked
-                    $cmbWinGetVersion.Enabled = $true
+                    $comboBox.Enabled = $true
                 }
             })
-            
-            $form.Controls.Add($chkPrerelease)
 
             $y += $labelHeight + 5
 
