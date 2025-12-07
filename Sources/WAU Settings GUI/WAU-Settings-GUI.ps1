@@ -876,27 +876,32 @@ Start-Process "`$env:USERPROFILE\Desktop\`$SandboxFolderName\$selectedFile" -Wor
         }
     }
 
-    # Show configuration dialog
-    $dialogResult = Show-SandboxTestDialog
-    if ($dialogResult.DialogResult -eq 'OK') {
+    # Show configuration dialog in a loop to allow re-entry if version is invalid
+    while ($true) {
+        $dialogResult = Show-SandboxTestDialog
+        
+        if ($dialogResult.DialogResult -ne 'OK') {
+            # User cancelled the dialog
+            exit
+        }
+        
         # Validate WinGet version if one was specified
+        $versionValid = $true
         if (![string]::IsNullOrWhiteSpace($dialogResult.WinGetVersion)) {
             Write-Verbose "Validating WinGet version: $($dialogResult.WinGetVersion)"
             $versionExists = Test-WinGetVersionExists -Version $dialogResult.WinGetVersion -IncludePrerelease $dialogResult.Prerelease
             
             if (-not $versionExists) {
                 $result = [System.Windows.Forms.MessageBox]::Show(
-                    "The specified WinGet version '$($dialogResult.WinGetVersion)' was not found in the GitHub repository.`n`nDo you want to try anyway?`n`nClick 'OK' to return to the configuration dialog and change the version.`nClick 'Cancel' to exit.",
+                    "The specified WinGet version '$($dialogResult.WinGetVersion)' was not found in the GitHub repository.`n`nPlease choose an action:`n`n• Click 'OK' to return to the configuration dialog and select a different version.`n• Click 'Cancel' to exit the application.",
                     "Invalid WinGet Version",
                     [System.Windows.Forms.MessageBoxButtons]::OKCancel,
                     [System.Windows.Forms.MessageBoxIcon]::Warning
                 )
                 
                 if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
-                    # Return to the dialog by recursively calling the function
-                    # This allows the user to correct the version
-                    . $MyInvocation.MyCommand.Path -SandboxTest
-                    return
+                    # Continue the loop to show the dialog again
+                    $versionValid = $false
                 } else {
                     # User chose Cancel - exit the script
                     exit
@@ -904,31 +909,37 @@ Start-Process "`$env:USERPROFILE\Desktop\`$SandboxFolderName\$selectedFile" -Wor
             }
         }
         
-        # Build parameters for SandboxTest
-        $sandboxParams = @{
-            MapFolder = $dialogResult.MapFolder
-            SandboxFolderName = $dialogResult.SandboxFolderName
-            Script = $dialogResult.Script
-        }
-
-        # Add optional parameters if they have values
-        if (![string]::IsNullOrWhiteSpace($dialogResult.WinGetVersion)) {
-            $sandboxParams.WinGetVersion = $dialogResult.WinGetVersion
-        }
-        if ($dialogResult.Prerelease) { $sandboxParams.Prerelease = $true }
-        if ($dialogResult.Clean) { $sandboxParams.Clean = $true }
-        if ($dialogResult.Async) { $sandboxParams.Async = $true }
-        if ($dialogResult.Verbose) { $sandboxParams.Verbose = $true }
-
-        # Call SandboxTest with collected parameters
-        SandboxTest @sandboxParams
-
-        # Wait for key press if requested
-        if ($dialogResult.Wait) {
-            Write-Host "`nPress any key to exit..." -ForegroundColor Yellow
-            $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+        # If version is valid (or not specified), proceed with SandboxTest
+        if ($versionValid) {
+            break
         }
     }
+    
+    # Build parameters for SandboxTest
+    $sandboxParams = @{
+        MapFolder = $dialogResult.MapFolder
+        SandboxFolderName = $dialogResult.SandboxFolderName
+        Script = $dialogResult.Script
+    }
+
+    # Add optional parameters if they have values
+    if (![string]::IsNullOrWhiteSpace($dialogResult.WinGetVersion)) {
+        $sandboxParams.WinGetVersion = $dialogResult.WinGetVersion
+    }
+    if ($dialogResult.Prerelease) { $sandboxParams.Prerelease = $true }
+    if ($dialogResult.Clean) { $sandboxParams.Clean = $true }
+    if ($dialogResult.Async) { $sandboxParams.Async = $true }
+    if ($dialogResult.Verbose) { $sandboxParams.Verbose = $true }
+
+    # Call SandboxTest with collected parameters
+    SandboxTest @sandboxParams
+
+    # Wait for key press if requested
+    if ($dialogResult.Wait) {
+        Write-Host "`nPress any key to exit..." -ForegroundColor Yellow
+        $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+    }
+    
     exit
 }
 
