@@ -72,7 +72,7 @@ Benefits from not having to manage the settings in several places when testing e
   ```bash
   Dependencies:
     - Package Dependencies:
-        Romanitho.Winget-AutoUpdate`
+        Romanitho.Winget-AutoUpdate
   ```
 
 ### Running
