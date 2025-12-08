@@ -1792,7 +1792,19 @@ function Start-WAUGUIUpdate {
 
                 # Clean up extraction directory AFTER copying files
                 Remove-Item -Path $extractPath -Recurse -Force -ErrorAction SilentlyContinue
-                
+
+                # Update registry DisplayVersion before restart
+                $newExePath = Join-Path $Script:WorkingDir "$Script:WAU_GUI_NAME.exe"
+                if (Test-Path $newExePath) {
+                    try {
+                        $newFileVersionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($newExePath)
+                        $newVersion = $newFileVersionInfo.ProductVersion
+                        Update-UninstallRegistryVersion -NewVersion $newVersion
+                    } catch {
+                        Write-Warning "Could not update registry after update: $($_.Exception.Message)"
+                    }
+                }
+
                 Close-PopUp
                 
                 # Restart the application with the new version
@@ -1832,6 +1844,67 @@ function Start-WAUGUIUpdate {
         return $false
     }
 }
+
+function Update-UninstallRegistryVersion {
+    <#
+    .SYNOPSIS
+        Updates the DisplayVersion in Windows Uninstall registry after application upgrade.
+
+    .DESCRIPTION
+        Detects installation type (WinGet, Manual, Portable) and updates the appropriate
+        registry path with the new version. Handles permissions and errors gracefully.
+
+    .PARAMETER NewVersion
+        The new version string to write to registry (e.g., "1.9.1.2")
+
+    .EXAMPLE
+        Update-UninstallRegistryVersion -NewVersion "1.9.1.3"
+    #>
+
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$NewVersion
+    )
+
+    try {
+        # Skip if running in portable mode
+        if ($Script:PORTABLE_MODE) {
+            return $true
+        }
+
+        # Detect installation type and registry path (both are in HKCU)
+        $registryPaths = @()
+
+        # Check for WinGet installation (HKCU)
+        $wingetPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe"
+        if (Test-Path $wingetPath) {
+            $registryPaths += $wingetPath
+        }
+
+        # Check for manual installation (HKCU)
+        $manualPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\WAU-Settings-GUI"
+        if (Test-Path $manualPath) {
+            $registryPaths += $manualPath
+        }
+
+        # Update DisplayVersion in all found registry paths
+        foreach ($regPath in $registryPaths) {
+            $currentDisplayVersion = (Get-ItemProperty -Path $regPath -Name "DisplayVersion" -ErrorAction SilentlyContinue).DisplayVersion
+
+            if ($currentDisplayVersion -ne $NewVersion) {
+                Set-ItemProperty -Path $regPath -Name "DisplayVersion" -Value $NewVersion -Type String
+                Write-Host "Updated DisplayVersion in $regPath from '$currentDisplayVersion' to '$NewVersion'"
+            }
+        }
+
+        return $true
+    }
+    catch {
+        Write-Host "Warning: Failed to update registry DisplayVersion: $($_.Exception.Message)" -ForegroundColor Yellow
+        return $false
+    }
+}
+
 function Start-RestoreFromBackup {
     param(
         [string]$backupPath,
@@ -1935,9 +2008,21 @@ function Start-RestoreFromBackup {
 
         # Clean up extraction directory AFTER copying files
         Remove-Item -Path $tempExtractDir -Recurse -Force -ErrorAction SilentlyContinue
-        
+
+        # Update registry DisplayVersion with restored version
+        $restoredExePath = Join-Path $Script:WorkingDir "$Script:WAU_GUI_NAME.exe"
+        if (Test-Path $restoredExePath) {
+            try {
+                $restoredFileVersionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($restoredExePath)
+                $restoredVersion = $restoredFileVersionInfo.ProductVersion
+                Update-UninstallRegistryVersion -NewVersion $restoredVersion
+            } catch {
+                Write-Warning "Could not update registry after restore: $($_.Exception.Message)"
+            }
+        }
+
         Close-PopUp
-        
+
         # Restart the application with the restored version
         if (-not $Script:PORTABLE_MODE) {
             $startMenuShortcut = "$Script:STARTMENU_WAU_DIR\$Script:GUI_TITLE.lnk"
@@ -6382,6 +6467,16 @@ if (Test-Path $exePath) {
         Copy-Item -Path $uninstPath -Destination $exePath -Force -ErrorAction SilentlyContinue
     }
     # If neither file exists, keep default "0.0.0.0"
+}
+
+# Verify registry DisplayVersion matches actual EXE version (self-healing)
+if ($Script:WAU_GUI_VERSION -ne "0.0.0.0") {
+    try {
+        Update-UninstallRegistryVersion -NewVersion $Script:WAU_GUI_VERSION
+    } catch {
+        # Silently ignore registry verification errors
+        # This is self-healing, not critical for application function
+    }
 }
 
 # Ensure the original version ZIP exists in \ver
