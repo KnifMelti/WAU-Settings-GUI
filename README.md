@@ -66,12 +66,18 @@ Benefits from not having to manage the settings in several places when testing e
   ```bash
   winget install KnifMelti.WAU-Settings-GUI #(--scope user, if failing)
   ```
-This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **WAU-Settings-GUI**) to:
+- This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **WAU-Settings-GUI**) to:
    `%USERPROFILE%\AppData\Local\Microsoft\WinGet\Packages\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe`
+
+  ```bash
+  Dependencies:
+    - Package Dependencies:
+        Romanitho.Winget-AutoUpdate`
+  ```
 
 ### Running
 - After installation, **WAU Settings GUI** starts (if installed by **WinGet** you must start it via an ordinary **Command Prompt** using the `PortableCommandAlias`: **WAU-Settings-GUI**)
-- If **WAU** is not installed, it will prompt to download and install with standard settings
+- If **WAU** is not installed and this is a manual installation, a prompt to download and install it with standard settings will pop up
 - If a local list is not found, it will prompt to create a new `excluded_apps.txt`
   - The created list will contain `KnifMelti.WAU-Settings-GUI`
 - In the **[GUI](#managed-by-registry-local)** you now have **☐|☑ Start Menu shortcuts** / **☐|☑ WAU Desktop shortcut** / **☐|☑ App Installer shortcut** options showing the current installed **WAU** configuration
