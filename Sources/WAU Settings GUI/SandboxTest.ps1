@@ -518,7 +518,7 @@ if (!(Test-Path $nirSoftFolder)) {
     
     # Set custom folder icon using desktop.ini
     $desktopIniPath = Join-Path $nirSoftFolder "desktop.ini"
-    "[.ShellClassInfo]`r`nIconResource=${env:SystemRoot}\System32\SHELL32.dll,14`r`nInfoTip=Download and run NirSoft utilities" | Out-File -FilePath $desktopIniPath -Encoding ASCII -Force
+    "[.ShellClassInfo]`r`nIconResource=${env:SystemRoot}\System32\SHELL32.dll,14`r`nInfoTip=Download and run NirSoft Utilities" | Out-File -FilePath $desktopIniPath -Encoding ASCII -Force
     
     # Use attrib.exe to set attributes (more reliable in Sandbox)
     & attrib.exe +H +S "$desktopIniPath" 2>$null
@@ -527,6 +527,7 @@ if (!(Test-Path $nirSoftFolder)) {
 
 # Create non-WAU shortcuts
 Add-Shortcut "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe" "${env:Public}\Desktop\Sysinternals Live.lnk" "https://live.sysinternals.com/" "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe,5" "Download and run from Sysinternals Live" "Normal"
+Add-Shortcut "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe" "$nirSoftFolder\NirSoft.lnk" "https://www.nirsoft.net/" "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe,5" "Download from NirSoft Utilities" "Normal"
 Add-Shortcut "${env:SystemRoot}\System32\WindowsPowerShell\v1.0\powershell.exe" "${env:Public}\Desktop\CTT Windows Utility.lnk" "-ExecutionPolicy Bypass -Command `"Start-Process powershell.exe -verb runas -ArgumentList 'irm https://christitus.com/win | iex'`"" "${env:SystemRoot}\System32\SHELL32.dll,43" "Run Chris Titus Tech's Windows Utility"
 Add-Shortcut "${env:SystemRoot}\System32\WindowsPowerShell\v1.0\powershell.exe" "$nirSoftFolder\UninstallView.lnk" "-ExecutionPolicy Bypass -WindowStyle Hidden -Command `"if(!(Test-Path '${env:TEMP}\UninstallView\UninstallView.exe')){Invoke-WebRequest -Uri 'https://www.nirsoft.net/utils/uninstallview-x64.zip' -OutFile '${env:TEMP}\uninstallview-x64.zip' -UseBasicParsing;Expand-Archive -Path '${env:TEMP}\uninstallview-x64.zip' -DestinationPath '${env:TEMP}\UninstallView' -Force};[System.Windows.Forms.SendKeys]::SendWait('{F5}');Start-Process '${env:TEMP}\UninstallView\UninstallView.exe' -Verb RunAs`"" "${env:TEMP}\UninstallView\UninstallView.exe,0" "Download and run UninstallView" "Minimized"
 Add-Shortcut "${env:SystemRoot}\System32\WindowsPowerShell\v1.0\powershell.exe" "$nirSoftFolder\AdvancedRun.lnk" "-ExecutionPolicy Bypass -WindowStyle Hidden -Command `"if(!(Test-Path '${env:TEMP}\AdvancedRun\AdvancedRun.exe')){Invoke-WebRequest -Uri 'https://www.nirsoft.net/utils/advancedrun-x64.zip' -OutFile '${env:TEMP}\advancedrun-x64.zip' -UseBasicParsing;Expand-Archive -Path '${env:TEMP}\advancedrun-x64.zip' -DestinationPath '${env:TEMP}\AdvancedRun' -Force};[System.Windows.Forms.SendKeys]::SendWait('{F5}');Start-Process '${env:TEMP}\AdvancedRun\AdvancedRun.exe' -Verb RunAs`"" "${env:TEMP}\AdvancedRun\AdvancedRun.exe,0" "Download and run AdvancedRun" "Minimized"
