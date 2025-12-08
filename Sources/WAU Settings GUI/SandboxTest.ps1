@@ -558,28 +558,6 @@ $uninstallViewConfig | Out-File -FilePath (Join-Path $uninstallViewFolder "Unins
 
 '@
 
-        $sandboxPostInstallScript = @'
-# Post-install initialization (after WAU installation)
-
-# Create WAU-specific shortcuts and registry settings (Add-Shortcut function already defined in Pre-Install)
-Add-Shortcut "C:\Program Files\Winget-AutoUpdate" "${env:Public}\Desktop\WAU InstallDir.lnk" "" "" "WAU InstallDir"
-
-# Configure Regedit settings
-reg.exe add "HKCU\Software\Microsoft\Windows\CurrentVersion\Applets\Regedit" /v LastKey /t REG_SZ /d Computer\HKEY_LOCAL_MACHINE\SOFTWARE\Romanitho\Winget-AutoUpdate /f | Out-Null
-reg.exe add "HKCU\Software\Microsoft\Windows\CurrentVersion\Applets\Regedit\Favorites" /v WAU /t REG_SZ /d Computer\HKEY_LOCAL_MACHINE\SOFTWARE\Romanitho\Winget-AutoUpdate /f | Out-Null
-
-# Create AdvancedRun configuration folder and config file
-$advancedRunFolder = "${env:TEMP}\AdvancedRun"
-if (!(Test-Path $advancedRunFolder)) {
-    New-Item -Path $advancedRunFolder -ItemType Directory -Force | Out-Null
-}
-
-# Create AdvancedRun.cfg with WAU test configuration
-$configContent = "[General]`r`nCommandLine=`"-NoProfile -ExecutionPolicy bypass -File `"C:\Program Files\Winget-AutoUpdate\Winget-Install.ps1`" -AppIDs Notepad++.Notepad++`"`r`nStartDirectory=`r`nRunAs=4`r`nEnvironmentVariablesMode=1`r`nUseSearchPath=1`r`nRunMode=4`r`nCommandWindowMode=1"
-$configContent | Out-File -FilePath (Join-Path $advancedRunFolder "AdvancedRun.cfg") -Encoding ASCII -Force
-
-'@
-
         if ($Script) {
             Write-Verbose "Creating script file from 'Script' argument with initialization code"
 
@@ -596,35 +574,103 @@ $configContent | Out-File -FilePath (Join-Path $advancedRunFolder "AdvancedRun.c
 
 '@ + $scriptText + "`r`n" + @'
 
-# Wait for WAU installation to complete by polling for installation directory
+# Wait for WAU installation to complete by polling registry and installation directory
 Write-Host ""
 Write-Host "Waiting for WAU installation to complete..." -ForegroundColor Yellow
 
 $timeout = 300  # 5 minutes max
 $elapsed = 0
 $checkInterval = 2
+$wauRegPath = "HKLM:\SOFTWARE\Romanitho\Winget-AutoUpdate"
+$installLocation = $null
 
-while ((Test-Path "C:\Program Files\Winget-AutoUpdate\Winget-Upgrade.ps1") -eq $false -and $elapsed -lt $timeout) {
+# First wait for registry key with InstallLocation
+while ($elapsed -lt $timeout) {
+    try {
+        $installLocation = (Get-ItemProperty -Path $wauRegPath -Name "InstallLocation" -ErrorAction SilentlyContinue).InstallLocation
+        if ($installLocation) {
+            Write-Host ""
+            Write-Host "Registry key found: $installLocation" -ForegroundColor Cyan
+            break
+        }
+    } catch {
+        # Registry key doesn't exist yet
+    }
     Start-Sleep -Seconds $checkInterval
     $elapsed += $checkInterval
     Write-Host "." -NoNewline -ForegroundColor Yellow
 }
 
-Write-Host ""
-
-if (Test-Path "C:\Program Files\Winget-AutoUpdate\Winget-Upgrade.ps1") {
-    Write-Host "WAU installation completed successfully!" -ForegroundColor Green -BackgroundColor DarkGreen
-    Start-Sleep -Seconds 2
+# Then verify that Winget-Upgrade.ps1 exists at that location
+if ($installLocation) {
+    $wauScriptPath = Join-Path $installLocation "Winget-Upgrade.ps1"
+    
+    while ($elapsed -lt $timeout) {
+        if (Test-Path $wauScriptPath) {
+            Write-Host ""
+            Write-Host "WAU installation completed successfully!" -ForegroundColor Green -BackgroundColor DarkGreen
+            Write-Host "Installation verified at: $wauScriptPath" -ForegroundColor Cyan
+            Start-Sleep -Seconds 2
+            break
+        }
+        Start-Sleep -Seconds $checkInterval
+        $elapsed += $checkInterval
+        Write-Host "." -NoNewline -ForegroundColor Yellow
+    }
+    
+    if (-not (Test-Path $wauScriptPath)) {
+        Write-Host ""
+        Write-Host "Timeout: WAU script not found at $wauScriptPath" -ForegroundColor Red
+    }
 } else {
-    Write-Host "Timeout: WAU installation did not complete within $timeout seconds" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "Timeout: WAU registry key not created within $timeout seconds" -ForegroundColor Red
 }
 
 '@
 
-                # Combine: pre-install + user script + post-install
+                # Create dynamic post-install script that uses $installLocation from above
+                $dynamicPostInstallScript = @'
+
+# Post-install initialization (after WAU installation)
+# $installLocation is already defined from WAU detection above
+
+if ($installLocation) {
+    Write-Host ""
+    Write-Host "Setting up WAU-specific shortcuts and configurations..." -ForegroundColor Yellow
+    
+    # Create WAU-specific shortcuts using dynamic path (Add-Shortcut function already defined in Pre-Install)
+    Add-Shortcut "$installLocation" "${env:Public}\Desktop\WAU InstallDir.lnk" "" "" "WAU InstallDir"
+
+    # Configure Regedit settings
+    reg.exe add "HKCU\Software\Microsoft\Windows\CurrentVersion\Applets\Regedit" /v LastKey /t REG_SZ /d Computer\HKEY_LOCAL_MACHINE\SOFTWARE\Romanitho\Winget-AutoUpdate /f | Out-Null
+    reg.exe add "HKCU\Software\Microsoft\Windows\CurrentVersion\Applets\Regedit\Favorites" /v WAU /t REG_SZ /d Computer\HKEY_LOCAL_MACHINE\SOFTWARE\Romanitho\Winget-AutoUpdate /f | Out-Null
+
+    # Create AdvancedRun configuration folder and config file
+    $advancedRunFolder = "${env:TEMP}\AdvancedRun"
+    if (!(Test-Path $advancedRunFolder)) {
+        New-Item -Path $advancedRunFolder -ItemType Directory -Force | Out-Null
+    }
+
+    # Build dynamic path to Winget-Install.ps1 using InstallLocation from registry
+    $wauInstallScript = Join-Path $installLocation "Winget-Install.ps1"
+
+    # Create AdvancedRun.cfg with WAU test configuration using dynamic path
+    $configContent = "[General]`r`nCommandLine=`"-NoProfile -ExecutionPolicy bypass -File `"$wauInstallScript`" -AppIDs Notepad++.Notepad++`"`r`nStartDirectory=`r`nRunAs=4`r`nEnvironmentVariablesMode=1`r`nUseSearchPath=1`r`nRunMode=4`r`nCommandWindowMode=1"
+    $configContent | Out-File -FilePath (Join-Path $advancedRunFolder "AdvancedRun.cfg") -Encoding ASCII -Force
+    
+    Write-Host "WAU-specific configuration completed!" -ForegroundColor Green
+} else {
+    Write-Host ""
+    Write-Host "WARNING: InstallLocation not found - skipping WAU-specific shortcuts" -ForegroundColor Yellow
+}
+
+'@
+
+                # Combine: pre-install + user script + dynamic post-install
                 $fullScript = "# Pre-Install Initialization`r`n" + $sandboxPreInstallScript +
                               "`r`n" + $modifiedUserScript +
-                              "`r`n# Post-Install Initialization`r`n" + $sandboxPostInstallScript
+                              "`r`n# Post-Install Initialization`r`n" + $dynamicPostInstallScript
             }
             else {
                 Write-Verbose "No WAU installation detected - pre-install initialization only"
