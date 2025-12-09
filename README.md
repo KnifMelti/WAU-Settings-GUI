@@ -68,7 +68,7 @@ Benefits from not having to manage the settings in several places when testing e
   ```
 - This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **WAU-Settings-GUI**) to:
    `%USERPROFILE%\AppData\Local\Microsoft\WinGet\Packages\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe`
-
+- Elevation needed if dependencies missing:
   ```bash
   Dependencies:
     - Package Dependencies:
