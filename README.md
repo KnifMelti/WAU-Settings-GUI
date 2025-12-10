@@ -68,8 +68,8 @@ Benefits from not having to manage the settings in several places when testing e
   winget install KnifMelti.WAU-Settings-GUI #(--scope user, if failing)
   ```
   - In a **Portable WinGet Package** manifest we can't force `Scope: user` and if installed from an **Administrator Command Prompt** the `[INSTALLDIR]` will be under `%ProgramFiles%` and the registry will be populated under `HKLM`
-    - This will in turn break the complete uninstallation/self-healing `winget` version functionality during upgrade/restore!
-- UAC will prompt if dependencies missing:
+    - This will in turn break the complete uninstallation/self-healing **WinGet** version functionality during upgrade/restore!
+- **UAC** will prompt if dependencies missing:
   ```bash
   Dependencies:
     - Package Dependencies:
