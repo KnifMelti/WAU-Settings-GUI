@@ -43,7 +43,7 @@ Benefits from not having to manage the settings in several places when testing e
   - `[usr]` **Change colors/update schedule** for **WAU Settings GUI**
   - `[msi]` **MSI** transform creation (using current showing configuration)
   - `[wsb]` **[Windows Sandbox (WSB)](https://github.com/KnifMelti/WAU-Settings-GUI?tab=readme-ov-file#sandboxtest)** installation/test of **WAU** installation
-    - A standalone **SandboxTest** shortcut for running advanced tests is created in **User Start Menu** the first time `[wsb]` is used with **WSB** installed
+    - A standalone **SandboxTest** shortcut for running advanced tests is created in **Start Menu** the first time `[wsb]` is used with **WSB** installed
   - `[cfg]` **Configuration** backup/import (i.e. for sharing settings)
   - `[wau]` Reinstall **WAU** (with current showing configuration)
     - Stores source in `[INSTALLDIR]\msi\[VERSION]` (enables **WAU** `Repair` in **Programs and Features**)
@@ -64,18 +64,17 @@ Benefits from not having to manage the settings in several places when testing e
 ### Automatic installation
 - Use **WinGet CLI** from a **Command Prompt** to install the latest released version:
   ```bash
-  winget install KnifMelti.WAU-Settings-GUI
+  winget install KnifMelti.WAU-Settings-GUI # --scope user if installation fails)
   ```
 - Installation locations:
   - **From standard Command Prompt**: `%USERPROFILE%\AppData\Local\Microsoft\WinGet\Packages\...` (user-only, HKCU registry)
   - **From elevated Command Prompt**: `%ProgramFiles%\WinGet\Packages\...` (system-wide, HKLM registry)
   - Both installation types are fully supported with automatic version tracking, shortcuts, and clean uninstallation
-- If installation fails, use: `winget install KnifMelti.WAU-Settings-GUI --scope user`
 - This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **WAU-Settings-GUI**)
 
 ### Running
 - After installation, **WAU Settings GUI** starts (if installed by **WinGet** you must start it via an ordinary **Command Prompt** using the `PortableCommandAlias`: **WAU-Settings-GUI**)
-- If **WAU** is not installed and this is a manual installation, a prompt to download and install it with standard settings will pop up
+- If **WAU** is not installed a prompt to download and install it with standard settings will pop up
 - If a local list is not found, it will prompt to create a new `excluded_apps.txt`
   - The created list will contain `KnifMelti.WAU-Settings-GUI`
 - In the **[GUI](#managed-by-registry-local)** you now have **☐|☑ Start Menu shortcuts** / **☐|☑ WAU Desktop shortcut** / **☐|☑ App Installer shortcut** options showing the current installed **WAU** configuration
@@ -109,7 +108,7 @@ Benefits from not having to manage the settings in several places when testing e
   - https://github.com/microsoft/winget-pkgs/blob/master/doc/README.md#in-windows-sandbox
   - Sandbox requirements: Windows 10/11 Pro/Enterprise/Education (Win10: version 1903+)/Virtualization enabled in BIOS (Intel VT-x or AMD-V)/Minimum 4 GB RAM, 2 CPU cores
 - Now incorporated (heavily modified) in **WAU Settings GUI** for testing the installation of **WAU** (with generated transform) and be able to fully test **WinGet** installations/updates via **WAU** in the virtual environment
-- A standalone **[SandboxTest](#sandboxtest-1)** shortcut is also created in the user **Start Menu** (the first time `[wsb]` is used with **WSB** installed) for more advanced testing, including recognition of files in the selected folder
+- A standalone **[SandboxTest](#sandboxtest-1)** shortcut is also created in the **Start Menu** (the first time `[wsb]` is used with **WSB** installed) for more advanced testing, including recognition of files in the selected folder
 - A **Script Mapping Configuration** in `wsb\script-mappings.txt` determines what is chosen
   - 4 predefined scripts are included (create your own and save/load) chosen by recognition:
       - **InstallWSB**: if the chosen folder contains files created from `[wsb]`
