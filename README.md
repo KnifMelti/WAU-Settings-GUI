@@ -43,7 +43,7 @@ Benefits from not having to manage the settings in several places when testing e
   - `[usr]` **Change colors/update schedule** for **WAU Settings GUI**
   - `[msi]` **MSI** transform creation (using current showing configuration)
   - `[wsb]` **[Windows Sandbox (WSB)](https://github.com/KnifMelti/WAU-Settings-GUI?tab=readme-ov-file#sandboxtest)** installation/test of **WAU** installation
-    - A standalone **SandboxTest** shortcut for running advanced tests is created in **Start Menu** the first time `[wsb]` is used with **WSB** installed
+    - A standalone **SandboxTest** shortcut for running advanced tests is created in the **Start Menu** the first time `[wsb]` is used with **WSB** installed
   - `[cfg]` **Configuration** backup/import (i.e. for sharing settings)
   - `[wau]` Reinstall **WAU** (with current showing configuration)
     - Stores source in `[INSTALLDIR]\msi\[VERSION]` (enables **WAU** `Repair` in **Programs and Features**)
@@ -64,7 +64,7 @@ Benefits from not having to manage the settings in several places when testing e
 ### Automatic installation
 - Use **WinGet CLI** from a **Command Prompt** to install the latest released version:
   ```bash
-  winget install KnifMelti.WAU-Settings-GUI # --scope user if installation fails)
+  winget install KnifMelti.WAU-Settings-GUI #(--scope user, if failing)
   ```
 - Installation locations:
   - **From standard Command Prompt**: `%USERPROFILE%\AppData\Local\Microsoft\WinGet\Packages\...` (user-only, HKCU registry)
