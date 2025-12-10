@@ -99,9 +99,9 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
         }
     }
 
-    ; Check if working dir is under '\WinGet\Packages\' = installed by WinGet
+    ; Remove WinGet registry entries (if installed via WinGet)
     if InStr(A_WorkingDir, "\WinGet\Packages\", false) > 0 {
-        ; Remove registry entries (local manifest/WinGet) from both HKCU and HKLM
+        ; Remove local manifest registry entries from both HKCU and HKLM
         try {
             RegDeleteKey("HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\KnifMelti.WAU-Settings-GUI__DefaultSource")
         } catch {
@@ -110,6 +110,7 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
             RegDeleteKey("HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\KnifMelti.WAU-Settings-GUI__DefaultSource")
         } catch {
         }
+        ; Remove official WinGet source registry entries from both HKCU and HKLM
         try {
             RegDeleteKey("HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe")
         } catch {
@@ -118,16 +119,16 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
             RegDeleteKey("HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe")
         } catch {
         }
-    } else {
-        ; Remove WAU-Settings-GUI registry key (manual installation)
-        try {
-            RegDeleteKey("HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\WAU-Settings-GUI")
-        } catch {
-        }
-        try {
-            RegDeleteKey("HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\WAU-Settings-GUI")
-        } catch {
-        }
+    }
+
+    ; Always remove manual installation registry keys (in both HKCU and HKLM)
+    try {
+        RegDeleteKey("HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\WAU-Settings-GUI")
+    } catch {
+    }
+    try {
+        RegDeleteKey("HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\WAU-Settings-GUI")
+    } catch {
     }
 
     ; MSI uninstall/install to restore WAU from current showing shortcut settings in the GUI
