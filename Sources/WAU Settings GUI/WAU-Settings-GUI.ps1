@@ -27,7 +27,7 @@ Configure **WAU** settings after installation:
   - `[usr]` Change colors/update schedule for **WAU Settings GUI**
   - `[msi]` **MSI** transform creation (using current showing configuration)
   - `[wsb]` Windows Sandbox test for **WAU**
-    - A standalone **SandboxTest** shortcut for running advanced tests is created in Common Start Menu (All Users)
+    - A standalone **SandboxTest** shortcut is created in Common Start Menu: Programs\SandboxTest.lnk
   - `[cfg]` **Configuration** backup/import (i.e. for sharing settings)
   - `[wau]` Reinstall **WAU** (with current showing configuration)
     - Stores source in `[INSTALLDIR]\msi\[VERSION]` (enables **WAU** `Repair` in **Programs and Features**)
@@ -5857,14 +5857,14 @@ function Show-WAUSettingsGUI {
 
             # Create SandboxTest shortcut in Common Start Menu (All Users) if it doesn't exist
             $commonStartMenuPath = [Environment]::GetFolderPath('CommonStartMenu')
-            $sandboxTestShortcutPath = Join-Path $commonStartMenuPath "Programs\Winget-AutoUpdate\SandboxTest.lnk"
+            $sandboxTestShortcutPath = Join-Path $commonStartMenuPath "Programs\SandboxTest.lnk"
 
             if (-not (Test-Path $sandboxTestShortcutPath)) {
                 try {
-                    # Ensure the Winget-AutoUpdate directory exists
-                    $wauStartMenuDir = Join-Path $commonStartMenuPath "Programs\Winget-AutoUpdate"
-                    if (-not (Test-Path $wauStartMenuDir)) {
-                        New-Item -Path $wauStartMenuDir -ItemType Directory -Force | Out-Null
+                    # Ensure the Programs directory exists
+                    $programsDir = Join-Path $commonStartMenuPath "Programs"
+                    if (-not (Test-Path $programsDir)) {
+                        New-Item -Path $programsDir -ItemType Directory -Force | Out-Null
                     }
 
                     # Create the shortcut

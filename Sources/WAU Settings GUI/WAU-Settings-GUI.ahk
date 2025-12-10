@@ -3,8 +3,8 @@
 ;@Ahk2Exe-Set CompanyName, KnifMelti
 ;@Ahk2Exe-Set ProductName, WAU Settings GUI
 ;@Ahk2Exe-Set FileDescription, Modify every aspect of Winget-AutoUpdate (WAU)
-;@Ahk2Exe-Set FileVersion, 1.9.1.4
-;@Ahk2Exe-Set ProductVersion, 1.9.1.4
+;@Ahk2Exe-Set FileVersion, 1.9.1.5
+;@Ahk2Exe-Set ProductVersion, 1.9.1.5
 ;@Ahk2Exe-Set LegalCopyright, Copyright © 2025 KnifMelti
 ;@Ahk2Exe-Set LegalTrademarks, WAU Settings GUI
 ;@Ahk2Exe-Set InternalName, WAU-Settings-GUI
@@ -24,7 +24,7 @@ A_TrayMenu.Add("Exit", (*) => ExitApp())
 ; Check if we are started from PowerShell for UnInst.exe creation
 fromPS := (A_Args.Length && A_Args[1] = "/FROMPS")
 shortcutDesktop := A_Desktop "\WAU Settings (Administrator).lnk"
-shortcutSandboxTest := A_ProgramsCommon "\Winget-AutoUpdate\SandboxTest.lnk"
+shortcutSandboxTest := A_ProgramsCommon "\SandboxTest.lnk"
 shortcutStartMenu := A_ProgramsCommon "\Winget-AutoUpdate\WAU Settings (Administrator).lnk"
 shortcutOpenLogs := A_ProgramsCommon "\Winget-AutoUpdate\Open Logs.lnk"
 shortcutAppInstaller := A_ProgramsCommon "\Winget-AutoUpdate\WAU App Installer.lnk"
