@@ -62,21 +62,23 @@ Benefits from not having to manage the settings in several places when testing e
   - Select a base directory for the `[INSTALLDIR]` or run directly in portable mode
 
 ### Automatic installation
-- Use **WinGet CLI** from an **Command Prompt** to install the latest released **WinGet** version
-- **NB:** this **MUST** be executed via an **ordinary Command Prompt**:
+- Use **WinGet CLI** from a **Command Prompt** to install the latest released version:
   ```bash
   winget install KnifMelti.WAU-Settings-GUI #(--scope user, if failing)
   ```
-  - In a **Portable WinGet Package** manifest we can't force `Scope: user` and if installed from an **Administrator Command Prompt** the `[INSTALLDIR]` will be under `%ProgramFiles%` and the registry will be populated under `HKLM`
-    - This will in turn break the complete uninstallation/self-healing **WinGet** `version` functionality during upgrade/restore!
-- **UAC** will prompt if dependencies missing:
+- **UAC** will prompt if dependencies are missing:
   ```bash
   Dependencies:
     - Package Dependencies:
         Romanitho.Winget-AutoUpdate
   ```
-- This will install **WAU** with standard settings and then a **Portable WinGet Package** (with `PortableCommandAlias`: **WAU-Settings-GUI**) to:
-   `%USERPROFILE%\AppData\Local\Microsoft\WinGet\Packages\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe`
+  - **WAU** will be installed system-wide (no scope restriction) as designed
+  - If installation fails, retry with `--scope user` flag as shown above
+- Installation locations:
+  - **From elevated Command Prompt**: `%ProgramFiles%\WinGet\Packages\...` (system-wide, HKLM registry)
+  - **From standard Command Prompt**: `%USERPROFILE%\AppData\Local\Microsoft\WinGet\Packages\...` (user-only, HKCU registry)
+  - Both installation types are fully supported with automatic version tracking, shortcuts, and clean uninstallation
+- This will install **WAU** with standard settings and then a **Portable WinGet Package** (with `PortableCommandAlias`: **WAU-Settings-GUI**)
 
 ### Running
 - After installation, **WAU Settings GUI** starts (if installed by **WinGet** you must start it via an ordinary **Command Prompt** using the `PortableCommandAlias`: **WAU-Settings-GUI**)

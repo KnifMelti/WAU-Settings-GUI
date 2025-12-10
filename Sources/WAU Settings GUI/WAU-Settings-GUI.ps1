@@ -27,7 +27,7 @@ Configure **WAU** settings after installation:
   - `[usr]` Change colors/update schedule for **WAU Settings GUI**
   - `[msi]` **MSI** transform creation (using current showing configuration)
   - `[wsb]` Windows Sandbox test for **WAU**
-    - A standalone **SandboxTest** shortcut for running advanced tests is created in User Start Menu
+    - A standalone **SandboxTest** shortcut for running advanced tests is created in Common Start Menu (All Users)
   - `[cfg]` **Configuration** backup/import (i.e. for sharing settings)
   - `[wau]` Reinstall **WAU** (with current showing configuration)
     - Stores source in `[INSTALLDIR]\msi\[VERSION]` (enables **WAU** `Repair` in **Programs and Features**)
@@ -1872,7 +1872,7 @@ function Update-UninstallRegistryVersion {
             return $true
         }
 
-        # Detect installation type and registry path (both are in HKCU)
+        # Detect installation type and registry path (supports both HKCU and HKLM)
         $registryPaths = @()
 
         # Check for WinGet installation (HKCU)
@@ -1881,10 +1881,22 @@ function Update-UninstallRegistryVersion {
             $registryPaths += $wingetPath
         }
 
+        # Check for WinGet installation (HKLM) - when installed from elevated prompt
+        $wingetPathHKLM = "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe"
+        if (Test-Path $wingetPathHKLM) {
+            $registryPaths += $wingetPathHKLM
+        }
+
         # Check for manual installation (HKCU)
         $manualPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\WAU-Settings-GUI"
         if (Test-Path $manualPath) {
             $registryPaths += $manualPath
+        }
+
+        # Check for manual installation (HKLM) - if manually installed system-wide
+        $manualPathHKLM = "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\WAU-Settings-GUI"
+        if (Test-Path $manualPathHKLM) {
+            $registryPaths += $manualPathHKLM
         }
 
         # Update DisplayVersion in all found registry paths
@@ -5830,18 +5842,31 @@ function Show-WAUSettingsGUI {
                 }
             }
 
-            # Create SandboxTest shortcut in user's start menu if it doesn't exist
-            $userStartMenuPath = [Environment]::GetFolderPath('StartMenu')
-            $sandboxTestShortcutPath = Join-Path $userStartMenuPath "Programs\SandboxTest.lnk"
+            # Migrate old SandboxTest shortcut from User Start Menu to Common Start Menu
+            $oldUserStartMenuPath = [Environment]::GetFolderPath('StartMenu')
+            $oldSandboxTestShortcut = Join-Path $oldUserStartMenuPath "Programs\SandboxTest.lnk"
+
+            if (Test-Path $oldSandboxTestShortcut) {
+                try {
+                    Remove-Item -Path $oldSandboxTestShortcut -Force -ErrorAction SilentlyContinue
+                    Write-Verbose "Removed old SandboxTest shortcut from User Start Menu"
+                } catch {
+                    Write-Warning "Failed to remove old SandboxTest shortcut: $($_.Exception.Message)"
+                }
+            }
+
+            # Create SandboxTest shortcut in Common Start Menu (All Users) if it doesn't exist
+            $commonStartMenuPath = [Environment]::GetFolderPath('CommonStartMenu')
+            $sandboxTestShortcutPath = Join-Path $commonStartMenuPath "Programs\Winget-AutoUpdate\SandboxTest.lnk"
 
             if (-not (Test-Path $sandboxTestShortcutPath)) {
                 try {
-                    # Ensure the Programs directory exists
-                    $programsDir = Join-Path $userStartMenuPath "Programs"
-                    if (-not (Test-Path $programsDir)) {
-                        New-Item -Path $programsDir -ItemType Directory -Force | Out-Null
+                    # Ensure the Winget-AutoUpdate directory exists
+                    $wauStartMenuDir = Join-Path $commonStartMenuPath "Programs\Winget-AutoUpdate"
+                    if (-not (Test-Path $wauStartMenuDir)) {
+                        New-Item -Path $wauStartMenuDir -ItemType Directory -Force | Out-Null
                     }
-                    
+
                     # Create the shortcut
                     Add-Shortcut -Shortcut $sandboxTestShortcutPath `
                                 -Target "powershell.exe" `
@@ -5850,10 +5875,10 @@ function Show-WAUSettingsGUI {
                                 -Icon $Script:GUI_ICON `
                                 -Description "Launch WAU Settings GUI in SandboxTest mode" `
                                 -WindowStyle "Normal"
-                    
+
                     # Show dialog about created shortcut
                     [System.Windows.MessageBox]::Show(
-                        "A SandboxTest shortcut has been created in the Start Menu.`n`nYou can now run SandboxTest standalone from the Start Menu without opening WAU Settings GUI first.",
+                        "A SandboxTest shortcut has been created in the Start Menu (All Users).`n`nYou can now run SandboxTest standalone from the Start Menu without opening WAU Settings GUI first.",
                         "SandboxTest Shortcut Created",
                         "OK",
                         "Information"

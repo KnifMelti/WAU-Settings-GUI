@@ -3,8 +3,8 @@
 ;@Ahk2Exe-Set CompanyName, KnifMelti
 ;@Ahk2Exe-Set ProductName, WAU Settings GUI
 ;@Ahk2Exe-Set FileDescription, Modify every aspect of Winget-AutoUpdate (WAU)
-;@Ahk2Exe-Set FileVersion, 1.9.1.3
-;@Ahk2Exe-Set ProductVersion, 1.9.1.3
+;@Ahk2Exe-Set FileVersion, 1.9.1.4
+;@Ahk2Exe-Set ProductVersion, 1.9.1.4
 ;@Ahk2Exe-Set LegalCopyright, Copyright © 2025 KnifMelti
 ;@Ahk2Exe-Set LegalTrademarks, WAU Settings GUI
 ;@Ahk2Exe-Set InternalName, WAU-Settings-GUI
@@ -24,7 +24,7 @@ A_TrayMenu.Add("Exit", (*) => ExitApp())
 ; Check if we are started from PowerShell for UnInst.exe creation
 fromPS := (A_Args.Length && A_Args[1] = "/FROMPS")
 shortcutDesktop := A_Desktop "\WAU Settings (Administrator).lnk"
-shortcutPrograms := A_Programs "\SandboxTest.lnk"
+shortcutSandboxTest := A_ProgramsCommon "\Winget-AutoUpdate\SandboxTest.lnk"
 shortcutStartMenu := A_ProgramsCommon "\Winget-AutoUpdate\WAU Settings (Administrator).lnk"
 shortcutOpenLogs := A_ProgramsCommon "\Winget-AutoUpdate\Open Logs.lnk"
 shortcutAppInstaller := A_ProgramsCommon "\Winget-AutoUpdate\WAU App Installer.lnk"
@@ -61,10 +61,18 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
         ; Ignore errors if no matching processes found
     }
 
-    ; Remove SandboxTest shortcut
-    if FileExist(shortcutPrograms) {
+    ; Remove SandboxTest shortcut from Common Start Menu
+    if FileExist(shortcutSandboxTest) {
         try {
-            FileDelete(shortcutPrograms)
+            FileDelete(shortcutSandboxTest)
+        } catch {
+        }
+    }
+
+    ; Also remove old location (backwards compatibility cleanup)
+    if FileExist(A_Programs "\SandboxTest.lnk") {
+        try {
+            FileDelete(A_Programs "\SandboxTest.lnk")
         } catch {
         }
     }
@@ -93,21 +101,33 @@ if A_Args.Length && (A_Args[1] = "/UNINSTALL") {
 
     ; Check if working dir is under '\WinGet\Packages\' = installed by WinGet
     if InStr(A_WorkingDir, "\WinGet\Packages\", false) > 0 {
-        ; Remove current user registry entries (local manifest/WinGet)
+        ; Remove registry entries (local manifest/WinGet) from both HKCU and HKLM
         try {
             RegDeleteKey("HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\KnifMelti.WAU-Settings-GUI__DefaultSource")
+        } catch {
+        }
+        try {
+            RegDeleteKey("HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\KnifMelti.WAU-Settings-GUI__DefaultSource")
         } catch {
         }
         try {
             RegDeleteKey("HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe")
         } catch {
         }
-    }
-
-    ; Remove WAU-Settings-GUI registry key
-    try {
-        RegDeleteKey("HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\WAU-Settings-GUI")
-    } catch {
+        try {
+            RegDeleteKey("HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe")
+        } catch {
+        }
+    } else {
+        ; Remove WAU-Settings-GUI registry key (manual installation)
+        try {
+            RegDeleteKey("HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\WAU-Settings-GUI")
+        } catch {
+        }
+        try {
+            RegDeleteKey("HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\WAU-Settings-GUI")
+        } catch {
+        }
     }
 
     ; MSI uninstall/install to restore WAU from current showing shortcut settings in the GUI
