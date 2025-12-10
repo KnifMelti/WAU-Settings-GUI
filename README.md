@@ -72,7 +72,6 @@ Benefits from not having to manage the settings in several places when testing e
   - Both installation types are fully supported with automatic version tracking, shortcuts, and clean uninstallation
 - If installation fails, use: `winget install KnifMelti.WAU-Settings-GUI --scope user`
 - This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **WAU-Settings-GUI**)
-- **Note**: If **WAU** is not installed, you will be prompted to download and install it on first run
 
 ### Running
 - After installation, **WAU Settings GUI** starts (if installed by **WinGet** you must start it via an ordinary **Command Prompt** using the `PortableCommandAlias`: **WAU-Settings-GUI**)
