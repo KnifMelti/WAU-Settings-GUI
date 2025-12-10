@@ -66,19 +66,13 @@ Benefits from not having to manage the settings in several places when testing e
   ```bash
   winget install KnifMelti.WAU-Settings-GUI
   ```
-- Not elevated: **UAC** will prompt if dependencies are missing:
-  ```bash
-  Dependencies:
-    - Package Dependencies:
-        Romanitho.Winget-AutoUpdate
-  ```
-  - Not elevated: **WAU** will be installed system-wide/**WAU Settings GUI** user-only (`winget install KnifMelti.WAU-Settings-GUI --scope user`, if installation is failing)
-  - Elevated: **WAU**/**WAU Settings GUI** will be installed system-wide
 - Installation locations:
   - **From standard Command Prompt**: `%USERPROFILE%\AppData\Local\Microsoft\WinGet\Packages\...` (user-only, HKCU registry)
   - **From elevated Command Prompt**: `%ProgramFiles%\WinGet\Packages\...` (system-wide, HKLM registry)
   - Both installation types are fully supported with automatic version tracking, shortcuts, and clean uninstallation
-- This will install **WAU** with standard settings and then a **Portable WinGet Package** (with `PortableCommandAlias`: **WAU-Settings-GUI**)
+- If installation fails, use: `winget install KnifMelti.WAU-Settings-GUI --scope user`
+- This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **WAU-Settings-GUI**)
+- **Note**: If **WAU** is not installed, you will be prompted to download and install it on first run
 
 ### Running
 - After installation, **WAU Settings GUI** starts (if installed by **WinGet** you must start it via an ordinary **Command Prompt** using the `PortableCommandAlias`: **WAU-Settings-GUI**)
