@@ -214,7 +214,7 @@ function SandboxTest {
         .OUTPUTS
         Nullable Object containing GitHub release details
         #>
-        $releasesAPIResponse = Invoke-RestMethod -Uri $script:ReleasesApiUrl
+        $releasesAPIResponse = Invoke-RestMethod -Uri $script:ReleasesApiUrl -UseBasicParsing
         if (!$script:Prerelease) {
             $releasesAPIResponse = $releasesAPIResponse.Where({ !$_.prerelease })
         }
@@ -249,7 +249,7 @@ function SandboxTest {
         if ([String]::IsNullOrWhiteSpace($URL)) {
             $response = @{ StatusCode = 400 }
         } else {
-            $response = Invoke-WebRequest -Uri $URL -Method Head -ErrorAction SilentlyContinue
+            $response = Invoke-WebRequest -Uri $URL -Method Head -UseBasicParsing -ErrorAction SilentlyContinue
         }
         if ($response.StatusCode -ne 200) {
             Write-Debug "Fetching remote content from $URL returned status code $($response.StatusCode)"
