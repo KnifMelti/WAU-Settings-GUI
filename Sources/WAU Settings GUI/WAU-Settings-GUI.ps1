@@ -194,7 +194,7 @@ Install.* = Installer.ps1
             Write-Verbose "Fetching WinGet releases from GitHub API..."
             
             # Fetch releases from GitHub API with timeout and User-Agent header
-            $releases = Invoke-RestMethod -Uri $releasesApiUrl -TimeoutSec 10 -UserAgent "WAU-Settings-GUI" -ErrorAction Stop
+            $releases = Invoke-RestMethod -Uri $releasesApiUrl -TimeoutSec 10 -UserAgent "WAU-Settings-GUI" -UseBasicParsing -ErrorAction Stop
             
             # Filter to only stable releases (not prerelease) that have assets and get top 25
             $stableReleases = $releases | Where-Object { 
@@ -241,8 +241,8 @@ Install.* = Installer.ps1
         try {
             $releasesApiUrl = 'https://api.github.com/repos/microsoft/winget-cli/releases?per_page=100'
             Write-Verbose "Validating WinGet version: $Version"
-            
-            $releases = Invoke-RestMethod -Uri $releasesApiUrl -TimeoutSec 10 -UserAgent "WAU-Settings-GUI" -ErrorAction Stop
+
+            $releases = Invoke-RestMethod -Uri $releasesApiUrl -TimeoutSec 10 -UserAgent "WAU-Settings-GUI" -UseBasicParsing -ErrorAction Stop
             
             if (-not $IncludePrerelease) {
                 $releases = $releases | Where-Object { -not $_.prerelease }

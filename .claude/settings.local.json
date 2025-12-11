@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell -Command \"Select-String -Path ''SandboxTest.ps1'' -Pattern ''Invoke-WebRequest'' -Context 2,2\")",
+      "Bash(powershell -Command \"Select-String -Path ''WAU-Settings-GUI.ps1'' -Pattern ''Invoke-WebRequest'' | Select-Object -First 20 LineNumber,Line\")",
+      "Bash(powershell -Command \"Select-String -Path ''WAU-Settings-GUI.ps1'' -Pattern ''@[\"\"'''']'' | Measure-Object | Select-Object -ExpandProperty Count\")",
+      "Bash(findstr:*)",
+      "Bash(powershell -Command \"Select-String -Path ''WAU-Settings-GUI.ps1'' -Pattern ''Invoke-RestMethod'' -Context 0,1 | Select-Object -First 10\")",
+      "Bash(powershell:*)"
+    ]
+  }
+}
