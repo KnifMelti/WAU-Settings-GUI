@@ -533,7 +533,11 @@ Add-Shortcut "${env:SystemRoot}\System32\WindowsPowerShell\v1.0\powershell.exe" 
 Add-Shortcut "${env:SystemRoot}\System32\WindowsPowerShell\v1.0\powershell.exe" "$nirSoftFolder\AdvancedRun.lnk" "-ExecutionPolicy Bypass -WindowStyle Hidden -Command `"if(!(Test-Path '${env:TEMP}\AdvancedRun\AdvancedRun.exe')){Invoke-WebRequest -Uri 'https://www.nirsoft.net/utils/advancedrun-x64.zip' -OutFile '${env:TEMP}\advancedrun-x64.zip' -UseBasicParsing;Expand-Archive -Path '${env:TEMP}\advancedrun-x64.zip' -DestinationPath '${env:TEMP}\AdvancedRun' -Force};[System.Windows.Forms.SendKeys]::SendWait('{F5}');Start-Process '${env:TEMP}\AdvancedRun\AdvancedRun.exe' -Verb RunAs`"" "${env:TEMP}\AdvancedRun\AdvancedRun.exe,0" "Download and run AdvancedRun" "Minimized"
 Add-Shortcut "${env:windir}\regedit.exe" "${env:Public}\Desktop\Registry Editor.lnk" "" "" "Open Registry Editor" "Normal"
 
-# Configure Explorer settings
+# Configure Regedit settings (Favorites)
+reg.exe add "HKCU\Software\Microsoft\Windows\CurrentVersion\Applets\Regedit\Favorites" /v "Uninstall Machine" /t REG_SZ /d Computer\HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall /f | Out-Null
+reg.exe add "HKCU\Software\Microsoft\Windows\CurrentVersion\Applets\Regedit\Favorites" /v "Uninstall User" /t REG_SZ /d Computer\HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall /f | Out-Null
+
+    # Configure Explorer settings
 reg.exe add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v HideFileExt /t REG_DWORD /d 0 /f | Out-Null
 reg.exe add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v Hidden /t REG_DWORD /d 1 /f | Out-Null
 
@@ -609,7 +613,7 @@ if ($installLocation) {
     while ($elapsed -lt $timeout) {
         if (Test-Path $wauScriptPath) {
             Write-Host ""
-            Write-Host "WAU installation completed successfully!" -ForegroundColor Green -BackgroundColor DarkGreen
+            Write-Host "WAU installation completed successfully!" -ForegroundColor Green
             Write-Host "Installation verified at: $wauScriptPath" -ForegroundColor Cyan
             Start-Sleep -Seconds 2
             break
@@ -722,7 +726,7 @@ try {
     Get-ChildItem -Recurse -Filter '*.appx' | Where-Object {`$_.FullName -match 'x64'} | Add-AppxPackage -ErrorAction Stop
     Write-Host '    [3/3] Installing WinGet...' -ForegroundColor Cyan
     Add-AppxPackage './$($script:AppInstallerPFN).msixbundle' -ErrorAction Stop
-    Write-Host '    WinGet installed successfully!' -ForegroundColor Green -BackgroundColor DarkGreen
+    Write-Host '    WinGet installed successfully!' -ForegroundColor Green
 } catch {
   Write-Host ''
   Write-Host '    Package installation failed. Using fallback method...' -ForegroundColor Yellow
@@ -742,7 +746,7 @@ try {
   }
   Write-Host '    [3/3] Repairing WinGet Package Manager...' -ForegroundColor Cyan
   Repair-WinGetPackageManager -Version $($script:AppInstallerReleaseTag)
-  Write-Host '    WinGet installed successfully!' -ForegroundColor Green -BackgroundColor DarkGreen
+  Write-Host '    WinGet installed successfully!' -ForegroundColor Green
 }
 
 Write-Host ''
@@ -760,7 +764,7 @@ Get-ChildItem -Filter 'settings.json' | Copy-Item -Destination C:\Users\WDAGUtil
 winget settings --Enable LocalManifestFiles | Out-Null
 winget settings --Enable LocalArchiveMalwareScanOverride | Out-Null
 Set-WinHomeLocation -GeoID $($script:HostGeoID)
-Write-Host '    Configuration completed!' -ForegroundColor Green -BackgroundColor DarkGreen
+Write-Host '    Configuration completed!' -ForegroundColor Green
 
 Write-Host ''
 Write-Host '================================================' -ForegroundColor Cyan
