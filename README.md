@@ -73,7 +73,7 @@ Benefits from not having to manage the settings in several places when testing e
 - This will install a **Portable WinGet Package** (with `PortableCommandAlias`: **WAU-Settings-GUI**)
 
 ### Running
-- After installation, **WAU Settings GUI** starts (if installed by **WinGet** you must start it via an ordinary **Command Prompt** using the `PortableCommandAlias`: **WAU-Settings-GUI**)
+- After installation, **WAU Settings GUI** starts (if installed by **WinGet** you must start it via an ordinary **Command Prompt (not PS!)** using the `PortableCommandAlias`: **WAU-Settings-GUI**)
 - If **WAU** is not installed a prompt to download and install it with standard settings will pop up
 - If a local list is not found, it will prompt to create a new `excluded_apps.txt`
   - The created list will contain `KnifMelti.WAU-Settings-GUI`
