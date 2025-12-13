@@ -525,6 +525,32 @@ if (!(Test-Path $nirSoftFolder)) {
     & attrib.exe +R "$nirSoftFolder" 2>$null
 }
 
+# Enable Dark Mode for Apps
+Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "AppsUseLightTheme" -Value 0
+
+# Enable Dark Mode for System
+Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "SystemUsesLightTheme" -Value 0
+
+# Set the Dark Mode Wallpaper
+$wallpaperPath = "C:\Windows\Web\Wallpaper\Windows\img19.jpg"
+$code = @"
+using System.Runtime.InteropServices;
+public class Wallpaper {
+    [DllImport("user32.dll", CharSet=CharSet.Auto)]
+    public static extern int SystemParametersInfo(int uAction, int uParam, string lpvParam, int fuWinIni);
+}
+"@
+
+Add-Type $code
+$SPI_SETDESKWALLPAPER = 0x0014
+$UPDATE_INI_FILE = 0x01
+$SEND_CHANGE = 0x02
+
+[Wallpaper]::SystemParametersInfo($SPI_SETDESKWALLPAPER, 0, $wallpaperPath, ($UPDATE_INI_FILE -bor $SEND_CHANGE))
+
+# Enable Clipboard History
+Set-ItemProperty -Path "HKCU:\Software\Microsoft\Clipboard" -Name "EnableClipboardHistory" -Value 1 -Type DWord -Force
+
 # Create non-WAU shortcuts
 Add-Shortcut "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe" "${env:Public}\Desktop\Sysinternals Live.lnk" "https://live.sysinternals.com/" "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe,5" "Download and run from Sysinternals Live" "Normal"
 Add-Shortcut "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe" "$nirSoftFolder\NirSoft.lnk" "https://www.nirsoft.net/" "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe,5" "Download from NirSoft Utilities" "Normal"
