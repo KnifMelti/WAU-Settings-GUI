@@ -85,8 +85,8 @@ Benefits from not having to manage the settings in several places when testing e
 ### Updating
 - Checks automatically every week as standard (click the button `[usr]` under Dev Tools (**F12**) to change the update schedule)
 - Dev Tools (**F12**): Click the button `[ver]`
-  - If `[INSTALLDIR]\ver\backup` exists a restore option is also presented
 - If an update exists, **WAU Settings GUI** will ask if you want to download and install the new version
+  - If `[INSTALLDIR]\ver\backup` exists a restore option is also presented
 - Before updating a backup of the current version will be created in `[INSTALLDIR]\ver\backup` folder
   - After update/restore the local **WinGet** version in registry is synced with the current version of `WAU-Settings-GUI.exe`
 - **WAU** will also rudimentary update **WAU Settings GUI** in user scope with every new released **WinGet** version
