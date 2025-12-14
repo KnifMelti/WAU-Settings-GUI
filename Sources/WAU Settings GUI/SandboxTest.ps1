@@ -535,10 +535,10 @@ if (!(Test-Path $nirSoftFolder)) {
 }
 
 # Enable Dark Mode adaptively based on host system
-Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "AppsUseLightTheme" -Value PLACEHOLDER_APPS_LIGHT_THEME
+Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "AppsUseLightTheme" -Value PLACEHOLDER_APPS_LIGHT_THEME | Out-Null
 
 # Enable Dark Mode for System adaptively
-Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "SystemUsesLightTheme" -Value PLACEHOLDER_SYSTEM_LIGHT_THEME
+Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "SystemUsesLightTheme" -Value PLACEHOLDER_SYSTEM_LIGHT_THEME | Out-Null
 
 # Set the wallpaper based on theme (dark = img19.jpg, light = img0.jpg)
 if (PLACEHOLDER_SYSTEM_LIGHT_THEME -eq 0) {
@@ -560,7 +560,7 @@ $SPI_SETDESKWALLPAPER = 0x0014
 $UPDATE_INI_FILE = 0x01
 $SEND_CHANGE = 0x02
 
-[Wallpaper]::SystemParametersInfo($SPI_SETDESKWALLPAPER, 0, $wallpaperPath, ($UPDATE_INI_FILE -bor $SEND_CHANGE))
+[Wallpaper]::SystemParametersInfo($SPI_SETDESKWALLPAPER, 0, $wallpaperPath, ($UPDATE_INI_FILE -bor $SEND_CHANGE)) | Out-Null
 
 # Enable Clipboard History
 Set-ItemProperty -Path "HKCU:\Software\Microsoft\Clipboard" -Name "EnableClipboardHistory" -Value 1 -Type DWord -Force
@@ -589,7 +589,7 @@ Invoke-Command -ScriptBlock {
 # Refresh Explorer windows and desktop icons
 Get-Process explorer -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 Start-Sleep -Milliseconds 500
-ie4uinit.exe -Show
+ie4uinit.exe -Show | Out-Null
 
 # Create UninstallView configuration folder and config file
 $uninstallViewFolder = "${env:TEMP}\UninstallView"
@@ -810,19 +810,12 @@ winget settings --Enable LocalArchiveMalwareScanOverride | Out-Null
 Set-WinHomeLocation -GeoID $($script:HostGeoID)
 Write-Host '    Configuration completed!' -ForegroundColor Green
 
-Write-Host ''
-Write-Host '================================================' -ForegroundColor Cyan
-Write-Host 'Tip: Type "Update-EnvironmentVariables" to refresh' -ForegroundColor Gray
-Write-Host 'environment variables after installing software.' -ForegroundColor Gray
-Write-Host '================================================' -ForegroundColor Cyan
-Write-Host ''
-
 `$BoundParameterScript = Get-ChildItem -Filter 'BoundParameterScript.ps1'
 if (`$BoundParameterScript) {
     Write-Host ""
-    Write-Host "--> Running BoundParameterScript.ps1" -ForegroundColor Yellow
+    Write-Host "--> Running user script with sandbox initialization" -ForegroundColor Yellow
     Write-Host ""
-    & `$BoundParameterScript.FullName
+    & `$BoundParameterScript.FullName | Out-Host
 }
 
 Pop-Location
