@@ -147,6 +147,15 @@ function SandboxTest {
     $script:SandboxBootstrapFile = Join-Path -Path $script:SandboxTestDataFolder -ChildPath "$script:ScriptName.ps1"
     $script:HostGeoID = (Get-WinHomeLocation).GeoID
 
+    # Detect host dark mode settings to replicate in sandbox
+    $script:HostAppsUseLightTheme = try {
+        (Get-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "AppsUseLightTheme" -ErrorAction SilentlyContinue).AppsUseLightTheme
+    } catch { 0 }  # Default to dark if unable to detect
+
+    $script:HostSystemUsesLightTheme = try {
+        (Get-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "SystemUsesLightTheme" -ErrorAction SilentlyContinue).SystemUsesLightTheme
+    } catch { 0 }  # Default to dark if unable to detect
+
     # Misc
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
@@ -525,14 +534,19 @@ if (!(Test-Path $nirSoftFolder)) {
     & attrib.exe +R "$nirSoftFolder" 2>$null
 }
 
-# Enable Dark Mode for Apps
-Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "AppsUseLightTheme" -Value 0
+# Enable Dark Mode adaptively based on host system
+Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "AppsUseLightTheme" -Value PLACEHOLDER_APPS_LIGHT_THEME
 
-# Enable Dark Mode for System
-Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "SystemUsesLightTheme" -Value 0
+# Enable Dark Mode for System adaptively
+Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "SystemUsesLightTheme" -Value PLACEHOLDER_SYSTEM_LIGHT_THEME
 
-# Set the Dark Mode Wallpaper
-$wallpaperPath = "C:\Windows\Web\Wallpaper\Windows\img19.jpg"
+# Set the wallpaper based on theme (dark = img19.jpg, light = img0.jpg)
+if (PLACEHOLDER_SYSTEM_LIGHT_THEME -eq 0) {
+    $wallpaperPath = "C:\Windows\Web\Wallpaper\Windows\img19.jpg"  # Dark wallpaper
+} else {
+    $wallpaperPath = "C:\Windows\Web\Wallpaper\Windows\img0.jpg"   # Light wallpaper (Hero on Win10, Bloom on Win11)
+}
+
 $code = @"
 using System.Runtime.InteropServices;
 public class Wallpaper {
@@ -588,6 +602,10 @@ $uninstallViewConfig = "[General]`r`nMarkOddEvenRows=1`r`nShowGridLines=1`r`nSho
 $uninstallViewConfig | Out-File -FilePath (Join-Path $uninstallViewFolder "UninstallView.cfg") -Encoding ASCII -Force
 
 '@
+
+        # Replace placeholders with actual host theme values
+        $sandboxPreInstallScript = $sandboxPreInstallScript -replace 'PLACEHOLDER_APPS_LIGHT_THEME', $script:HostAppsUseLightTheme
+        $sandboxPreInstallScript = $sandboxPreInstallScript -replace 'PLACEHOLDER_SYSTEM_LIGHT_THEME', $script:HostSystemUsesLightTheme
 
         if ($Script) {
             Write-Verbose "Creating script file from 'Script' argument with initialization code"
