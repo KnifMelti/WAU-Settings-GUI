@@ -8,7 +8,7 @@ Provides a user-friendly portable standalone interface to modify every aspect of
 
 ### Dependencies
 This project depends on the following repository:
-- [Winget-AutoUpdate](https://github.com/Romanitho/Winget-AutoUpdate): has all the settings this project can handle/modify/save/restore/share and document
+- [Winget-AutoUpdate](https://github.com/Romanitho/Winget-AutoUpdate): has all the settings this project can handle/modify/save/restore/share/test and document
 
 If **WAU** is not installed, it will prompt to download and install with standard settings.
 
