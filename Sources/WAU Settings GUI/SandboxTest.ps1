@@ -569,8 +569,8 @@ Set-ItemProperty -Path "HKCU:\Software\Microsoft\Clipboard" -Name "EnableClipboa
 Add-Shortcut "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe" "${env:Public}\Desktop\Sysinternals Live.lnk" "https://live.sysinternals.com/" "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe,5" "Download and run from Sysinternals Live" "Normal"
 Add-Shortcut "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe" "$nirSoftFolder\NirSoft.lnk" "https://www.nirsoft.net/" "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe,5" "Download from NirSoft Utilities" "Normal"
 Add-Shortcut "${env:SystemRoot}\System32\WindowsPowerShell\v1.0\powershell.exe" "${env:Public}\Desktop\CTT Windows Utility.lnk" "-ExecutionPolicy Bypass -Command `"Start-Process powershell.exe -verb runas -ArgumentList 'irm https://christitus.com/win | iex'`"" "${env:SystemRoot}\System32\SHELL32.dll,43" "Run Chris Titus Tech's Windows Utility"
-Add-Shortcut "${env:SystemRoot}\System32\WindowsPowerShell\v1.0\powershell.exe" "$nirSoftFolder\UninstallView.lnk" "-ExecutionPolicy Bypass -WindowStyle Hidden -Command `"if(!(Test-Path '${env:TEMP}\UninstallView\UninstallView.exe')){Invoke-WebRequest -Uri 'https://www.nirsoft.net/utils/uninstallview-x64.zip' -OutFile '${env:TEMP}\uninstallview-x64.zip' -UseBasicParsing;Expand-Archive -Path '${env:TEMP}\uninstallview-x64.zip' -DestinationPath '${env:TEMP}\UninstallView' -Force};[System.Windows.Forms.SendKeys]::SendWait('{F5}');Start-Process '${env:TEMP}\UninstallView\UninstallView.exe' -Verb RunAs`"" "${env:TEMP}\UninstallView\UninstallView.exe,0" "Download and run UninstallView" "Minimized"
-Add-Shortcut "${env:SystemRoot}\System32\WindowsPowerShell\v1.0\powershell.exe" "$nirSoftFolder\AdvancedRun.lnk" "-ExecutionPolicy Bypass -WindowStyle Hidden -Command `"if(!(Test-Path '${env:TEMP}\AdvancedRun\AdvancedRun.exe')){Invoke-WebRequest -Uri 'https://www.nirsoft.net/utils/advancedrun-x64.zip' -OutFile '${env:TEMP}\advancedrun-x64.zip' -UseBasicParsing;Expand-Archive -Path '${env:TEMP}\advancedrun-x64.zip' -DestinationPath '${env:TEMP}\AdvancedRun' -Force};[System.Windows.Forms.SendKeys]::SendWait('{F5}');Start-Process '${env:TEMP}\AdvancedRun\AdvancedRun.exe' -Verb RunAs`"" "${env:TEMP}\AdvancedRun\AdvancedRun.exe,0" "Download and run AdvancedRun" "Minimized"
+Add-Shortcut "${env:SystemRoot}\System32\WindowsPowerShell\v1.0\powershell.exe" "$nirSoftFolder\UninstallView.lnk" "-ExecutionPolicy Bypass -WindowStyle Hidden -Command `"if(!(Test-Path '${env:TEMP}\UninstallView\UninstallView.exe')){Invoke-WebRequest -Uri 'https://www.nirsoft.net/utils/uninstallview-x64.zip' -OutFile '${env:TEMP}\uninstallview-x64.zip' -UseBasicParsing;Expand-Archive -Path '${env:TEMP}\uninstallview-x64.zip' -DestinationPath '${env:TEMP}\UninstallView' -Force};[System.Windows.Forms.SendKeys]::SendWait('{F5}');Start-Process '${env:TEMP}\UninstallView\UninstallView.exe' -Verb RunAs`"" "${env:TEMP}\UninstallView\UninstallView.exe,0" "Download and run UninstallView - List all installed apps" "Minimized"
+Add-Shortcut "${env:SystemRoot}\System32\WindowsPowerShell\v1.0\powershell.exe" "$nirSoftFolder\AdvancedRun.lnk" "-ExecutionPolicy Bypass -WindowStyle Hidden -Command `"if(!(Test-Path '${env:TEMP}\AdvancedRun\AdvancedRun.exe')){Invoke-WebRequest -Uri 'https://www.nirsoft.net/utils/advancedrun-x64.zip' -OutFile '${env:TEMP}\advancedrun-x64.zip' -UseBasicParsing;Expand-Archive -Path '${env:TEMP}\advancedrun-x64.zip' -DestinationPath '${env:TEMP}\AdvancedRun' -Force};[System.Windows.Forms.SendKeys]::SendWait('{F5}');Start-Process '${env:TEMP}\AdvancedRun\AdvancedRun.exe' -Verb RunAs`"" "${env:TEMP}\AdvancedRun\AdvancedRun.exe,0" "Download and run AdvancedRun - Install apps in SYSTEM context" "Minimized"
 Add-Shortcut "${env:windir}\regedit.exe" "${env:Public}\Desktop\Registry Editor.lnk" "" "" "Open Registry Editor" "Normal"
 
 # Configure Regedit settings (Favorites)
@@ -591,7 +591,7 @@ Get-Process explorer -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorA
 Start-Sleep -Milliseconds 500
 ie4uinit.exe -Show | Out-Null
 
-# Create UninstallView configuration folder and config file
+# Create UninstallView configuration folder
 $uninstallViewFolder = "${env:TEMP}\UninstallView"
 if (!(Test-Path $uninstallViewFolder)) {
     New-Item -Path $uninstallViewFolder -ItemType Directory -Force | Out-Null
@@ -600,6 +600,16 @@ if (!(Test-Path $uninstallViewFolder)) {
 # Create UninstallView.cfg with configuration
 $uninstallViewConfig = "[General]`r`nMarkOddEvenRows=1`r`nShowGridLines=1`r`nShowInfoTip=1`r`nUseQuickFilter=1`r`nQuickFilterColumnsMode=1`r`nQuickFilterFindMode=1`r`nQuickFilterShowHide=1`r`nLoadFrom=1`r`nLoadingSpeed=1`r`nShowSystemComponents=1`r`nRegEditOpenMode=1`r`nAddExportHeaderLine=1`r`nSort=4099"
 $uninstallViewConfig | Out-File -FilePath (Join-Path $uninstallViewFolder "UninstallView.cfg") -Encoding ASCII -Force
+
+# Create NotePad++ configuration folder
+$notepadPPConfigFolder = "${env:APPDATA}\Notepad++"
+if (!(Test-Path $notepadPPConfigFolder)) {
+    New-Item -Path $notepadPPConfigFolder -ItemType Directory -Force | Out-Null
+}
+
+# Create NotePad++ config.xml for Dark Mode (adaptive)
+$notepadPPConfig = "<?xml version=`"1.0`" encoding=`"UTF-8`" ?>`r`n<NotepadPlus>`r`n    <FindHistory nbMaxFindHistoryPath=`"10`" nbMaxFindHistoryFilter=`"10`" nbMaxFindHistoryFind=`"10`" nbMaxFindHistoryReplace=`"10`" matchWord=`"no`" matchCase=`"no`" wrap=`"yes`" directionDown=`"yes`" fifRecuisive=`"yes`" fifInHiddenFolder=`"no`" fifProjectPanel1=`"no`" fifProjectPanel2=`"no`" fifProjectPanel3=`"no`" fifFilterFollowsDoc=`"no`" searchMode=`"0`" transparencyMode=`"1`" transparency=`"150`" dotMatchesNewline=`"no`" isSearch2ButtonsMode=`"no`" regexBackward4PowerUser=`"no`" bookmarkLine=`"no`" purge=`"no`" />`r`n    <History nbMaxFile=`"10`" inSubMenu=`"no`" customLength=`"-1`" />`r`n    <GUIConfigs>`r`n        <GUIConfig name=`"AppPosition`" x=`"159`" y=`"33`" width=`"1024`" height=`"700`" isMaximized=`"no`" />`r`n        <GUIConfig name=`"DarkMode`" enable=`"yes`" colorTone=`"0`" customColorTop=`"2105376`" customColorMenuHotTrack=`"4539717`" customColorActive=`"3684408`" customColorMain=`"2105376`" customColorError=`"176`" customColorText=`"14737632`" customColorDarkText=`"12632256`" customColorDisabledText=`"8421504`" customColorLinkText=`"65535`" customColorEdge=`"6579300`" customColorHotEdge=`"10197915`" customColorDisabledEdge=`"4737096`" enableWindowsMode=`"yes`" darkThemeName=`"DarkModeDefault.xml`" darkToolBarIconSet=`"0`" darkTbFluentColor=`"0`" darkTbFluentCustomColor=`"16229943`" darkTbFluentMono=`"no`" darkTabIconSet=`"2`" darkTabUseTheme=`"no`" lightThemeName=`"`" lightToolBarIconSet=`"4`" lightTbFluentColor=`"0`" lightTbFluentCustomColor=`"12873472`" lightTbFluentMono=`"no`" lightTabIconSet=`"0`" lightTabUseTheme=`"yes`" />`r`n    </GUIConfigs>`r`n</NotepadPlus>"
+$notepadPPConfig | Out-File -FilePath (Join-Path $notepadPPConfigFolder "config.xml") -Encoding ASCII -Force
 
 '@
 
@@ -705,7 +715,7 @@ if ($installLocation) {
     $wauInstallScript = Join-Path $installLocation "Winget-Install.ps1"
 
     # Create AdvancedRun.cfg with WAU test configuration using dynamic path
-    $configContent = "[General]`r`nCommandLine=`"-NoProfile -ExecutionPolicy bypass -File `"$wauInstallScript`" -AppIDs Notepad++.Notepad++`"`r`nStartDirectory=`r`nRunAs=4`r`nEnvironmentVariablesMode=1`r`nUseSearchPath=1`r`nRunMode=4`r`nCommandWindowMode=1"
+    $configContent = "[General]`r`nCommandLine=`"-NoProfile -ExecutionPolicy bypass -File `"$wauInstallScript`" -AppIDs `"Notepad++.Notepad++,InstEd.InstEd`"`"`r`nStartDirectory=`r`nRunAs=4`r`nEnvironmentVariablesMode=1`r`nUseSearchPath=1`r`nRunMode=4`r`nCommandWindowMode=1"
     $configContent | Out-File -FilePath (Join-Path $advancedRunFolder "AdvancedRun.cfg") -Encoding ASCII -Force
     
     Write-Host "WAU-specific configuration completed!" -ForegroundColor Green
@@ -813,8 +823,9 @@ Write-Host '    Configuration completed!' -ForegroundColor Green
 `$BoundParameterScript = Get-ChildItem -Filter 'BoundParameterScript.ps1'
 if (`$BoundParameterScript) {
     Write-Host ""
-    Write-Host "--> Running user script with sandbox initialization" -ForegroundColor Yellow
-    Write-Host ""
+    Write-Host "================================================" -ForegroundColor Cyan
+    Write-Host "--> Running user script (WSB initialization)" -ForegroundColor Yellow
+    Write-Host "================================================" -ForegroundColor Cyan
     & `$BoundParameterScript.FullName | Out-Host
 }
 
