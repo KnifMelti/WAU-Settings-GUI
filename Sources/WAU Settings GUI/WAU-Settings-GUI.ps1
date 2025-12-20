@@ -46,11 +46,12 @@ param(
 
 if ($SandboxTest.IsPresent) {
     $Script:WorkingDir = $PSScriptRoot
+    $ProjectRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent  # 2 levels up
     # Import required assemblies
     Add-Type -AssemblyName System.Windows.Forms
     Add-Type -AssemblyName System.Drawing
     Add-Type -AssemblyName PresentationFramework
-    . $WorkingDir\shared\SandboxTest.ps1
+    . "$ProjectRoot\shared\SandboxTest.ps1"
     
     function Get-ScriptMappings {
         <#
@@ -3607,7 +3608,7 @@ function Start-WSBTesting {
                 }
                 
                 # Load sandbox script
-                . $WorkingDir\shared\SandboxTest.ps1
+                . "$ProjectRoot\shared\SandboxTest.ps1"
 
                 # Call the function
                 SandboxTest -MapFolder $msiDirectory -SandboxFolderName "WAU-install" -Script {
