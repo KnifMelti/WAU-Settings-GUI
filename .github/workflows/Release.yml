@@ -9,12 +9,35 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+      with:
+        submodules: recursive
     
-    - name: Create zip from subdirectory
+    - name: Create release package
       run: |
-        cd "Sources/WAU Settings GUI"
-        zip -r "../../WAU-Settings-GUI-${{ github.event.release.tag_name }}.zip" . -x "compile_and_sign.ps1" "sign_exe.ps1"
+        # Create structure that matches development environment
+        # ProjectRoot/
+        #   Sources/
+        #     WAU Settings GUI/
+        #       WAU-Settings-GUI.ps1
+        #   shared/
+        #     SandboxTest.ps1
         
+        mkdir -p release-package/Sources/WAU\ Settings\ GUI
+        mkdir -p release-package/shared
+        
+        # Copy main files (excluding build scripts and old SandboxTest.ps1)
+        cd "Sources/WAU Settings GUI"
+        find . -type f ! -name "compile_and_sign.ps1" ! -name "sign_exe.ps1" ! -name "SandboxTest.ps1" -exec cp --parents {} ../../release-package/Sources/WAU\ Settings\ GUI/ \;
+        cd ../..
+        
+        # Copy shared submodule
+        cp shared/SandboxTest.ps1 release-package/shared/
+        
+        # Create zip from contents (without extra parent directory)
+        cd release-package
+        zip -r "../WAU-Settings-GUI-${{ github.event.release.tag_name }}.zip" .
+        cd ..
+    
     - name: Upload Release Asset
       uses: softprops/action-gh-release@v1
       with:
