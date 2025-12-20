@@ -45,7 +45,16 @@ param(
  )
 
 if ($SandboxTest.IsPresent) {
-    $sandboxTestPath = "$Script:WorkingDir\SandboxTest.ps1"
+    # Set WorkingDir early for SandboxTest mode
+    $Script:WorkingDir = $PSScriptRoot
+    
+    # Import required assemblies first
+    Add-Type -AssemblyName System.Windows.Forms
+    Add-Type -AssemblyName System.Drawing
+    Add-Type -AssemblyName PresentationFramework
+    
+    # Load SandboxTest.ps1
+    $sandboxTestPath = "$PSScriptRoot\SandboxTest.ps1"
     
     if (Test-Path $sandboxTestPath) {
         . $sandboxTestPath
@@ -58,11 +67,6 @@ if ($SandboxTest.IsPresent) {
         )
         exit 1
     }
-
-    # Import required assemblies
-    Add-Type -AssemblyName System.Windows.Forms
-    Add-Type -AssemblyName System.Drawing
-    Add-Type -AssemblyName PresentationFramework
     
     function Get-ScriptMappings {
         <#
