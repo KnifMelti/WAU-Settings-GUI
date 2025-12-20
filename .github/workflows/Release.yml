@@ -30,7 +30,8 @@ jobs:
         find . -type f ! -name "compile_and_sign.ps1" ! -name "sign_exe.ps1" ! -name "SandboxTest.ps1" -exec cp --parents {} ../../release-package/Sources/WAU\ Settings\ GUI/ \;
         cd ../..
         
-        # Copy shared submodule
+        # Copy only SandboxTest.ps1 from shared submodule
+        mkdir -p release-package/shared
         cp shared/SandboxTest.ps1 release-package/shared/
         
         # Create zip from contents (without extra parent directory)

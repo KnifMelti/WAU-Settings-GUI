@@ -45,13 +45,12 @@ param(
  )
 
 if ($SandboxTest.IsPresent) {
-    $Script:WorkingDir = $PSScriptRoot
-    $ProjectRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent  # 2 levels up
+    . "$Script:ProjectRoot\shared\SandboxTest.ps1"
+
     # Import required assemblies
     Add-Type -AssemblyName System.Windows.Forms
     Add-Type -AssemblyName System.Drawing
     Add-Type -AssemblyName PresentationFramework
-    . "$ProjectRoot\shared\SandboxTest.ps1"
     
     function Get-ScriptMappings {
         <#
@@ -972,6 +971,7 @@ $Script:UPDATE_RESTORE_MODE = $false
 
 # Set essential variables, used already in <# MAIN #>
 $Script:WorkingDir = $PSScriptRoot
+$Script:ProjectRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent  # 2 levels up to project root
 $Script:WAU_GUI_NAME = "WAU-Settings-GUI"  # Default name for WAU Settings GUI executable
 $Script:WAU_GUI_REPO = "KnifMelti/WAU-Settings-GUI" # GitHub repository for WAU Settings GUI
 
@@ -1649,11 +1649,17 @@ function Start-WAUGUIUpdate {
                 
                 # Find the actual files to copy
                 $filesToCopy = $null
+                $sharedFolderSource = $null
                 
                 # Check for Sources\WAU Settings GUI structure
                 $wauSettingsPath = Join-Path $sourceDir "Sources\WAU Settings GUI"
                 if (Test-Path $wauSettingsPath) {
                     $filesToCopy = $wauSettingsPath
+                    # Check for shared folder at project root level
+                    $sharedPath = Join-Path $sourceDir "shared"
+                    if (Test-Path $sharedPath) {
+                        $sharedFolderSource = $sharedPath
+                    }
                 } elseif (Test-Path (Join-Path $sourceDir "WAU-Settings-GUI.ps1")) {
                     $filesToCopy = $sourceDir
                 }
@@ -1788,6 +1794,24 @@ function Start-WAUGUIUpdate {
                             }
                             throw
                         }
+                    }
+                }
+
+                # Copy SandboxTest.ps1 from shared folder if it exists
+                if ($sharedFolderSource) {
+                    $sharedDestination = Join-Path (Split-Path $Script:WorkingDir -Parent) "shared"
+                    $sandboxTestSource = Join-Path $sharedFolderSource "SandboxTest.ps1"
+                    
+                    if (Test-Path $sandboxTestSource) {
+                        # Create shared folder if it doesn't exist
+                        if (-not (Test-Path $sharedDestination)) {
+                            New-Item -ItemType Directory -Path $sharedDestination -Force | Out-Null
+                        }
+                        
+                        # Copy only SandboxTest.ps1
+                        $sandboxTestDest = Join-Path $sharedDestination "SandboxTest.ps1"
+                        Copy-Item -Path $sandboxTestSource -Destination $sandboxTestDest -Force
+                        Write-Host "Updated shared/SandboxTest.ps1"
                     }
                 }
 
@@ -3608,8 +3632,8 @@ function Start-WSBTesting {
                 }
                 
                 # Load sandbox script
-                . "$ProjectRoot\shared\SandboxTest.ps1"
-
+                . "$Script:ProjectRoot\shared\SandboxTest.ps1"
+                
                 # Call the function
                 SandboxTest -MapFolder $msiDirectory -SandboxFolderName "WAU-install" -Script {
                     $SandboxFolderName = "WAU-install"
