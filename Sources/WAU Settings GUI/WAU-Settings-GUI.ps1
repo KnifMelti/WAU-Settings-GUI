@@ -50,7 +50,7 @@ if ($SandboxTest.IsPresent) {
     Add-Type -AssemblyName System.Windows.Forms
     Add-Type -AssemblyName System.Drawing
     Add-Type -AssemblyName PresentationFramework
-    . $WorkingDir\SandboxTest.ps1
+    . $WorkingDir\shared\SandboxTest.ps1
     
     function Get-ScriptMappings {
         <#
@@ -3607,7 +3607,7 @@ function Start-WSBTesting {
                 }
                 
                 # Load sandbox script
-                . $WorkingDir\SandboxTest.ps1
+                . $WorkingDir\shared\SandboxTest.ps1
 
                 # Call the function
                 SandboxTest -MapFolder $msiDirectory -SandboxFolderName "WAU-install" -Script {
