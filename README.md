@@ -117,6 +117,7 @@ Benefits from not having to manage the settings in several places when testing e
       - **Installer**: if the chosen folder contains `install.*`
       - **Explorer**: a general script opening the selected mapped folder in **WSB**
 - A file browser for specifically selecting the file to run is also included
+- Install predefined sets of applications via **WinGet** using custom package lists
 - The preconfigured **[Windows Sandbox (WSB)](#wsb)** started is a really good platform with downloadable tools for quick testing a lot as a developer
 - Only interested in **Windows Sandbox (WSB)** automation and **WinGet**:
   - Try [SandboxStart](https://github.com/KnifMelti/SandboxStart)!
@@ -149,7 +150,7 @@ Benefits from not having to manage the settings in several places when testing e
 #### Managed by GPO (central/local)
 ![image](Sources/assets/Screenshot_GPO.png)
 #### SandboxTest
-![image](Sources/assets/SandboxTest.png) ![image](Sources/assets/List.png)
+<img src="Sources/assets/SandboxTest.png" alt="SandboxTest" width="48%" style="vertical-align: top"> <img src="Sources/assets/List.png" alt="List" width="48%" style="vertical-align: top">
 #### WSB
 ![image](Sources/assets/WSB.png)
 #### Uninstallation
