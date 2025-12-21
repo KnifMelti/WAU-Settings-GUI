@@ -149,7 +149,7 @@ Benefits from not having to manage the settings in several places when testing e
 #### Managed by GPO (central/local)
 ![image](Sources/assets/Screenshot_GPO.png)
 #### SandboxTest
-![image](Sources/assets/SandboxTest.png)
+![image](Sources/assets/SandboxTest.png) ![image](Sources/assets/List.png)
 #### WSB
 ![image](Sources/assets/WSB.png)
 #### Uninstallation
