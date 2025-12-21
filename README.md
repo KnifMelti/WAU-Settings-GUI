@@ -150,7 +150,7 @@ Benefits from not having to manage the settings in several places when testing e
 #### Managed by GPO (central/local)
 ![image](Sources/assets/Screenshot_GPO.png)
 #### SandboxTest
-<img src="Sources/assets/SandboxTest.png" alt="SandboxTest" width="48%" style="vertical-align: top"> <img src="Sources/assets/List.png" alt="List" width="48%" style="vertical-align: top">
+<img src="Sources/assets/SandboxTest.png" alt="SandboxTest" width="49%"> <img src="Sources/assets/List.png" alt="List" width="49%">
 #### WSB
 ![image](Sources/assets/WSB.png)
 #### Uninstallation
