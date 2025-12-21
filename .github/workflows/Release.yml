@@ -30,7 +30,7 @@ jobs:
         cd ../..
         
         # Copy SandboxTest.ps1 from shared submodule to the root
-        cp shared/SandboxTest.ps1 release-package/
+        cp Sources/shared/SandboxTest.ps1 release-package/
         
         # Create zip from contents (without extra parent directory)
         cd release-package
