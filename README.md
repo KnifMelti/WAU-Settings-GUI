@@ -7,12 +7,12 @@
 Provides a user-friendly portable standalone interface to modify every aspect of Winget-AutoUpdate (**WAU**)
 
 ### Dependencies
-This project depends on the following repository:
+This project depends on the following repositories:
+- [KnifMelti/SandboxTest-Shared](https://github.com/KnifMelti/SandboxTest-Shared): a shared Git submodule for **SandboxTest**
 - [Winget-AutoUpdate](https://github.com/Romanitho/Winget-AutoUpdate): has all the settings this project can handle/modify/save/restore/share/test and document
 
 If **WAU** is not installed, it will prompt to download and install with standard settings.
 
-> It also depends on the [KnifMelti/SandboxTest-Shared](https://github.com/KnifMelti/SandboxTest-Shared) repository as a **Submodule**.
 ---
 
 ### Description
