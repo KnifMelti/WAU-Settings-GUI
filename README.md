@@ -8,8 +8,8 @@ Provides a user-friendly portable standalone interface to modify every aspect of
 
 ### Dependencies
 This project depends on the following repositories:
-- [KnifMelti/SandboxTest-Shared](https://github.com/KnifMelti/SandboxTest-Shared): a shared Git submodule for **SandboxTest**
 - [Winget-AutoUpdate](https://github.com/Romanitho/Winget-AutoUpdate): has all the settings this project can handle/modify/save/restore/share/test and document
+- [KnifMelti/SandboxTest-Shared](https://github.com/KnifMelti/SandboxTest-Shared): a shared Git submodule for **SandboxTest**
 
 If **WAU** is not installed, it will prompt to download and install with standard settings.
 
