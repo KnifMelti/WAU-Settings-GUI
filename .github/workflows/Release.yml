@@ -14,24 +14,23 @@ jobs:
     
     - name: Create release package
       run: |
-        # Create structure that matches development environment
-        # ProjectRoot/
-        #   Sources/
-        #     WAU Settings GUI/
-        #       WAU-Settings-GUI.ps1
-        #   shared/
-        #     SandboxTest.ps1
+        # Create flat structure with files directly in root
+        # release-package/
+        #   WAU-Settings-GUI.ps1
+        #   SandboxTest.ps1
+        #   config/
+        #   modules/
+        #   ...
         
-        mkdir -p release-package/Sources/WAU\ Settings\ GUI
-        mkdir -p release-package/shared
+        mkdir -p release-package
         
         # Copy main files (excluding build scripts and old SandboxTest.ps1)
         cd "Sources/WAU Settings GUI"
-        find . -type f ! -name "compile_and_sign.ps1" ! -name "sign_exe.ps1" ! -name "SandboxTest.ps1" -exec cp --parents {} ../../release-package/Sources/WAU\ Settings\ GUI/ \;
+        find . -type f ! -name "compile_and_sign.ps1" ! -name "sign_exe.ps1" ! -name "SandboxTest.ps1" -exec cp --parents {} ../../release-package/ \;
         cd ../..
         
-        # Copy SandboxTest.ps1 from shared submodule to the root of Sources/WAU Settings GUI
-        cp shared/SandboxTest.ps1 release-package/Sources/WAU\ Settings\ GUI/
+        # Copy SandboxTest.ps1 from shared submodule to the root
+        cp shared/SandboxTest.ps1 release-package/
         
         # Create zip from contents (without extra parent directory)
         cd release-package
