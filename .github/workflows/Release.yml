@@ -18,19 +18,21 @@ jobs:
         # release-package/
         #   WAU-Settings-GUI.ps1
         #   SandboxTest.ps1
+        #   Show-SandboxTestDialog.ps1
         #   config/
         #   modules/
         #   ...
         
         mkdir -p release-package
         
-        # Copy main files (excluding build scripts and old SandboxTest.ps1)
+        # Copy main files (excluding build scripts and files from shared submodule)
         cd "Sources/WAU Settings GUI"
-        find . -type f ! -name "compile_and_sign.ps1" ! -name "sign_exe.ps1" ! -name "SandboxTest.ps1" -exec cp --parents {} ../../release-package/ \;
+        find . -type f ! -name "compile_and_sign.ps1" ! -name "sign_exe.ps1" ! -name "SandboxTest.ps1" ! -name "Show-SandboxTestDialog.ps1" -exec cp --parents {} ../../release-package/ \;
         cd ../..
         
-        # Copy SandboxTest.ps1 from shared submodule to the root
+        # Copy shared submodule files to the root
         cp Sources/shared/SandboxTest.ps1 release-package/
+        cp Sources/shared/Show-SandboxTestDialog.ps1 release-package/
         
         # Create zip from contents (without extra parent directory)
         cd release-package
