@@ -118,6 +118,7 @@ Benefits from not having to manage the settings in several places when testing e
       - **Explorer**: a general script opening the selected mapped folder in **WSB**
 - A file browser for specifically selecting the file to run is also included
 - Install predefined sets of applications via **WinGet** using custom package lists
+- **WSB** Configuration - Control network access, memory allocation, and GPU virtualization
 - The preconfigured **[Windows Sandbox (WSB)](#wsb)** started is a really good platform with downloadable tools for quick testing a lot as a developer
 - Only interested in **Windows Sandbox (WSB)** automation and **WinGet**:
   - Try [SandboxStart](https://github.com/KnifMelti/SandboxStart)
