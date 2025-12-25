@@ -105,7 +105,7 @@ Benefits from not having to manage the settings in several places when testing e
   - A repair is automatically performed if files are corrupted/missing when starting
 
 ### SandboxTest
-- **Microsoft** developed a script for prepping and starting a **Windows Sandbox (WSB)** environment for installing/validating local **WinGet** manifests:
+- **Microsoft** developed a script for prepping and starting a **Windows Sandbox (WSB)** environment for validating/installing local **WinGet** manifests:
   - https://github.com/microsoft/winget-pkgs/blob/master/doc/README.md#in-windows-sandbox
   - Sandbox requirements: Windows 10/11 Pro/Enterprise/Education (Win10: version 1903+)/Virtualization enabled in BIOS (Intel VT-x or AMD-V)/Minimum 4 GB RAM, 2 CPU cores
 - Now incorporated (heavily modified) in **WAU Settings GUI** for testing the installation of **WAU** (with generated transform) and be able to fully test **WinGet** installations/updates via **WAU** in the virtual environment
