@@ -110,7 +110,7 @@ Benefits from not having to manage the settings in several places when testing e
   - Sandbox requirements: Windows 10/11 Pro/Enterprise/Education (Win10: version 1903+)/Virtualization enabled in BIOS (Intel VT-x or AMD-V)/Minimum 4 GB RAM, 2 CPU cores
 - Now incorporated (heavily modified) in **WAU Settings GUI** for testing the installation of **WAU** (with generated transform) and be able to fully test **WinGet** installations/updates via **WAU** in the virtual environment
 - A standalone **[SandboxTest](#sandboxtest-1)** shortcut is also created in the **Start Menu** (the first time `[wsb]` is used with **WSB** installed) for more advanced testing, including recognition of files in the selected folder
-  - For full documentation see: [SandboxStart](https://github.com/KnifMelti/SandboxStart)
+  - For full detailed documentation see: [SandboxStart](https://github.com/KnifMelti/SandboxStart)
 - The preconfigured **[Windows Sandbox (WSB)](#wsb)** started is a really good platform with downloadable tools for quick testing a lot as a developer
 
 ### Uninstallation
