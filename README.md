@@ -110,18 +110,8 @@ Benefits from not having to manage the settings in several places when testing e
   - Sandbox requirements: Windows 10/11 Pro/Enterprise/Education (Win10: version 1903+)/Virtualization enabled in BIOS (Intel VT-x or AMD-V)/Minimum 4 GB RAM, 2 CPU cores
 - Now incorporated (heavily modified) in **WAU Settings GUI** for testing the installation of **WAU** (with generated transform) and be able to fully test **WinGet** installations/updates via **WAU** in the virtual environment
 - A standalone **[SandboxTest](#sandboxtest-1)** shortcut is also created in the **Start Menu** (the first time `[wsb]` is used with **WSB** installed) for more advanced testing, including recognition of files in the selected folder
-- A **Script Mapping Configuration** in `wsb\script-mappings.txt` determines what is chosen
-  - 4 predefined scripts are included (create your own and save/load) chosen by recognition:
-      - **InstallWSB**: if the chosen folder contains files created from `[wsb]`
-      - **WinGetManifest**: if the chosen folder contains **WinGet** manifests
-      - **Installer**: if the chosen folder contains `install.*`
-      - **Explorer**: a general script opening the selected mapped folder in **WSB**
-- A file browser for specifically selecting the file to run is also included
-- Install predefined sets of applications via **WinGet** using custom package lists
-- **WSB** Configuration - Control network access, memory allocation, and GPU virtualization
+  - Full documentation at: [SandboxStart](https://github.com/KnifMelti/SandboxStart)
 - The preconfigured **[Windows Sandbox (WSB)](#wsb)** started is a really good platform with downloadable tools for quick testing a lot as a developer
-- Only interested in **Windows Sandbox (WSB)** automation and **WinGet**:
-  - Try [SandboxStart](https://github.com/KnifMelti/SandboxStart)
 
 ### Uninstallation
 - Use **[Programs and Features](#uninstallation-1)** in **Control Panel** to uninstall **KnifMelti WAU Settings GUI**
