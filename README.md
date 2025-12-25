@@ -122,7 +122,7 @@ Benefits from not having to manage the settings in several places when testing e
   #i.e.:
   "%USERPROFILE%\AppData\Local\Microsoft\WinGet\Packages\KnifMelti.WAU-Settings-GUI_Microsoft.Winget.Source_8wekyb3d8bbwe\UnInst.exe" /UNINSTALL /S
   ```
-- This will remove everything, including the **Portable WinGet Package** from the source (it will not show up in the **WinGet** installed list anymore)
+- This will remove everything, including the **Portable WinGet Package** (`WAU Settings GUI`) from the source (it will not show up in the **WinGet** installed list anymore)
 - **WAU** will be automatically reinstalled afterward restoring the current showing configuration
   - Stores source in `%ProgramData%\Package Cache\[GUID][LONGVERSION]` (enables **WAU** `Repair` in **Programs and Features**)
 
