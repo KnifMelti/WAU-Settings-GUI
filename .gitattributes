@@ -1,0 +1,35 @@
+# PowerShell files must have Windows line endings
+*.ps1 text eol=crlf
+*.psm1 text eol=crlf
+*.psd1 text eol=crlf
+
+# WPF XAML files
+*.xaml text eol=crlf
+
+# Windows Sandbox configuration
+*.wsb text eol=crlf
+
+# AutoHotkey scripts
+*.ahk text eol=crlf
+
+# Text configuration files
+*.txt text eol=crlf
+*.ini text eol=crlf
+*.cfg text eol=crlf
+
+# JSON and YAML
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Markdown documentation
+*.md text eol=lf
+
+# Binary files (no line ending conversion)
+*.exe binary
+*.dll binary
+*.ico binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.zip binary

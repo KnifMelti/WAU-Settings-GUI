@@ -22,15 +22,22 @@ jobs:
         #   config/
         #   modules/
         #   ...
-        
+
         mkdir -p release-package
-        
+
         # Copy main files (excluding build scripts and files from shared submodule)
         cd "Sources/WAU Settings GUI"
         find . -type f ! -name "compile_and_sign.ps1" ! -name "sign_exe.ps1" ! -name "SandboxTest.ps1" ! -name "Show-SandboxTestDialog.ps1" -exec cp --parents {} ../../release-package/ \;
         cd ../..
-        
-        # Copy shared submodule files to the root
+
+        # Ensure proper line endings for submodule files
+        # The .gitattributes in the submodule enforces CRLF, so we ensure it's applied
+        cd Sources/shared
+        git config core.autocrlf true
+        git checkout --force HEAD
+        cd ../..
+
+        # Copy shared submodule files to the root (now with correct line endings)
         cp Sources/shared/SandboxTest.ps1 release-package/
         cp Sources/shared/Show-SandboxTestDialog.ps1 release-package/
         
