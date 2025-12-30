@@ -2704,9 +2704,11 @@ function Start-WSBTesting {
                 
                 # Load sandbox script from root
                 $sandboxTestPath = "$Script:WorkingDir\SandboxTest.ps1"
+                $sharedHelpers = "$Script:WorkingDir\Shared-Helpers.ps1"
                 
                 if (Test-Path $sandboxTestPath) {
                     . $sandboxTestPath
+                    . $sharedHelpers
                 } else {
                     [System.Windows.MessageBox]::Show(
                         "SandboxTest.ps1 not found in: $sandboxTestPath",
