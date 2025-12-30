@@ -54,6 +54,7 @@ if ($SandboxTest.IsPresent) {
     
     # Load SandboxTest.ps1 and Show-SandboxTestDialog.ps1 (from shared Submodule)
     . "$WorkingDir\SandboxTest.ps1"
+    . "$WorkingDir\Shared-Helpers.ps1"
     . "$WorkingDir\Show-SandboxTestDialog.ps1"
 
     exit
