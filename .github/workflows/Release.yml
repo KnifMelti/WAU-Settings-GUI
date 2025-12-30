@@ -39,6 +39,7 @@ jobs:
 
         # Copy shared submodule files to the root (now with correct line endings)
         cp Sources/shared/SandboxTest.ps1 release-package/
+        cp Sources/shared/Shared-Helpers.ps1 release-package/
         cp Sources/shared/Show-SandboxTestDialog.ps1 release-package/
         
         # Create zip from contents (without extra parent directory)
