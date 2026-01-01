@@ -27,7 +27,7 @@ jobs:
 
         # Copy main files (excluding build scripts and files from shared submodule)
         cd "Sources/WAU Settings GUI"
-        find . -type f ! -name "compile_and_sign.ps1" ! -name "sign_exe.ps1" ! -name "SandboxTest.ps1" ! -name "Show-SandboxTestDialog.ps1" -exec cp --parents {} ../../release-package/ \;
+        find . -type f ! -name "compile_and_sign.ps1" ! -name "sign_exe.ps1" ! -name "SandboxTest.ps1" ! -name "Shared-Helpers.ps1" ! -name "Show-SandboxTestDialog.ps1" -exec cp --parents {} ../../release-package/ \;
         cd ../..
 
         # Ensure proper line endings for submodule files
