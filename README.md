@@ -16,7 +16,7 @@ If **WAU** is not installed, it will prompt to download and install with standar
 ---
 
 ### Description
-Significantly enhance **WAU's** usability for home admin users while maintaining enterprise-grade functionality.<br>
+Significantly enhance **WAU's** usability for home admin users while maintaining all enterprise functionality.<br>
 Benefits from not having to manage the settings in several places when testing etc. (great for developers)...
 
 ...a perfect companion for those supporting the community (if the community actually uses it!) - being able to ask for a screenshot of the settings because it comes with all included (even a screenshot function masking potentially sensitive data)!
