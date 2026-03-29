@@ -3778,17 +3778,40 @@ function New-WindowScreenshot {
             $controls.AzureBlobSASURLTextBox.Text = Hide-SensitiveText $originalAzureBlob
         }
 
-        # Force UI update to show masked values
-        [System.Windows.Forms.Application]::DoEvents()
-        Start-Sleep -Milliseconds 100
+        # Force layout recalculation before capturing
+        $window.UpdateLayout()
 
-        # Ensure window is active/focused
-        $window.Activate()
-        $window.Focus()
-        Start-Sleep -Milliseconds 50
+        # Get DPI scale (handles high-DPI screens correctly)
+        $dpiScale = [System.Windows.PresentationSource]::FromVisual($window).CompositionTarget.TransformToDevice.M11
 
-        # Send Alt+Print Screen to capture active window
-        [System.Windows.Forms.SendKeys]::SendWait("%{PRTSC}")
+        # Grid.ActualWidth/Height + its Margin = exact window client area
+        # (window.ActualWidth/RenderSize can include extra space on SizeToContent windows)
+        $content     = $window.Content
+        $pixelWidth  = [int](($content.ActualWidth  + $content.Margin.Left + $content.Margin.Right)  * $dpiScale)
+        $pixelHeight = [int](($content.ActualHeight + $content.Margin.Top  + $content.Margin.Bottom) * $dpiScale)
+        $wpfDpi      = 96 * $dpiScale
+
+        # Render window directly to bitmap (synchronous – no message queue)
+        $renderBitmap = New-Object System.Windows.Media.Imaging.RenderTargetBitmap(
+            $pixelWidth, $pixelHeight, $wpfDpi, $wpfDpi,
+            [System.Windows.Media.PixelFormats]::Pbgra32
+        )
+        $renderBitmap.Render($window)
+        $renderBitmap.Freeze()
+
+        # Encode bitmap to PNG stream (avoids OLE clipboard contention from SetImage)
+        $pngEncoder = New-Object System.Windows.Media.Imaging.PngBitmapEncoder
+        $pngEncoder.Frames.Add([System.Windows.Media.Imaging.BitmapFrame]::Create($renderBitmap))
+        $pngStream = New-Object System.IO.MemoryStream
+        $pngEncoder.Save($pngStream)
+        $pngStream.Seek(0, [System.IO.SeekOrigin]::Begin) | Out-Null
+
+        # Build DataObject and copy to clipboard
+        # SetDataObject with $false skips OleFlushClipboard (avoids CLIPBRD_E_CANT_OPEN)
+        $dataObj = New-Object System.Windows.DataObject
+        $dataObj.SetData("PNG", $pngStream)
+        $dataObj.SetImage($renderBitmap)
+        [System.Windows.Clipboard]::SetDataObject($dataObj, $false)
 
         # Show confirmation
         $controls.StatusBarText.Text = "Screenshot copied"
@@ -5536,6 +5559,9 @@ function Show-WAUSettingsGUI {
    }) | Out-Null
     
     Test-WAULists -controls $controls -updatedConfig $currentConfig
+
+    # Limit window height to screen working area (handles DPI scaling > 100%)
+    $window.MaxHeight = [System.Windows.SystemParameters]::WorkArea.Height
 
    # Show window
     $window.ShowDialog() | Out-Null
