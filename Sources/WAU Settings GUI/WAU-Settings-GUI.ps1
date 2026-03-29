@@ -1625,14 +1625,40 @@ function Import-WAUSettingsFromFile {
                             }
                         }
                     }
+                    'WAU_UpdateDeadlineDays' {
+                        $deadlineDays = $null
+                        if ($valueData -match 'dword:(\w+)') {
+                            $deadlineDays = [int]"0x$($matches[1])"
+                        } elseif ($valueData -match '^"(\d+)"$') {
+                            $deadlineDays = [int]$matches[1]
+                        }
+                        if ($null -ne $deadlineDays -and $deadlineDays -ge 0 -and $deadlineDays -le 30) {
+                            $Controls.UpdateDeadlineDaysComboBox.SelectedIndex = $deadlineDays
+                        }
+                    }
+                    'WAU_ReminderIntervalDays' {
+                        $reminderDays = $null
+                        if ($valueData -match 'dword:(\w+)') {
+                            $reminderDays = [int]"0x$($matches[1])"
+                        } elseif ($valueData -match '^"(\d+)"$') {
+                            $reminderDays = [int]$matches[1]
+                        }
+                        if ($null -ne $reminderDays -and $reminderDays -ge 1 -and $reminderDays -le 14) {
+                            $Controls.ReminderIntervalDaysComboBox.SelectedIndex = $reminderDays - 1
+                        }
+                    }
+                    'WAU_CompanyName' {
+                        $Controls.CompanyNameTextBox.Text = ($valueData -replace '^"|"$', '') -replace '\\\\', '\'
+                    }
                 }
             }
         }
-        
+
         # Update dependent states after importing all values
         Update-StatusDisplay -Controls $Controls
         Update-MaxLogSizeState -Controls $Controls
         Update-PreReleaseCheckBoxState -Controls $Controls
+        Update-DeadlineState -Controls $Controls
     }
     catch {
         throw "Could not parse file: $($_.Exception.Message)"
@@ -2062,7 +2088,14 @@ function New-MSITransformFromControls {
         } else {
             '1048576'
         }
-        
+        $properties['UPDATEDEADLINEDAYS'] = if ($controls.UpdateDeadlineDaysComboBox.SelectedItem) {
+            [int]$controls.UpdateDeadlineDaysComboBox.SelectedItem.Content
+        } else { 0 }
+        $properties['REMINDERINTERVALDAYS'] = if ($controls.ReminderIntervalDaysComboBox.SelectedItem) {
+            $controls.ReminderIntervalDaysComboBox.SelectedItem.Content
+        } else { '2' }
+        $properties['COMPANYNAME'] = $controls.CompanyNameTextBox.Text
+
         # Add/Update all properties in the modified database
         foreach ($propName in $properties.Keys) {
             $propValue = $properties[$propName]
@@ -2117,7 +2150,9 @@ function New-MSITransformFromControls {
                 'DISABLEWAUAUTOUPDATE', 'UPDATEPRERELEASE', 'DONOTRUNONMETERED',
                 'STARTMENUSHORTCUT', 'DESKTOPSHORTCUT', 'APPINSTALLERSHORTCUT',
                 'UPDATESATLOGON', 'USERCONTEXT', 'BYPASSLISTFORUSERS', 'USEWHITELIST',
-                'MAXLOGFILES', 'MAXLOGSIZE', 'REBOOT'
+                'MAXLOGFILES', 'MAXLOGSIZE',
+                'UPDATEDEADLINEDAYS', 'REMINDERINTERVALDAYS', 'COMPANYNAME',
+                'REBOOT'
             )
             
             $propertiesSummary = ($propertyOrder | ForEach-Object {
@@ -3214,6 +3249,14 @@ function Update-MaxLogSizeState {
         $controls.MaxLogSizeComboBox.IsEnabled = $true
     }
 }
+function Update-DeadlineState {
+    param($controls)
+    # Only enable dependent controls if the main ComboBox itself is enabled (respects GPO mode)
+    $isEnabled = ($controls.UpdateDeadlineDaysComboBox.IsEnabled) -and
+                 ($controls.UpdateDeadlineDaysComboBox.SelectedItem.Content -ne "0")
+    $controls.ReminderIntervalDaysComboBox.IsEnabled = $isEnabled
+    $controls.CompanyNameTextBox.IsEnabled = $isEnabled
+}
 function Update-PreReleaseCheckBoxState {
     param($controls)
 
@@ -3281,8 +3324,9 @@ function Update-GPOManagementState {
         Update-StatusDisplay -Controls $controls
         Update-MaxLogSizeState -Controls $controls
         Update-PreReleaseCheckBoxState -Controls $controls
+        Update-DeadlineState -Controls $controls
     }
-    
+
     return $gpoControlsActive
 }
 function Update-WAUGUIFromConfig {
@@ -3417,6 +3461,36 @@ function Update-WAUGUIFromConfig {
         $Controls.MaxLogSizeComboBox.Text = $maxLogSize
     }
 
+    # Update Deadline settings
+    $deadlineDays = (Get-DisplayValue -PropertyName "WAU_UpdateDeadlineDays" -Config $updatedConfig -Policies $updatedPolicies).ToString()
+    try {
+        $deadlineDaysInt = [int]$deadlineDays
+        if ($deadlineDaysInt -ge 0 -and $deadlineDaysInt -le 30) {
+            $Controls.UpdateDeadlineDaysComboBox.SelectedIndex = $deadlineDaysInt
+        } else {
+            $Controls.UpdateDeadlineDaysComboBox.SelectedIndex = 0
+        }
+    } catch {
+        $Controls.UpdateDeadlineDaysComboBox.SelectedIndex = 0
+    }
+
+    $reminderDays = (Get-DisplayValue -PropertyName "WAU_ReminderIntervalDays" -Config $updatedConfig -Policies $updatedPolicies).ToString()
+    try {
+        $reminderDaysInt = [int]$reminderDays
+        if ($reminderDaysInt -ge 1 -and $reminderDaysInt -le 14) {
+            $Controls.ReminderIntervalDaysComboBox.SelectedIndex = $reminderDaysInt - 1
+        } else {
+            $Controls.ReminderIntervalDaysComboBox.SelectedIndex = 1  # Default: 2 days
+        }
+    } catch {
+        $Controls.ReminderIntervalDaysComboBox.SelectedIndex = 1
+    }
+
+    $Controls.CompanyNameTextBox.Text = (Get-DisplayValue -PropertyName "WAU_CompanyName" -Config $updatedConfig -Policies $updatedPolicies).ToString()
+
+    # Update ReminderInterval/CompanyName enabled state
+    Update-DeadlineState -Controls $Controls
+
     # Update information section
     $Controls.WAUSettingsVersionText.Text = $Script:WAU_GUI_VERSION
     $Controls.WAUVersionText.Text = $Script:WAU_VERSION  
@@ -3532,6 +3606,7 @@ function Update-WAUGUIFromConfig {
     Update-StatusDisplay -Controls $controls
     Update-MaxLogSizeState -Controls $controls
     Update-PreReleaseCheckBoxState -Controls $controls
+    Update-DeadlineState -Controls $controls
 
     # Check if we're being called from a save operation by checking if we're in GPO mode
     $gpoControlsActive = Get-WAUPoliciesStatus
@@ -3963,8 +4038,23 @@ function Test-SettingsChanged {
                 $controls.MaxLogSizeComboBox.Text 
             }
             if ($savedMaxLogSize -ne $guiMaxLogSize) { $changes += "Max Log Size" }
+
+            # Update Deadline settings
+            $savedDeadlineDays = Get-DisplayValue "WAU_UpdateDeadlineDays" $currentConfig $policies
+            $guiDeadlineDays = $controls.UpdateDeadlineDaysComboBox.SelectedItem.Content
+            if ($savedDeadlineDays -ne $guiDeadlineDays) { $changes += "Update Deadline Days" }
+
+            $savedReminderDays = Get-DisplayValue "WAU_ReminderIntervalDays" $currentConfig $policies
+            $guiReminderDays = if ($controls.ReminderIntervalDaysComboBox.SelectedItem) {
+                [int]$controls.ReminderIntervalDaysComboBox.SelectedItem.Content
+            } else { 2 }
+            if ($savedReminderDays -ne $guiReminderDays) { $changes += "Reminder Interval Days" }
+
+            $savedCompanyName = Get-DisplayValue "WAU_CompanyName" $currentConfig $policies
+            $guiCompanyName = $controls.CompanyNameTextBox.Text
+            if ($savedCompanyName -ne $guiCompanyName) { $changes += "Company Name" }
         }
-        
+
         return @{
             HasChanges = ($changes.Count -gt 0)
             Changes = $changes
@@ -4076,8 +4166,13 @@ function Save-WAUSettings {
                 WAU_UseWhiteList = if ($controls.UseWhiteListCheckBox.IsChecked) { 1 } else { 0 }
                 WAU_MaxLogFiles = $controls.MaxLogFilesComboBox.SelectedItem.Content
                 WAU_MaxLogSize = if ($controls.MaxLogSizeComboBox.SelectedItem -and $controls.MaxLogSizeComboBox.SelectedItem.Tag) { $controls.MaxLogSizeComboBox.SelectedItem.Tag } else { $controls.MaxLogSizeComboBox.Text }
+                WAU_UpdateDeadlineDays = [int]$controls.UpdateDeadlineDaysComboBox.SelectedItem.Content
+                WAU_ReminderIntervalDays = if ($controls.ReminderIntervalDaysComboBox.SelectedItem) {
+                    [int]$controls.ReminderIntervalDaysComboBox.SelectedItem.Content
+                } else { 2 }
+                WAU_CompanyName = $controls.CompanyNameTextBox.Text
             }
-            
+
             # Save settings
             if (Set-WAUConfig -Settings $newSettings) {
                 # Update status to "Done"
@@ -4295,10 +4390,24 @@ function Show-WAUSettingsGUI {
     $controls.UpdateTimeMinuteComboBox.SelectedIndex = 0  # For minute 00
 
     # Set initial values for MaxLogFiles ComboBox programmatically
-    0..99 | ForEach-Object { 
+    0..99 | ForEach-Object {
         $item = New-Object System.Windows.Controls.ComboBoxItem
         $item.Content = [string]$_
         $controls.MaxLogFilesComboBox.Items.Add($item) | Out-Null
+    }
+
+    # UpdateDeadlineDays ComboBox: 0-30 (0 = disabled)
+    0..30 | ForEach-Object {
+        $item = New-Object System.Windows.Controls.ComboBoxItem
+        $item.Content = [string]$_
+        $controls.UpdateDeadlineDaysComboBox.Items.Add($item) | Out-Null
+    }
+
+    # ReminderIntervalDays ComboBox: 1-14
+    1..14 | ForEach-Object {
+        $item = New-Object System.Windows.Controls.ComboBoxItem
+        $item.Content = [string]$_
+        $controls.ReminderIntervalDaysComboBox.Items.Add($item) | Out-Null
     }
 
     # Event handler for interval change
@@ -4318,6 +4427,11 @@ function Show-WAUSettingsGUI {
     # Event handler for MaxLogFiles change
     $controls.MaxLogFilesComboBox.Add_SelectionChanged({
         Update-MaxLogSizeState -Controls $controls
+    })
+
+    # Event handler for UpdateDeadlineDays change
+    $controls.UpdateDeadlineDaysComboBox.Add_SelectionChanged({
+        Update-DeadlineState -Controls $controls
     })
 
     # Event handlers for path TextBox input validation
